@@ -8,8 +8,7 @@
 
 ## [Unreleased]
 
-### Planned (post v1.8, per `docs/blueprint-v2.md`)
-- I 波 v1.9：非结构 2D 三角网格 + meshio adapter
+### Planned (post v1.9, per `docs/blueprint-v2.md`)
 - J 波 v2.0：boundary extraction + SVG/DXF/STL 几何输出
 - K 波 v2.0-final：tutorial v2 + rubric ≥95 收口
 
@@ -19,6 +18,63 @@
 - F 波（应力约束）仅做 verification-time 检查；SIMP 梯度集成（adjoint method）留给未来 ADR
 - G 波 algorithm plug-in 抽象：基于 ABC + 注册表（同 solver backend 模式）
 - H 波 scipy 作为 optional dep（`[project.optional-dependencies].sparse`）；runtime mandatory 仍仅 NumPy
+- I 波 triangle mesh **只支持 linear elastic solve，不支持 SIMP**：SIMP-on-triangles 是独立的大重构（adjoint sensitivity 在三角元素上需重新推导），留到未来 wave
+
+---
+
+## [1.9.0] — 2026-05-16
+
+### 非结构 2D 三角网格 + meshio adapter（Wave I）
+
+第五个 v2 增量：CST（Constant Strain Triangle）单元 + `TriangleMesh` + `MeshioReader`。可以读 .msh / .vtk / .vtu / .xdmf 等格式的 2D 三角网格，做线弹性求解。
+
+### Added
+- **`core/triangle.py`** — CST 三角元素 + 三角网格
+  - `triangle_stiffness(E, ν, node_coords, thickness) -> (ke, area)` — 6×6 plane-stress stiffness
+  - `TriangleMesh` dataclass：nodes + elements + ndof + element_dofs + element_area + select_nodes_in_box
+  - `solve_tri_linear_elastic(...)` — assemble + solve（支持四种 solver backend）
+  - 内部 `_assemble_tri_dense` + `_assemble_tri_sparse`（向量化 COO → CSR）
+- **`adapters/mesh_source.py`** — meshio 读入
+  - `MeshSource` ABC（未来可加 GmshScript / Triangle / FreeCAD 等其他 reader）
+  - `MeshioReader` 实现：读任意 meshio 支持格式 → TriangleMesh
+  - meshio 不可用时 raises RuntimeError 明确提示
+  - `meshio_available()` 函数（动态查询）
+- **`pyproject.toml` 新 optional-dependencies 组 `mesh = ["meshio>=5.0"]`**
+- **`tests/test_triangle_mesh.py`** — 22 个测试：
+  - CST 数学：unit-right-triangle SPD + 6 RBM (3 zero eigenvalues)、E 线性缩放、几何相似下不变、退化拒、shape 拒
+  - TriangleMesh：n_nodes / n_elements / ndof / element_dofs / element_area / select_nodes_in_box
+  - solve_tri：positive compliance + finite displacements + strain energies ≥ 0
+  - 四 backend 一致性：sparse / dense / cg 1e-6 relative；displacements 1e-9 close
+  - 错误路径：density size mismatch / 全 DOFs fixed
+  - density 线性缩放：half density → 2× compliance（确认线性力学性质）
+  - meshio I/O：write .vtu → read → 完全一致（nodes + elements）
+  - meshio: 拒绝无 triangle cells 的 mesh；混合时只取第一个 triangle 块
+  - 端到端：write .vtu → read → solve_tri → positive compliance
+  - MeshSource ABC 不可直接实例化
+
+### Changed
+- `pyproject.toml` — 增 `[[tool.mypy.overrides]] module = "meshio.*"`
+- `pyproject.toml` version: 1.8.0 → 1.9.0
+
+### Coverage
+- 全测试 221 → **243** (+22)
+- `core/triangle.py`: **100%**
+- `adapters/mesh_source.py`: 测试覆盖（通过 importorskip）
+- 整体覆盖率：93.1% → **93.4%**
+
+### Engineering principles
+- 不复用 `StructuredMesh`：tri mesh 是独立类型，避免 quad/tri 杂交的方法分发污染
+- meshio 输入是一次性 adapter：不持有 meshio 引用，只取 nodes + triangle cells
+- 红线 7.1 严守：只支持 2D triangle，3D mesh 显式拒绝
+- 红线 7.2 严守：mandatory deps 仍只是 numpy；meshio 进 `[mesh]` extra
+- SIMP-on-triangles 是诚实留白：tri solve 是"可用"的，但完整 SIMP-tri 路径要单独 ADR + 大重构
+
+### v2.x rubric 增量
+- 3.4 meshio adapter 读 2D 三角网格: +3
+- 3.5 三角元素 stiffness 实装 + 测试: +2
+- 3.6 非结构网格 + 三角元素 benchmark: +3（meshio round-trip → solve E2E 算作 benchmark）
+
+总分 37/100 → **45/100**
 
 ---
 

@@ -111,6 +111,7 @@
 | v1.6.0 (Wave F) | 18/100 | G-K 波尚未开工；测试 183 离 250 还差 67；CI 双路径未做；几何输出未做 | 应力 p-norm + KS + 1 benchmark + verification 集成 + 31 测试；core/stress.py 97.6% |
 | v1.7.0 (Wave G) | 29/100 | H-K 波尚未开工；测试 205 离 250 还差 45；CI 双路径 / sparse / meshio / 几何输出 / tutorial v2 未做 | BESO + algorithm plug-in + CLI flag + 22 测试；algorithm_base.py 100%；core/beso.py 96.7% |
 | v1.8.0 (Wave H) | 37/100 | I-K 波尚未开工；测试 221 离 250 还差 29；CI 双路径 / meshio / 几何输出 / tutorial v2 未做 | scipy sparse + sparse_cg backend 实测 24× 加速；optional dep + 16 测试 |
+| v1.9.0 (Wave I) | 45/100 | J-K 波尚未开工；测试 243 离 250 还差 7；CI 双路径 / 几何输出 / tutorial v2 未做；SIMP-on-tri 未做（诚实留白） | CST 三角 + meshio adapter + TriangleMesh + 22 测试；core/triangle.py 100% |
 
 （每波结束后追加一行）
 
@@ -132,6 +133,11 @@
 - 3.1 scipy sparse optional backend: **+4/4**
 - 3.2 大网格 ≥3× 加速 (实测 24×): **+2/2**
 - 3.3 optional dep 分类清晰 ([sparse] group): **+2/2**
+
+### 1.9.0 (Wave I) 评分明细
+- 3.4 meshio adapter 读 2D 三角网格: **+3/3**
+- 3.5 三角元素 stiffness 实装 + 测试: **+2/2**
+- 3.6 非结构网格 + 三角元素 benchmark (meshio round-trip + E2E solve): **+3/3**
 
 
 
