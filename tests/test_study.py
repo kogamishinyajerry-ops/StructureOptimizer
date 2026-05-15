@@ -28,6 +28,7 @@ def test_study_command_generates_ranked_candidates_and_html(capsys):
     assert len(rows) >= 2
     expected_columns = {
         "rank",
+        "pareto_rank",
         "candidate_id",
         "run_dir",
         "benchmark",
@@ -55,6 +56,8 @@ def test_study_command_generates_ranked_candidates_and_html(capsys):
     html = study_html.read_text()
     assert "候选方案对比" in html
     assert "Pareto 风格对比" in html
+    assert "Pareto 前沿" in html
+    assert "pareto-summary" in html
     assert "排序规则" in html
     assert "默认排名偏向减重" in html
     assert "质量" in html
@@ -68,6 +71,9 @@ def test_study_command_generates_ranked_candidates_and_html(capsys):
     assert "查看详情" in html
     assert "optimization candidate" in html
     assert "2D/2.5D benchmark model" in html
+    # At least one candidate should be on the Pareto front in a typical run
+    assert "前沿" in html
+    assert "pareto-front" in html  # CSS class or scatter dot
 
 
 def test_study_rejects_empty_parameter_values(tmp_path, capsys):

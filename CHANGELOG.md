@@ -9,9 +9,39 @@
 ## [Unreleased]
 
 ### Planned
-- v0.7 真正 Pareto 前沿提取 + study.html 凸显前沿点
 - v0.8 求解器 adapter 稳固化（dense ⇄ sparse 透明切换，留 CalculiX/FEniCS 钩子）
 - v0.6.1 overhang 制造约束（additive manufacturing build direction）— v0.6 暂未支持
+
+---
+
+## [0.7.0] — 2026-05-16
+
+### Added (Pareto 前沿)
+- **非支配排序**（non-dominated sorting）在 study runner 中落地
+  - `_assign_pareto_ranks(rows, objectives)`：迭代剥离法，每次找当前剩余集合中非支配元素作为下一层
+  - `_dominates`：支持 minimize/maximize 混合方向
+  - 已被独立 unit test 完整覆盖（13 个测试，含混合方向 / 数值并列 / 链式支配 / 失败排除）
+- **`StudyConfig.objectives` 字段**：默认 `[{mass, minimize}, {compliance, minimize}]`
+  - 完整向后兼容：缺失字段 = 默认双目标
+  - 校验：拒绝空列表 / 非法 direction（仅接受 `minimize` / `maximize`）/ 缺失 name
+- **`candidates.csv` 新增 `pareto_rank` 列**：1 = 前沿；2+ = 被支配；空字符串 = 验证未通过（不参与前沿）
+- **`study.html` 视觉凸显前沿**：
+  - 新增 "Pareto 前沿" 摘要节，明确写出前沿候选数 + 当前目标定义
+  - 表格新增 "Pareto 前沿" 列，前沿候选显示橙色 "前沿" 徽标 + 行底色淡橙
+  - Pareto 散点图中前沿候选用橙色填充 + 白色描边
+- 验证未通过的候选（`verification_status != passed`）**不**参与前沿计算 — 工程上有意义的设计是：不挑跑挂掉的候选作为前沿"最佳"
+
+### Tests
+- 新 `tests/test_pareto.py`：13 个独立测试覆盖支配判断与非支配排序算法
+- 扩展 `tests/test_study.py`：CSV 新列断言 + study.html Pareto chip / pareto-front / pareto-summary 断言
+
+### Engineering principles
+- 不引入新依赖（纯 Python set 操作 + 简单二重循环；对 ≤ 64 候选无性能问题）
+- Pareto 与 `ranking` 字段正交：`ranking` 决定表格排序顺序，`pareto_rank` 是工程评审的独立维度
+- 失败候选不参与前沿是**有意为之**：避免推荐评审者关注"看起来低质量但其实根本跑不通"的候选
+
+### Test coverage
+41 → 54（+13 新）
 
 ---
 
