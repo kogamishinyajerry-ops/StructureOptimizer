@@ -58,6 +58,17 @@ class ExtrusionConstraintConfig:
 
 
 @dataclass(frozen=True)
+class SolverConfig:
+    """v0.8 solver-backend selector.
+
+    ``backend`` ∈ {"dense", "cg"}. Default ``dense`` preserves v0.1-v0.7
+    behavior exactly (np.linalg.solve direct factorization).
+    """
+
+    backend: str = "dense"
+
+
+@dataclass(frozen=True)
 class ManufacturingConstraintsConfig:
     """v0.6 manufacturing constraints applied during optimization.
 
@@ -90,6 +101,7 @@ class BenchmarkConfig:
     design_space: DesignSpaceConfig = field(default_factory=DesignSpaceConfig)
     load_cases: list[LoadCaseConfig] = field(default_factory=list)
     manufacturing_constraints: ManufacturingConstraintsConfig = field(default_factory=ManufacturingConstraintsConfig)
+    solver: SolverConfig = field(default_factory=SolverConfig)
     thickness: float = 1.0
     source_path: str | None = None
 
@@ -133,6 +145,7 @@ def parse_config(raw: dict[str, Any], source_path: str | None = None) -> Benchma
             for case in raw.get("load_cases", [])
         ]
         manufacturing_constraints = _parse_manufacturing_constraints(raw.get("manufacturing_constraints", {}))
+        solver = _parse_solver_config(raw.get("solver", {}))
         return BenchmarkConfig(
             name=raw["name"],
             dimension=raw["dimension"],
@@ -146,6 +159,7 @@ def parse_config(raw: dict[str, Any], source_path: str | None = None) -> Benchma
             design_space=design_space,
             load_cases=load_cases,
             manufacturing_constraints=manufacturing_constraints,
+            solver=solver,
             source_path=source_path,
         )
     except KeyError as exc:
@@ -250,6 +264,7 @@ def validate_config(config: BenchmarkConfig) -> None:
                 raise ConfigError("load case load must define nonzero fx or fy")
     _validate_design_space(config.design_space)
     _validate_manufacturing_constraints(config.manufacturing_constraints)
+    _validate_solver_config(config.solver)
 
 
 def _validate_selector_record(record: dict[str, Any], label: str) -> None:
@@ -270,6 +285,23 @@ def _validate_design_space(design_space: DesignSpaceConfig) -> None:
             selector = region.get("selector")
             if not isinstance(selector, (str, dict)):
                 raise ConfigError(f"design_space.{label} region requires a selector")
+
+
+def _parse_solver_config(raw: dict[str, Any]) -> SolverConfig:
+    if not isinstance(raw, dict):
+        raise ConfigError("solver must be an object")
+    backend = str(raw.get("backend", "dense"))
+    return SolverConfig(backend=backend)
+
+
+def _validate_solver_config(solver: SolverConfig) -> None:
+    # Import locally to avoid pulling adapters at config load time.
+    from structure_optimizer.adapters.solver_base import available_backends
+
+    if solver.backend not in available_backends():
+        raise ConfigError(
+            f"solver.backend must be one of {available_backends()}, got '{solver.backend}'"
+        )
 
 
 def _validate_manufacturing_constraints(constraints: ManufacturingConstraintsConfig) -> None:

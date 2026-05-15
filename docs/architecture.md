@@ -126,15 +126,31 @@ BenchmarkConfig (JSON)
 
 ## 4. 扩展点（adapters/）
 
-当前是 Protocol stub，标记的是**未来替换的边界**，不是当前必须实现的。
+### 4.1 LinearSolver（v0.8 起实装）
 
-- `adapters/solver_base.py` — 替换 FEA 求解器（如未来引入 scipy.sparse 后端，或 CalculiX/FEniCS spike）
-- `adapters/optimizer_base.py` — 替换优化算法（如未来引入 MMA 或多目标 Pareto driver）
-- `adapters/file_export.py` — 文件导出边界（如未来引入 VTK / mesh 格式）
+`adapters/solver_base.py` 已从 Protocol stub 升级为真实抽象：
+
+- `LinearSolver` ABC：抽象方法 `solve(matrix, rhs) -> np.ndarray`
+- `NumpyDenseSolver`：`np.linalg.solve` 直解；O(N³) cost、O(N²) memory；小规模主线
+- `NumpyCGSolver`：纯 NumPy Jacobi-preconditioned 共轭梯度迭代解；更省内存
+- `get_linear_solver(backend)` 工厂：`"dense"`（默认）/ `"cg"`
+- `available_backends()` 列出已注册名
+
+`BenchmarkConfig.solver.backend` 配置字段（默认 `"dense"`）控制选用哪个 backend，校验会拒绝未注册的名字。`fem2d.solve_linear_elastic` 内部仅通过 `get_linear_solver` 拿到实例，不直接调用 `np.linalg.solve` — 这就是抽象屏障。
+
+**未来扩展方向**（不在 v0.x 范围）：
+- scipy.sparse.linalg.spsolve / cg / minres backend：要求把 scipy 加入依赖；先评估能否被本地 NumPy CG 满足
+- CalculiX / Code_Aster file-based adapter：写入 deck → shell out → parse；引入文件 IO 路径
+- JAX-FEM 后端：评估 GPL 影响（v1+ spike）
+
+### 4.2 其他扩展点（仍为 Protocol stub）
+
+- `adapters/optimizer_base.py` — 替换优化算法（MMA / 多目标 Pareto driver / robust formulation）
+- `adapters/file_export.py` — 文件导出边界（VTK / mesh 格式 / 后处理）
 
 **约束**：
-- 引入真实实现时必须保持 `core/` 内部默认路径仍可走（不强制依赖 adapter）
-- adapter 实例化由 CLI / workflow 层装配，不在 `core/` 模块内部 import
+- 引入真实实现时必须保持 `core/` 内部默认路径仍可走（不强制依赖 adapter 配置）
+- adapter 实例化由 `core/` 内部通过工厂函数装配（如 `get_linear_solver`），CLI/workflow 不直接 import 具体类
 
 ---
 

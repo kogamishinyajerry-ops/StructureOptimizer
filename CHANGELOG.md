@@ -9,8 +9,45 @@
 ## [Unreleased]
 
 ### Planned
-- v0.8 求解器 adapter 稳固化（dense ⇄ sparse 透明切换，留 CalculiX/FEniCS 钩子）
+- v1.0 性能基线 + 已知限制清单 + README polish（可冻结里程碑）
 - v0.6.1 overhang 制造约束（additive manufacturing build direction）— v0.6 暂未支持
+- v0.9+ spike：scipy sparse / CalculiX / FEniCS 真适配（要先评估依赖影响）
+
+---
+
+## [0.8.0] — 2026-05-16
+
+### Added (求解器 adapter 稳固化)
+- **`adapters/solver_base.py` 从 Protocol stub 升级为真实抽象**：
+  - `LinearSolver` ABC：抽象方法 `solve(matrix, rhs)`
+  - `NumpyDenseSolver`（`dense`）：`np.linalg.solve` 直解，保持 v0.1-v0.7 行为完全等价
+  - `NumpyCGSolver`（`cg`）：纯 NumPy Jacobi-preconditioned 共轭梯度迭代解
+  - `get_linear_solver(backend)` 工厂 + `available_backends()` 注册查询
+  - 全模块独立 import，避免循环依赖；`SolverError` 仍在 `core/fem2d.py` 定义
+- **`BenchmarkConfig.solver.backend` 字段**：可选，默认 `"dense"`
+  - 完整向后兼容：缺失字段 = dense
+  - 校验拒绝未注册的 backend 名（启动时报错而非运行时崩溃）
+- **`fem2d.solve_linear_elastic` 透明 swap**：内部仅通过 `get_linear_solver` 取实例，不直接 `np.linalg.solve`
+
+### Refactor (内部)
+- 把硬编码 `np.linalg.solve` 调用移到 adapter 内部
+- `SolverError` 仍在 `core/fem2d.py` 定义，adapters 通过局部 import 引用（避免双向依赖）
+
+### Tests
+- 新 `tests/test_solver_adapter.py`：11 个测试
+  - 双 backend 在合成 SPD 系统上数值等价（atol 1e-7）
+  - 双 backend 在完整 FEM 流水线上工程级等价（相对误差 < 1e-5）
+  - CG 在零 rhs / 非 SPD 矩阵 / 不收敛系统上的正确异常
+  - 默认 backend 字段 = "dense" 不影响旧配置
+  - SIMP 完整循环 + CG backend 跑通
+
+### Engineering principles
+- 不引入新依赖：CG 是 100 行 NumPy；scipy sparse 留给 v0.9+ spike
+- 抽象屏障检验：`fem2d.py` 不再 import `np.linalg.solve` 直接调用；只通过 `LinearSolver.solve`
+- 文档同步：`docs/architecture.md` §4 反映 adapter 实装状态 + 未来扩展方向
+
+### Test coverage
+54 → 65（+11 新）
 
 ---
 

@@ -12,6 +12,10 @@ class SolverError(RuntimeError):
     """Raised when the FEM solve cannot complete."""
 
 
+# Defined here (not in adapters/) so SolverError can be raised by adapters
+# without an import cycle. Adapters import SolverError inside their methods.
+
+
 @dataclass(frozen=True)
 class FEMResult:
     displacements: np.ndarray
@@ -79,13 +83,13 @@ def solve_linear_elastic(
     if free.size == 0:
         raise SolverError("all degrees of freedom are fixed")
 
+    from structure_optimizer.adapters.solver_base import get_linear_solver
+
     displacements = np.zeros(mesh.ndof, dtype=float)
     kff = stiffness[np.ix_(free, free)]
     ff = force[free]
-    try:
-        displacements[free] = np.linalg.solve(kff, ff)
-    except np.linalg.LinAlgError as exc:
-        raise SolverError("singular_matrix") from exc
+    linear_solver = get_linear_solver(config.solver.backend)
+    displacements[free] = linear_solver.solve(kff, ff)
 
     element_energy = np.zeros(mesh.elements.shape[0], dtype=float)
     stress = np.zeros(mesh.elements.shape[0], dtype=float)
