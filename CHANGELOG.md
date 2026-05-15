@@ -1,0 +1,124 @@
+# Changelog
+
+本项目使用 [Keep a Changelog](https://keepachangelog.com/) 风格，版本号遵循 [SemVer](https://semver.org/)。
+
+所有日期为 ISO 8601 (`YYYY-MM-DD`)。
+
+---
+
+## [Unreleased]
+
+### Planned (v0.5 评审包收敛)
+- 共享评审包片段模块（`core/review_package.py`），统一 `demo.html` 与 `study.html` 的限制声明、指标解释和状态徽章
+- `study.html` 每个候选附带可点击的详情页（`candidate_xxx/demo.html`）
+- 双页统一中文措辞与样式来源
+
+---
+
+## [0.4.0] — 2026-05-15
+
+### Added
+- **本地参数 study runner**：`python -m structure_optimizer study --config <path>` 命令行入口
+- `studies/simple_bracket_tradeoff.json` 作为参考 study 配置
+- 支持的 study 参数：`volume_fraction`、`filter_radius`、`load_weights.<load_case_name>`
+- 候选排序（默认 `verification_status → mass → compliance → max_displacement`）
+- `runs/studies/<study_id>/` 输出目录布局：
+  - `study_input.json`：解析后的 study 配置快照
+  - `candidates.csv`：排名后的所有候选指标与参数
+  - `study.html`：候选对比静态页（Pareto 风格散点 + 排名表 + 限制说明）
+  - `candidate_NNN/`：每个候选完整的 run 产物（input.json / metrics.csv / density.png / verification.json / report.md）
+- `max_candidates` 上限保护（默认 64），避免参数矩阵爆炸
+- `tests/test_study.py`：study 命令冒烟测试 + 空参数值拒绝测试
+
+### Engineering principles
+- 本地静态 HTML 产物，不引入 OpenMDAO/Dakota 依赖
+- 仅做参数 grid search，不承担通用优化驱动职责
+
+---
+
+## [0.3.0] — 2026-05-12
+
+### Added
+- **`design_space` 工程约束对象**：在结构化网格上声明工程语义
+  - `frozen_solid` 区域：优化过程中保持 `density = 1.0`
+  - `void` 区域：优化过程中保持 `density = min_density`，质量统计按空区处理
+  - 矩形（`box`）与圆形（`circle`）`RegionSelector`
+  - 重叠 frozen / void 区域显式拒绝
+- **多载荷工况（`load_cases`）**：每个 case 带 `weight`，目标改为权重归一化后的 weighted compliance
+- **统一 `verification.json` schema**：
+  - `objective`：当前优化目标（`compliance` 或 `weighted_compliance`）
+  - `responses`：质量 / 柔度 / 最大位移 / 近似最大应力
+  - `constraints`：每条 `{name, value, limit, unit, source, status}`
+  - `load_cases`：多工况 baseline / candidate 独立验证指标
+- 报告输出分层：Objective / Responses / Constraints / Independent verification / Manufacturability warnings
+- `simple_bracket` 加入 `demo` preset，演示 frozen / void / 多载荷工况
+- `tests/test_design_space.py`：mask 一致性 + 重叠拒绝 + 多载荷工况冒烟
+
+### Engineering principles
+- 不引入 CAD、外部网格器、外部求解器或 GUI
+- 现有 `run` / `verify` / `report` / `demo` CLI 保持向后兼容
+- 缺少 `load_cases` 时旧的 `loads` 配置自动视为 `primary` 工况
+
+---
+
+## [0.2.0] — 2026-05-12
+
+### Added
+- **`demo` 命令**：`python -m structure_optimizer demo --benchmark <name> --preset <preset>`
+- `demo.html` 单次运行的静态工程评审页（中文 + popover 指标解释 + 收敛动画 + 制造性表格）
+- **粗制造性检查（`manufacturability.json`）**：
+  - `isolated_islands`：孤立材料岛
+  - `thin_member_warning`：薄构件风险
+  - `local_density_warning`：灰度密度区域
+- `tests/test_demo.py`：demo 命令产物与 manufacturability schema 测试
+
+### Engineering principles
+- 粗检查作为 warning 输出，不阻断流程，不作为投产判断依据
+- 静态 HTML 直接从磁盘打开，不依赖 web server
+
+---
+
+## [0.1.0] — 2026-05-12
+
+### Added
+- **MVP 核心闭环**：`benchmark config → mesh/model → baseline FEA → SIMP optimization → independent verification → report`
+- 5 个内置 benchmark：
+  - `mbb_beam`（2D 标准拓扑优化主线）
+  - `cantilever`（2D 载荷路径与边界条件）
+  - `l_bracket`（2D 应力集中与几何敏感性）
+  - `loaded_hook`（2D 非矩形设计域）
+  - `simple_bracket`（2.5D 厚度模型，3D 扩展接口预留）
+- CLI 入口：
+  - `python -m structure_optimizer run --benchmark <name> [--preset smoke]`
+  - `python -m structure_optimizer verify --run <path>`
+  - `python -m structure_optimizer report --run <path>`
+- `BenchmarkConfig` loader 与校验器（dataclass + 手写校验）
+- 结构化 quadrilateral mesh + 线弹性 2D FEM（NumPy dense）
+- SIMP 主循环：密度初始化 / 刚度插值 / 灵敏度计算 / 密度过滤 / OC update
+- 默认 SIMP 参数：`volume_fraction=0.4`、`penalty=3.0`、`filter_radius=1.5`、`max_iterations=120`、`change_tolerance=0.01`、`min_density=0.001`
+- 独立验证流程：连通性检查 / volume fraction 余量 / frozen-void mask 校验 / FEA 重算
+- 失败状态分类：`invalid_config` / `solver_failed` / `singular_matrix` / `volume_constraint_failed` / `connectivity_failed` / `design_space_constraint_failed` / `report_failed`
+- 运行产物（`runs/<benchmark>/<run_id>/`）：
+  - `input.json`、`metrics.csv`、`density.npy`、`density.png`
+  - `baseline.png`、`loadcase.png`、`convergence.png`、`optimization.gif`
+  - `optimization_frames/`：选定的密度演化帧
+  - `verification.json`、`report.md`
+- 测试：
+  - `tests/test_config_validation.py`：配置校验
+  - `tests/test_mbb_beam_smoke.py`：网格 / FEM / SIMP 冒烟
+  - `tests/test_run_verify_report.py`：完整 run → verify → report 路径
+
+### Engineering principles
+- 本地优先：所有功能本地可跑，零云依赖
+- 配置优先：每个 benchmark 由显式 JSON 驱动，无硬编码工况
+- 验证优先：迭代指标与独立验证指标在报告中明确区分
+- 适配器边界清晰（`adapters/solver_base.py`、`adapters/optimizer_base.py`、`adapters/file_export.py`），便于后续替换
+
+---
+
+## 文档参考
+
+- `docs/PRD-v0.1.md`：v0.1 产品定义
+- `docs/MVP-technical-plan.md`：v0.1 技术方案与 Slice 1-7
+- `docs/open-source-alignment-roadmap.md`：v0.3 / v0.4 / v0.5+ 开源对标路线
+- `docs/architecture.md`：模块边界与扩展点（M0 新增）
