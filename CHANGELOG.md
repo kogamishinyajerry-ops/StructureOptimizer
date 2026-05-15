@@ -8,8 +8,7 @@
 
 ## [Unreleased]
 
-### Planned (post v1.6, per `docs/blueprint-v2.md`)
-- G 波 v1.7：BESO 算法 + algorithm plug-in 抽象
+### Planned (post v1.7, per `docs/blueprint-v2.md`)
 - H 波 v1.8：scipy sparse optional backend
 - I 波 v1.9：非结构 2D 三角网格 + meshio adapter
 - J 波 v2.0：boundary extraction + SVG/DXF/STL 几何输出
@@ -19,6 +18,67 @@
 - overhang 制造约束已正式 deferred 到 v2.x+；理由见 `docs/decisions/D001-overhang-deferred.md`
 - v2.0 大蓝图：`docs/blueprint-v2.md` 已签发；v2.x 评分体系：`docs/quality-rubric-v2.md`
 - F 波（应力约束）仅做 verification-time 检查；SIMP 梯度集成（adjoint method）留给未来 ADR
+- G 波 algorithm plug-in 抽象：基于 ABC + 注册表（同 solver backend 模式）
+
+---
+
+## [1.7.0] — 2026-05-16
+
+### BESO 算法 + algorithm plug-in 抽象（Wave G）
+
+第三个 v2 增量：第二种 topology 算法 BESO（Bidirectional Evolutionary Structural Optimization）落地，与 SIMP 共存于统一插件接口。CLI 增 `--algorithm` flag 切换。
+
+### Added
+- **`adapters/algorithm_base.py`** — 算法 plug-in 抽象（同 `solver_base.py` 模式）
+  - `TopologyAlgorithm` ABC：契约方法 `run(config, mesh) -> OptimizationResult`
+  - `SimpAlgorithm` / `BesoAlgorithm` — 内置实现
+  - `_REGISTRY` 字典 + `available_algorithms()` + `get_algorithm(name)` 工厂
+  - 大小写不敏感；默认 `"simp"`；未知 → ValueError
+- **`core/beso.py`** — BESO 算法实装
+  - 起步全 1.0 密度，逐步演化到 `volume_fraction`
+  - 演化率 `er`（默认 0.02）每代缩减目标体积
+  - 按敏感度排序 → 阈值 cut → 顶部成 solid，底部成 min_density
+  - 完全复用 SIMP 的 `density_filter` / `apply_manufacturing_projections` / `solve_and_aggregate`
+  - 输出 `OptimizationResult` 与 SIMP 同 schema → demo/report/study 透明
+- **`OptimizationConfig.algorithm: str = "simp"`** + **`beso_er: float = 0.02`**
+  - 验证算法名在注册表内；`beso_er` ∈ (0, 1)
+- **CLI `--algorithm {simp,beso}` flag** on `structure-optimizer run`
+  - 覆盖 config 值；argparse 自动校验枚举
+- **`tests/test_beso.py`** — 22 个测试：
+  - registry：列两算法、get_algorithm 返回正确类、case-insensitive、未知报错
+  - config：默认 simp、默认 er=0.02、accept beso、拒绝 level_set / er>1 / er=0
+  - BESO 行为：reach target volume (±5%)、near-binary density (gray <5%)、honor frozen/void mask、completed not max_iter
+  - workflow 集成：默认 simp / beso override 路径都跑通
+  - CLI: --algorithm beso E2E + --algorithm genetic 被 argparse 拒
+
+### Changed
+- `core/workflow.py` —
+  - `run_benchmark(..., algorithm=None)` 新增覆盖参数（不破坏现有调用）
+  - `run_config` 通过 `get_algorithm(config.optimization.algorithm)` dispatch
+  - 移除直接的 `run_simp` 导入
+- `core/config.py` — `validate_config` 加 algorithm + beso_er 校验
+- `structure_optimizer/cli.py` — `run` 子命令加 `--algorithm` 选项
+- `pyproject.toml` version: 1.6.0 → 1.7.0
+
+### Coverage
+- 全测试 183 → **205** (+22)
+- `adapters/algorithm_base.py`: **100%**
+- `core/beso.py`: **96.7%**
+- `core/workflow.py`: 97.8% → **98.0%**
+- 整体覆盖率：93.0% → **93.2%**
+
+### Engineering principles
+- BESO 与 SIMP 共享 80% 工具链（filter / manufacturing / aggregator / FEM）→ 接口稳定不蔓延
+- 算法选择驱动从两处可入（config / CLI flag），但内部唯一 dispatcher → 单一真相源
+- BESO 数学：Huang & Xie 2010，硬 kill 形式（无 soft-kill 的 `min_density` ramp）；不增加内部超参，仅 `er`
+- 不引入 level-set / phase-field / MMA（避免 v2 scope creep；列入未来 hooks 文档）
+
+### v2.x rubric 增量
+- 1.5 BESO 算法 + 等价 benchmark: +6
+- 1.6 algorithm plug-in 抽象: +3
+- 1.7 CLI `--algorithm` flag: +2
+
+总分 18/100 → **29/100**
 
 ---
 

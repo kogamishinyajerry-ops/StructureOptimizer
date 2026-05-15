@@ -14,7 +14,6 @@ from structure_optimizer.core.run_store import (
     save_metrics,
     write_json,
 )
-from structure_optimizer.core.simp import run_simp
 from structure_optimizer.core.verification import verify_run
 from structure_optimizer.visualization import (
     write_baseline_png,
@@ -25,16 +24,32 @@ from structure_optimizer.visualization import (
 )
 
 
-def run_benchmark(benchmark: str, preset: str | None = None) -> Path:
-    """Load a built-in benchmark by name (+ optional preset) and run the full pipeline."""
+def run_benchmark(benchmark: str, preset: str | None = None, algorithm: str | None = None) -> Path:
+    """Load a built-in benchmark (+ optional preset, + optional algorithm override) and run the full pipeline.
+
+    ``algorithm`` of ``"simp"`` or ``"beso"`` overrides ``config.optimization.algorithm``.
+    None keeps the config-defined choice (defaults to ``"simp"``).
+    """
     config = load_benchmark(benchmark, preset=preset)
+    if algorithm is not None:
+        from dataclasses import replace
+
+        config = replace(config, optimization=replace(config.optimization, algorithm=algorithm))
     return run_config(config)
 
 
 def run_config(config, run_dir: Path | None = None) -> Path:
-    """Run mesh → SIMP → save artifacts → verify → report; return the run directory."""
+    """Run mesh → algorithm (SIMP or BESO) → save artifacts → verify → report.
+
+    Returns the run directory. Algorithm selection is driven by
+    ``config.optimization.algorithm``; the default ``"simp"`` preserves all
+    pre-v1.7 behavior.
+    """
+    from structure_optimizer.adapters.algorithm_base import get_algorithm
+
     mesh = create_structured_mesh(config)
-    result = run_simp(config, mesh)
+    algorithm = get_algorithm(config.optimization.algorithm)
+    result = algorithm.run(config, mesh)
     if run_dir is None:
         run_dir = create_run_dir(config)
     else:

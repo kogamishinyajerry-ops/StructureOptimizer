@@ -59,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--benchmark", required=True, choices=available_benchmarks())
     run.add_argument("--preset", default=None, help="Optional benchmark preset, e.g. smoke")
+    run.add_argument(
+        "--algorithm",
+        default=None,
+        choices=["simp", "beso"],
+        help="Override optimization algorithm (defaults to config value, usually 'simp')",
+    )
 
     verify = subcommands.add_parser(
         "verify",
@@ -117,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "run":
-            run_dir = run_benchmark(args.benchmark, preset=args.preset)
+            run_dir = run_benchmark(args.benchmark, preset=args.preset, algorithm=args.algorithm)
             print(run_dir)
             return 0
         if args.command == "verify":

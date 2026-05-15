@@ -109,6 +109,7 @@
 | v1.4.0 (baseline) | 0/100 | v2 维度全空（仅有 v1.x 基线，无多工况/应力/BESO/sparse/meshio/export） | v2 roadmap 已签发；v1.x rubric 100/100 |
 | v1.5.0 (Wave E) | 10/100 | F-K 波尚未开工：应力 / BESO / sparse / meshio / 几何输出 / tutorial v2 / CI 双路径 / etc | 多工况三 aggregator + 1 benchmark + 18 测试；core/objectives.py 100% 覆盖 |
 | v1.6.0 (Wave F) | 18/100 | G-K 波尚未开工；测试 183 离 250 还差 67；CI 双路径未做；几何输出未做 | 应力 p-norm + KS + 1 benchmark + verification 集成 + 31 测试；core/stress.py 97.6% |
+| v1.7.0 (Wave G) | 29/100 | H-K 波尚未开工；测试 205 离 250 还差 45；CI 双路径 / sparse / meshio / 几何输出 / tutorial v2 未做 | BESO + algorithm plug-in + CLI flag + 22 测试；algorithm_base.py 100%；core/beso.py 96.7% |
 
 （每波结束后追加一行）
 
@@ -120,6 +121,11 @@
 ### 1.6.0 (Wave F) 评分明细
 - 1.3 应力约束（p-norm + KS）+ 1 benchmark: **+6/6**
 - 1.4 stress_constraint_failed 专测: **+2/2**
+
+### 1.7.0 (Wave G) 评分明细
+- 1.5 BESO + 与 SIMP 等价 benchmark: **+6/6**
+- 1.6 algorithm plug-in 抽象 (ABC): **+3/3**
+- 1.7 CLI --algorithm flag: **+2/2**
 
 
 
