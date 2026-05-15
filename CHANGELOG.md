@@ -8,13 +8,69 @@
 
 ## [Unreleased]
 
-### Planned (post v1.4)
-- v1.x spike：scipy sparse / CalculiX / FEniCS 真适配（要先评估依赖影响）
-- robust formulation / 多材料 / 应力约束优化
-- 真实 CAD/mesh 输入受限工作流（meshio 适配）
+### Planned (post v1.5, per `docs/blueprint-v2.md`)
+- F 波 v1.6：应力约束（p-norm aggregation） → stress_constraint_failed
+- G 波 v1.7：BESO 算法 + algorithm plug-in 抽象
+- H 波 v1.8：scipy sparse optional backend
+- I 波 v1.9：非结构 2D 三角网格 + meshio adapter
+- J 波 v2.0：boundary extraction + SVG/DXF/STL 几何输出
+- K 波 v2.0-final：tutorial v2 + rubric ≥95 收口
 
 ### Decided
 - overhang 制造约束已正式 deferred 到 v2.x+；理由见 `docs/decisions/D001-overhang-deferred.md`
+- v2.0 大蓝图：`docs/blueprint-v2.md` 已签发；v2.x 评分体系：`docs/quality-rubric-v2.md`
+
+---
+
+## [1.5.0] — 2026-05-16
+
+### 多工况 robust formulation（Wave E）
+
+把单工况 / weighted_sum 唯一一种 multi-case 行为，扩展成三种 aggregator 可选；多工况 robust topology optimization 正式落地。这是 v2 大阶段的第一个增量。
+
+### Added
+- **`core/objectives.py`** — multi-case aggregator 抽象模块
+  - `AGGREGATORS` 集合：`{"weighted_sum", "average", "worst_case"}`
+  - `CaseResult` dataclass：单 case 的 FEMResult + name + weight
+  - `solve_all_cases(...)` — 独立 solve 每个 case，返回 `list[CaseResult]`
+  - `aggregate(mode, cases) -> FEMResult` — 三模式合并
+  - `solve_and_aggregate(...)` — 组合便利函数
+- **`OptimizationConfig.case_aggregator: str = "weighted_sum"`** — 新字段；config 校验拒绝未知字符串
+- **`structure_optimizer/benchmarks/configs/multi_load_cantilever.json`** — 3-case 悬臂梁
+  - cases: down (fy=-800) / up (fy=+800) / shear (fx=+400)
+  - presets: `smoke` (worst_case + small mesh) / `weighted` (weighted_sum) / `average`
+- **`tests/test_objectives.py`** — 18 个测试：
+  - aggregator 集合 / 默认值 / 配置校验
+  - weighted_sum 数学正确性（按 weight 加权）
+  - average 数学正确性（忽略 user weight）
+  - worst_case 选 argmax + strain_energy 跟随
+  - **property test**: 50 随机 case 集下 worst_case ≥ average 不变式
+  - max_displacement / max_stress 取 max-over-cases（所有 mode 一致）
+  - 空 case list / 未知 aggregator 报错路径
+  - 多工况 benchmark E2E 在三种 mode 下都跑通
+
+### Changed
+- `core/simp.py` — `_solve_weighted_load_cases` 删除；改调 `objectives.solve_and_aggregate(aggregator)`
+- `core/verification.py` — `_solve_load_case_metrics` 改调 `objectives.aggregate`；返回 dict 增加 `aggregator` 字段；`objective.name` 从 `weighted_compliance` 改为 `{aggregator}_compliance`（多 case 时）
+- `pyproject.toml` version: 1.4.0 → 1.5.0
+
+### Coverage
+- 全测试 134 → **152** (+18)
+- `core/objectives.py`: **100%**
+- 整体覆盖率仍 **92.7%**
+
+### Engineering principles
+- aggregator 模式数学定义在 docstring 里写明（含公式 + 文献引用）
+- worst_case "梯度" 用 argmax case 的 strain energy（subgradient，但实务有效；Bendsøe & Sigmund 2003 §1.4）
+- 不为多工况引入新依赖：纯 NumPy + 现有 FEM
+- 配置默认值保持 `"weighted_sum"`，v1.4 配置零修改即可继续运行
+
+### v2.x rubric 增量
+- 1.1 worst_case formulation + 1 benchmark: +5
+- 1.2 weighted_sum + average formulation: +3
+- 2.4 多工况 property test: +2
+
+总分 0 → **10/100**（v2.x 起步，还有 90 分要爬）。详见 `docs/quality-rubric-v2.md` 评分历史。
 
 ---
 

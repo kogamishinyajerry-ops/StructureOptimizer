@@ -4,11 +4,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from structure_optimizer.core.config import BenchmarkConfig, LoadCaseConfig, effective_load_cases
-from structure_optimizer.core.fem2d import FEMResult, solve_linear_elastic
+from structure_optimizer.core.config import BenchmarkConfig, effective_load_cases
+from structure_optimizer.core.fem2d import FEMResult
 from structure_optimizer.core.filtering import density_filter
 from structure_optimizer.core.manufacturing import apply_manufacturing_projections
 from structure_optimizer.core.mesh import StructuredMesh
+from structure_optimizer.core.objectives import solve_and_aggregate
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,8 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
     densities = _apply_density_masks(config, mesh, densities)
     baseline_densities = np.ones(mesh.elements.shape[0], dtype=float)
     baseline_densities = _apply_density_masks(config, mesh, baseline_densities)
-    baseline = _solve_weighted_load_cases(config, mesh, baseline_densities, load_cases)
+    aggregator = opt.case_aggregator
+    baseline = solve_and_aggregate(config, mesh, baseline_densities, load_cases, aggregator)
 
     metrics: list[IterationMetric] = []
     density_history: list[np.ndarray] = [densities.copy()]
@@ -59,7 +61,7 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
 
     for iteration in range(1, opt.max_iterations + 1):
         previous = densities.copy()
-        analysis = _solve_weighted_load_cases(config, mesh, densities, load_cases)
+        analysis = solve_and_aggregate(config, mesh, densities, load_cases, aggregator)
         sensitivities = -opt.penalty * (densities ** (opt.penalty - 1.0)) * analysis.element_strain_energy
         sensitivities[~mesh.design_mask] = 0.0
         sensitivities = density_filter(mesh, densities, sensitivities, opt.filter_radius, opt.min_density)
@@ -84,7 +86,7 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
             stop_reason = "change_tolerance"
             break
 
-    final_analysis = _solve_weighted_load_cases(config, mesh, densities, load_cases)
+    final_analysis = solve_and_aggregate(config, mesh, densities, load_cases, aggregator)
     return OptimizationResult(
         densities=densities,
         metrics=metrics,
@@ -101,40 +103,6 @@ def _apply_density_masks(config: BenchmarkConfig, mesh: StructuredMesh, densitie
     masked[mesh.frozen_solid_mask] = 1.0
     masked[mesh.void_mask] = config.optimization.min_density
     return masked
-
-
-def _solve_weighted_load_cases(
-    config: BenchmarkConfig,
-    mesh: StructuredMesh,
-    densities: np.ndarray,
-    load_cases: list[LoadCaseConfig],
-) -> FEMResult:
-    weighted_energy = np.zeros(mesh.elements.shape[0], dtype=float)
-    weighted_compliance = 0.0
-    max_displacement = 0.0
-    max_stress = 0.0
-    first_result: FEMResult | None = None
-    total_weight = sum(load_case.weight for load_case in load_cases)
-
-    for load_case in load_cases:
-        result = solve_linear_elastic(config, mesh, densities, loads=load_case.loads)
-        weight = load_case.weight / total_weight
-        weighted_energy += weight * result.element_strain_energy
-        weighted_compliance += weight * result.compliance
-        max_displacement = max(max_displacement, result.max_displacement)
-        max_stress = max(max_stress, result.max_stress)
-        if first_result is None:
-            first_result = result
-
-    assert first_result is not None
-    return FEMResult(
-        displacements=first_result.displacements,
-        compliance=float(weighted_compliance),
-        max_displacement=float(max_displacement),
-        max_stress=float(max_stress),
-        mass=first_result.mass,
-        element_strain_energy=weighted_energy,
-    )
 
 
 def _optimality_criteria_update(

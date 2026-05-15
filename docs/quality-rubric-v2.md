@@ -107,8 +107,16 @@
 | 版本 | 总分 | 关键短板 | 备注 |
 |---|---:|---|---|
 | v1.4.0 (baseline) | 0/100 | v2 维度全空（仅有 v1.x 基线，无多工况/应力/BESO/sparse/meshio/export） | v2 roadmap 已签发；v1.x rubric 100/100 |
+| v1.5.0 (Wave E) | 10/100 | F-K 波尚未开工：应力 / BESO / sparse / meshio / 几何输出 / tutorial v2 / CI 双路径 / etc | 多工况三 aggregator + 1 benchmark + 18 测试；core/objectives.py 100% 覆盖 |
 
 （每波结束后追加一行）
+
+### 1.5.0 (Wave E) 评分明细
+- 1.1 worst_case formulation + 1 benchmark: **+5/5**
+- 1.2 weighted_sum + average formulation: **+3/3**
+- 2.4 多工况 property test: **+2/2**
+
+
 
 ---
 

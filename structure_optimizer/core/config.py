@@ -34,7 +34,13 @@ class MaterialConfig:
 
 @dataclass(frozen=True)
 class OptimizationConfig:
-    """SIMP loop parameters: objective + volume target + filter + termination."""
+    """SIMP loop parameters: objective + volume target + filter + termination.
+
+    ``case_aggregator`` (v1.5+): how multi-load-case compliance is combined.
+    One of ``"weighted_sum"`` (default, honors per-case weight), ``"average"``
+    (equal weight regardless of config), or ``"worst_case"`` (max over cases,
+    robust formulation). Single-case configs are unaffected.
+    """
 
     objective: str
     volume_fraction: float
@@ -44,6 +50,7 @@ class OptimizationConfig:
     change_tolerance: float
     min_iterations: int = 1
     min_density: float = 0.001
+    case_aggregator: str = "weighted_sum"
 
 
 @dataclass(frozen=True)
@@ -269,6 +276,12 @@ def validate_config(config: BenchmarkConfig) -> None:
         raise ConfigError("change_tolerance must be positive")
     if not (0 < opt.min_density < 1):
         raise ConfigError("min_density must be in (0, 1)")
+    from structure_optimizer.core.objectives import AGGREGATORS
+
+    if opt.case_aggregator not in AGGREGATORS:
+        raise ConfigError(
+            f"optimization.case_aggregator must be one of {sorted(AGGREGATORS)}, got '{opt.case_aggregator}'"
+        )
 
     for bc in config.boundary_conditions:
         _validate_selector_record(bc, "boundary condition")

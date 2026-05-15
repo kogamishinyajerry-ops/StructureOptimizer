@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 
 from structure_optimizer.core.config import effective_load_cases, parse_config, validate_config
-from structure_optimizer.core.fem2d import SolverError, solve_linear_elastic
+from structure_optimizer.core.fem2d import SolverError
 from structure_optimizer.core.manufacturability import analyze_manufacturability
 from structure_optimizer.core.manufacturing import evaluate_manufacturing_compliance
 from structure_optimizer.core.mesh import StructuredMesh, create_structured_mesh
@@ -73,7 +73,8 @@ def verify_run(run_dir: Path | str) -> dict[str, Any]:
         status = PASS_STATUS
     constraints = _constraint_records(config, active_volume, volume_ok, connectivity_ok, frozen_ok, void_ok)
     constraints.extend(_manufacturing_constraint_records(manufacturing_compliance))
-    objective_name = "weighted_compliance" if len(effective_load_cases(config)) > 1 else "compliance"
+    n_cases = len(effective_load_cases(config))
+    objective_name = f"{config.optimization.case_aggregator}_compliance" if n_cases > 1 else "compliance"
 
     result = {
         "status": status,
@@ -154,25 +155,23 @@ def _elements_for_records(mesh: StructuredMesh, records: list[dict], node_to_ele
 def _solve_load_case_metrics(
     config, mesh: StructuredMesh, densities: np.ndarray
 ) -> tuple[dict[str, float], dict[str, dict]]:
+    from structure_optimizer.core.objectives import aggregate as _agg
+    from structure_optimizer.core.objectives import solve_all_cases
+
     load_cases = effective_load_cases(config)
-    total_weight = sum(load_case.weight for load_case in load_cases)
-    aggregate = {
-        "mass": 0.0,
-        "compliance": 0.0,
-        "max_displacement": 0.0,
-        "max_stress": 0.0,
-    }
+    cases = solve_all_cases(config, mesh, densities, load_cases)
     by_case: dict[str, dict] = {}
-    for load_case in load_cases:
-        analysis = solve_linear_elastic(config, mesh, densities, loads=load_case.loads)
-        metrics = _analysis_metrics(analysis)
-        by_case[load_case.name] = {"weight": load_case.weight, **metrics}
-        weight = load_case.weight / total_weight
-        aggregate["mass"] = analysis.mass
-        aggregate["compliance"] += weight * analysis.compliance
-        aggregate["max_displacement"] = max(aggregate["max_displacement"], analysis.max_displacement)
-        aggregate["max_stress"] = max(aggregate["max_stress"], analysis.max_stress)
-    return aggregate, by_case
+    for case in cases:
+        by_case[case.name] = {"weight": case.weight, **_analysis_metrics(case.result)}
+    aggregated = _agg(config.optimization.case_aggregator, cases)
+    aggregate_metrics = {
+        "mass": aggregated.mass,
+        "compliance": aggregated.compliance,
+        "max_displacement": aggregated.max_displacement,
+        "max_stress": aggregated.max_stress,
+        "aggregator": config.optimization.case_aggregator,
+    }
+    return aggregate_metrics, by_case
 
 
 def _analysis_metrics(analysis) -> dict[str, float]:
