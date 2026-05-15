@@ -12,6 +12,12 @@ from typing import Any
 
 from structure_optimizer.benchmarks.registry import load_benchmark
 from structure_optimizer.core.config import BenchmarkConfig, parse_config, validate_config
+from structure_optimizer.core.demo import generate_demo_html
+from structure_optimizer.core.review_package import (
+    format_metric_value,
+    limitation_disclaimer_html,
+    zh_status,
+)
 from structure_optimizer.core.run_store import RUNS_ROOT, read_json, write_json
 from structure_optimizer.core.workflow import run_config
 
@@ -113,6 +119,7 @@ def run_study(config_path: Path | str) -> Path:
         candidate_dir = study_dir / candidate_id
         candidate_config = _config_with_overrides(base_config, overrides)
         run_config(candidate_config, run_dir=candidate_dir)
+        generate_demo_html(candidate_dir)
         verification = read_json(candidate_dir / "verification.json")
         rows.append(_candidate_row(study, candidate_id, candidate_dir, overrides, candidate_config, verification))
 
@@ -385,6 +392,7 @@ def _write_study_html(path: Path, study: StudyConfig, rows: list[dict[str, Any]]
           <tr>
             <th>排名</th>
             <th>候选</th>
+            <th>详情页</th>
             <th>密度图</th>
             <th>质量</th>
             <th>体积分数</th>
@@ -403,13 +411,10 @@ def _write_study_html(path: Path, study: StudyConfig, rows: list[dict[str, Any]]
 
     <section>
       <h2>原始数据</h2>
-      <p><a href="candidates.csv">candidates.csv</a> 保存所有候选指标；每个候选目录内保留 <code>input.json</code>、<code>metrics.csv</code>、<code>verification.json</code>、<code>report.md</code> 和图片产物。</p>
+      <p><a href="candidates.csv">candidates.csv</a> 保存所有候选指标；每个候选目录内保留 <code>input.json</code>、<code>metrics.csv</code>、<code>verification.json</code>、<code>report.md</code>、<code>demo.html</code> 和图片产物。</p>
     </section>
 
-    <section>
-      <h2>限制说明</h2>
-      <p class="limits">这些结果是本地线弹性 SIMP 的 optimization candidate 对比，不是生产认证结论。当前模型仅覆盖 2D/2.5D benchmark model，需要工程师继续做高保真校核、制造性复核和必要的物理测试。</p>
-    </section>
+    {limitation_disclaimer_html("engineering")}
   </main>
 </body>
 </html>
@@ -419,19 +424,20 @@ def _write_study_html(path: Path, study: StudyConfig, rows: list[dict[str, Any]]
 
 def _candidate_table_row(row: dict[str, Any]) -> str:
     status = str(row.get("verification_status", "missing"))
-    status_class = "passed" if status == "passed" else "failed"
+    status_css = "passed" if status == "passed" else "failed"
     candidate_id = html.escape(str(row["candidate_id"]))
     return (
         "<tr>"
         f"<td>{html.escape(str(row['rank']))}</td>"
         f'<td><a href="{candidate_id}/report.md">{candidate_id}</a></td>'
+        f'<td><a class="demo-link" href="{candidate_id}/demo.html">查看详情</a></td>'
         f'<td><a href="{candidate_id}/density.png"><img class="thumb" src="{candidate_id}/density.png" alt="{candidate_id} density"></a></td>'
-        f"<td>{_format_number(row.get('mass'))}</td>"
-        f"<td>{_format_number(row.get('volume_fraction'))}</td>"
-        f"<td>{_format_number(row.get('filter_radius'))}</td>"
-        f"<td>{_format_number(row.get('compliance'))}</td>"
-        f"<td>{_format_number(row.get('max_displacement'))}</td>"
-        f'<td class="{status_class}">{html.escape(status)}</td>'
+        f"<td>{format_metric_value(row.get('mass'))}</td>"
+        f"<td>{format_metric_value(row.get('volume_fraction'))}</td>"
+        f"<td>{format_metric_value(row.get('filter_radius'))}</td>"
+        f"<td>{format_metric_value(row.get('compliance'))}</td>"
+        f"<td>{format_metric_value(row.get('max_displacement'))}</td>"
+        f'<td class="{status_css}">{html.escape(zh_status(status))}</td>'
         f"<td>{html.escape(str(row.get('manufacturability_warning_count', '')))}</td>"
         "</tr>"
     )
@@ -454,11 +460,3 @@ def _normalize(value: float, low: float, high: float) -> float:
     if high <= low:
         return 0.5
     return min(1.0, max(0.0, (value - low) / (high - low)))
-
-
-def _format_number(value: Any) -> str:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return html.escape(str(value))
-    return f"{number:.6g}"

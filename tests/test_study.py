@@ -47,7 +47,7 @@ def test_study_command_generates_ranked_candidates_and_html(capsys):
     candidate_dirs = [study_dir / row["candidate_id"] for row in rows]
     for candidate_dir in candidate_dirs:
         assert candidate_dir.exists()
-        for filename in ["input.json", "metrics.csv", "density.png", "verification.json", "report.md"]:
+        for filename in ["input.json", "metrics.csv", "density.png", "verification.json", "report.md", "demo.html"]:
             path = candidate_dir / filename
             assert path.exists(), f"{candidate_dir.name}/{filename}"
             assert path.stat().st_size > 0, f"{candidate_dir.name}/{filename}"
@@ -62,7 +62,10 @@ def test_study_command_generates_ranked_candidates_and_html(capsys):
     assert "柔度" in html
     assert "最大位移" in html
     assert "验证状态" in html
+    assert "详情页" in html
     assert "candidate_001/report.md" in html
+    assert "candidate_001/demo.html" in html
+    assert "查看详情" in html
     assert "optimization candidate" in html
     assert "2D/2.5D benchmark model" in html
 

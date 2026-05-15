@@ -8,10 +8,41 @@
 
 ## [Unreleased]
 
-### Planned (v0.5 评审包收敛)
-- 共享评审包片段模块（`core/review_package.py`），统一 `demo.html` 与 `study.html` 的限制声明、指标解释和状态徽章
-- `study.html` 每个候选附带可点击的详情页（`candidate_xxx/demo.html`）
-- 双页统一中文措辞与样式来源
+### Planned
+- v0.6 制造约束粗 warning → 实约束（min 构件尺寸 / 对称 / 单向挤出 / overhang 进入优化）
+- v0.7 真正 Pareto 前沿提取 + study.html 凸显前沿点
+- v0.8 求解器 adapter 稳固化（dense ⇄ sparse 透明切换，留 CalculiX/FEniCS 钩子）
+
+---
+
+## [0.5.0] — 2026-05-16
+
+### Added (评审包收敛)
+- **`core/review_package.py`**：单一来源的评审包共享片段
+  - 中文映射：`zh_status` / `zh_check_name` / `zh_stop_reason`
+  - 状态徽章：`status_class` + `status_badge_html`
+  - 数值格式化：`format_metric_value`、`percent_reduction`
+  - 限制声明工厂：`limitation_disclaimer_html(tone)`
+    - `evaluator` tone（demo.html）：软调，无 "2D/2.5D benchmark model" 工程术语
+    - `engineering` tone（study.html）：显式 `optimization candidate` / `2D/2.5D benchmark model` / 高保真校核要求
+  - 双 tone 分裂是**有意保留**的契约：测试两端互锁（`test_demo.py` 否定 / `test_study.py` 肯定）
+- **`study.html` 每候选详情页链接**：`candidate_xxx/demo.html` 一键跳转
+  - 表格新增"详情页"列
+  - study runner 在每个 candidate `verify+report` 完成后自动生成 `demo.html`
+- **demo.html 新增"结果适用范围"声明节**（evaluator tone）
+- 测试：
+  - `tests/test_review_package.py`：共享模块单元测试（zh 映射 / 徽章 / 双 tone 措辞）
+  - 扩展 `tests/test_study.py`：断言每候选目录含 `demo.html`，study.html 含 "详情页"、"查看详情"、"candidate_001/demo.html"
+
+### Changed
+- `study.py` 候选表的"验证状态"列从英文 raw status 改为中文 `zh_status` 输出（CSS 类保持英文）
+- 删除 study.py 内 `_format_number`（被 `format_metric_value` 取代）
+- 删除 demo.py 内 `_fmt` / `_zh_status` / `_zh_stop_reason` / `_zh_check_name` / `_status_class` / `_percent_reduction` 私有副本（被 `review_package` 取代）
+
+### Engineering principles
+- 共享模块零新依赖（仅 `html.escape`）
+- 双 tone 不强制统一：单页评审与多候选评审受众不同
+- 测试覆盖 17 → 27（+12 新 test）
 
 ---
 

@@ -5,6 +5,16 @@ from pathlib import Path
 from typing import Any
 
 from structure_optimizer.core.reporting import generate_report
+from structure_optimizer.core.review_package import (
+    format_metric_value,
+    limitation_disclaimer_html,
+    percent_reduction,
+    status_badge_html,
+    status_class,
+    zh_check_name,
+    zh_status,
+    zh_stop_reason,
+)
 from structure_optimizer.core.run_store import load_metrics, read_json
 from structure_optimizer.core.verification import verify_run
 from structure_optimizer.core.workflow import run_benchmark
@@ -303,7 +313,7 @@ def generate_demo_html(run_dir: Path | str) -> Path:
   <header>
     <section class="hero">
       <div>
-        <span class="status {_status_class(verification.get('status'))}">验证状态：{_zh_status(verification.get('status'))}</span>
+        {status_badge_html(verification.get('status'), '验证状态：' + zh_status(verification.get('status')))}
         <p class="eyebrow">StructureOptimizer 结构优化演示</p>
         <h1>从实心支架到轻量化候选结构</h1>
         <p>这是一页给非算法背景也能看懂的本地演示：先给定原始支架、固定边和载荷，再让 SIMP 拓扑优化自动移除低效材料，最后做一次独立验证检查。这里的结果是“优化候选方案”，不是可直接投产的认证设计。</p>
@@ -330,10 +340,10 @@ def generate_demo_html(run_dir: Path | str) -> Path:
   </header>
   <main>
     <section class="metrics">
-      {_metric_card("减重", _percent_reduction(baseline.get("mass"), candidate.get("mass")), "相对原始实心结构", "表示材料用量减少多少。减重高不一定更安全，必须结合柔度、位移和应力一起看。")}
-      {_metric_card("材料保留比例", _fmt(verification.get("actual_volume_fraction")), f"目标 {_fmt(verification.get('target_volume_fraction'))}", "0.5 表示大约保留一半材料。它是优化约束，不代表结构已经通过工程认证。")}
-      {_metric_card("柔度", _fmt(candidate.get("compliance")), f"原始 {_fmt(baseline.get('compliance'))}，数值越低越硬", "柔度可以理解为“不够硬”的程度。越低通常越好；这里减重后柔度升高，说明结构更轻但更软。")}
-      {_metric_card("最大位移", _fmt(candidate.get("max_displacement")), f"原始 {_fmt(baseline.get('max_displacement'))}", "最大位移表示受力后变形最大的点移动了多少。越低通常越稳；如果变大，需要后续工程复核。")}
+      {_metric_card("减重", percent_reduction(baseline.get("mass"), candidate.get("mass")), "相对原始实心结构", "表示材料用量减少多少。减重高不一定更安全，必须结合柔度、位移和应力一起看。")}
+      {_metric_card("材料保留比例", format_metric_value(verification.get("actual_volume_fraction")), f"目标 {format_metric_value(verification.get('target_volume_fraction'))}", "0.5 表示大约保留一半材料。它是优化约束，不代表结构已经通过工程认证。")}
+      {_metric_card("柔度", format_metric_value(candidate.get("compliance")), f"原始 {format_metric_value(baseline.get('compliance'))}，数值越低越硬", "柔度可以理解为“不够硬”的程度。越低通常越好；这里减重后柔度升高，说明结构更轻但更软。")}
+      {_metric_card("最大位移", format_metric_value(candidate.get("max_displacement")), f"原始 {format_metric_value(baseline.get('max_displacement'))}", "最大位移表示受力后变形最大的点移动了多少。越低通常越稳；如果变大，需要后续工程复核。")}
     </section>
 
     <section class="panel" style="margin-top: 18px;">
@@ -381,7 +391,7 @@ def generate_demo_html(run_dir: Path | str) -> Path:
           <tr><td>网格</td><td>{mesh.get('nelx')} x {mesh.get('nely')}</td></tr>
           <tr><td>目标</td><td>最小柔度</td></tr>
           <tr><td>迭代次数</td><td>{summary.get('iterations', len(metrics))}</td></tr>
-          <tr><td>停止原因</td><td>{_zh_stop_reason(summary.get('stop_reason', 'unknown'))}</td></tr>
+          <tr><td>停止原因</td><td>{zh_stop_reason(summary.get('stop_reason', 'unknown'))}</td></tr>
         </table>
       </div>
     </section>
@@ -409,6 +419,8 @@ def generate_demo_html(run_dir: Path | str) -> Path:
       </div>
     </section>
 
+    {limitation_disclaimer_html("evaluator")}
+
     <section class="panel" style="margin-top: 18px;">
       <h2>输出文件</h2>
       <div class="artifact-list">
@@ -422,7 +434,7 @@ def generate_demo_html(run_dir: Path | str) -> Path:
         <a href="manufacturability.json">manufacturability.json</a>
         <a href="report.md">report.md</a>
       </div>
-      <p>第一次迭代柔度：{_fmt(first_metric.get("compliance"))}。最终记录迭代柔度：{_fmt(last_metric.get("compliance"))}。</p>
+      <p>第一次迭代柔度：{format_metric_value(first_metric.get("compliance"))}。最终记录迭代柔度：{format_metric_value(last_metric.get("compliance"))}。</p>
       <div class="bar"><span style="width: {_bar_width(verification.get('actual_volume_fraction'))}%"></span></div>
       <p>上方进度条表示独立验证得到的材料保留比例。</p>
     </section>
@@ -476,7 +488,7 @@ def _comparison_table(baseline: dict[str, Any], candidate: dict[str, Any]) -> st
     }
     rows = ["<table><tr><th>指标</th><th>原始结构</th><th>优化候选</th></tr>"]
     for key in ("mass", "compliance", "max_displacement", "max_stress"):
-        rows.append(f"<tr><td>{labels[key]}</td><td>{_fmt(baseline.get(key))}</td><td>{_fmt(candidate.get(key))}</td></tr>")
+        rows.append(f"<tr><td>{labels[key]}</td><td>{format_metric_value(baseline.get(key))}</td><td>{format_metric_value(candidate.get(key))}</td></tr>")
     rows.append("</table>")
     return "".join(rows)
 
@@ -485,11 +497,11 @@ def _objective_response_table(objective: dict[str, Any], responses: list[dict[st
     rows = ["<table><tr><th>类型</th><th>名称</th><th>数值</th><th>来源</th></tr>"]
     if objective:
         rows.append(
-            f"<tr><td>目标</td><td>{escape(str(objective.get('name', 'n/a')))}</td><td>{_fmt(objective.get('value'))}</td><td>{escape(str(objective.get('source', 'n/a')))}</td></tr>"
+            f"<tr><td>目标</td><td>{escape(str(objective.get('name', 'n/a')))}</td><td>{format_metric_value(objective.get('value'))}</td><td>{escape(str(objective.get('source', 'n/a')))}</td></tr>"
         )
     for response in responses:
         rows.append(
-            f"<tr><td>响应</td><td>{escape(str(response.get('name', 'n/a')))}</td><td>{_fmt(response.get('value'))}</td><td>{escape(str(response.get('source', 'n/a')))}</td></tr>"
+            f"<tr><td>响应</td><td>{escape(str(response.get('name', 'n/a')))}</td><td>{format_metric_value(response.get('value'))}</td><td>{escape(str(response.get('source', 'n/a')))}</td></tr>"
         )
     rows.append("</table>")
     return "".join(rows)
@@ -501,7 +513,7 @@ def _constraint_table(constraints: list[dict[str, Any]]) -> str:
     rows = ["<table><tr><th>约束</th><th>数值</th><th>限值</th><th>状态</th></tr>"]
     for constraint in constraints:
         rows.append(
-            f"<tr><td>{escape(str(constraint.get('name', 'n/a')))}</td><td>{_fmt(constraint.get('value'))}</td><td>{_fmt(constraint.get('limit'))}</td><td>{_zh_status(constraint.get('status'))}</td></tr>"
+            f"<tr><td>{escape(str(constraint.get('name', 'n/a')))}</td><td>{format_metric_value(constraint.get('value'))}</td><td>{format_metric_value(constraint.get('limit'))}</td><td>{zh_status(constraint.get('status'))}</td></tr>"
         )
     rows.append("</table>")
     return "".join(rows)
@@ -511,40 +523,13 @@ def _manufacturability_table(manufacturability: dict[str, Any]) -> str:
     checks = manufacturability.get("checks", {})
     if not checks:
         return "<p>没有生成制造性检查结果。</p>"
-    rows = [f'<p><span class="status {_status_class(manufacturability.get("status"))}">总体：{_zh_status(manufacturability.get("status"))}</span></p>']
+    rows = [f'<p>{status_badge_html(manufacturability.get("status"), "总体：" + zh_status(manufacturability.get("status")))}</p>']
     rows.append("<table><tr><th>检查项</th><th>状态</th><th>关键结果</th></tr>")
     for name, check in checks.items():
         detail = ", ".join(f"{key}={value}" for key, value in check.items() if key not in {"status", "rule"})
-        rows.append(f"<tr><td>{_zh_check_name(name)}</td><td>{_zh_status(check.get('status', 'unknown'))}</td><td>{escape(detail)}</td></tr>")
+        rows.append(f"<tr><td>{zh_check_name(name)}</td><td>{zh_status(check.get('status', 'unknown'))}</td><td>{escape(detail)}</td></tr>")
     rows.append("</table>")
     return "".join(rows)
-
-
-def _fmt(value: Any) -> str:
-    if value is None:
-        return "n/a"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, str):
-        return escape(value)
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return escape(str(value))
-    if abs(number) >= 1000 or (0 < abs(number) < 0.001):
-        return f"{number:.3e}"
-    return f"{number:.4g}"
-
-
-def _percent_reduction(baseline: Any, candidate: Any) -> str:
-    try:
-        base = float(baseline)
-        cand = float(candidate)
-    except (TypeError, ValueError):
-        return "n/a"
-    if base == 0:
-        return "n/a"
-    return f"{(base - cand) / base * 100.0:.1f}%"
 
 
 def _bar_width(value: Any) -> int:
@@ -552,31 +537,3 @@ def _bar_width(value: Any) -> int:
         return max(0, min(100, int(float(value) * 100)))
     except (TypeError, ValueError):
         return 0
-
-
-def _status_class(status: Any) -> str:
-    return "pass" if status == "passed" else "warn"
-
-
-def _zh_status(status: Any) -> str:
-    return {
-        "passed": "通过",
-        "warning": "有警告",
-        "failed": "失败",
-        "missing": "缺失",
-    }.get(str(status), escape(str(status)))
-
-
-def _zh_stop_reason(reason: Any) -> str:
-    return {
-        "max_iterations": "达到最大迭代次数",
-        "change_tolerance": "变化量达到收敛阈值",
-    }.get(str(reason), escape(str(reason)))
-
-
-def _zh_check_name(name: str) -> str:
-    return {
-        "isolated_islands": "孤立材料岛",
-        "thin_member_warning": "薄构件风险",
-        "local_density_warning": "灰度密度区域",
-    }.get(name, escape(name))
