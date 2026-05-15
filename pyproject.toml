@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "structure-optimizer"
-version = "1.7.0"
+version = "1.8.0"
 description = "Local, verifiable, explainable 2D/2.5D structural optimization workbench with SIMP topology optimization, manufacturing constraints, multi-objective candidate study, and Pareto-front comparison."
 requires-python = ">=3.11"
 dependencies = [
@@ -18,11 +18,15 @@ structure-optimizer = "structure_optimizer.cli:main"
 test = [
   "pytest>=8.0",
 ]
+sparse = [
+  "scipy>=1.11",
+]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=5.0",
   "ruff>=0.5",
   "mypy>=1.10",
+  "scipy>=1.11",
 ]
 
 [tool.setuptools]
@@ -96,6 +100,10 @@ check_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = "numpy.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "scipy.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -27,6 +27,27 @@
 - **Verification** 列 `passed` 表示独立验证全部约束通过。任何其他值需要查对应 run 目录的 `verification.json`。
 - 默认 backend = `dense`（`np.linalg.solve`）。`backend=cg` 在大网格上内存占用更低但 wall time 通常更高，可在配置中切换实测。
 
+## v1.8 Wave H 新增：稀疏求解器实测
+
+在 100×30 结构网格（6262 DOF）上单次 `solve_linear_elastic`：
+
+| Backend | 单次 solve (ms) | 相对 dense |
+|---|---:|---:|
+| `dense` | 1112.5 | 1.0× |
+| `cg` | 2918.6 | 2.6× slower（密集 K·v 主导） |
+| `sparse` | 47.3 | **24× faster** |
+| `sparse_cg` | 60.9 | **18× faster** |
+
+记录条件：macOS arm64 / Python 3.13 / scipy 1.17 / 同一台机器，warm cache 后 3 次平均。
+
+**结论**：
+- `dense` 默认在 ndof ≤ 几千时仍合适（开销低、零依赖）
+- 单次大型解 → 走 `sparse`（直接稀疏分解，最快）
+- 受内存限制的大网格 → 走 `sparse_cg`（迭代，最低内存）
+- 老 `cg` 用 dense matrix 做 matrix-vector，并不省钱；scipy CG 配 sparse 矩阵才有意义
+
+激活：`pip install structure-optimizer[sparse]` → config `solver.backend = "sparse"` 或 `"sparse_cg"`。
+
 ## 性能扩展建议（不在 v1.0 范围）
 
 - 大网格（≥ 200×200）建议引入 `scipy.sparse` adapter，避免 dense O(N²) 内存

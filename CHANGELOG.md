@@ -8,8 +8,7 @@
 
 ## [Unreleased]
 
-### Planned (post v1.7, per `docs/blueprint-v2.md`)
-- H 波 v1.8：scipy sparse optional backend
+### Planned (post v1.8, per `docs/blueprint-v2.md`)
 - I 波 v1.9：非结构 2D 三角网格 + meshio adapter
 - J 波 v2.0：boundary extraction + SVG/DXF/STL 几何输出
 - K 波 v2.0-final：tutorial v2 + rubric ≥95 收口
@@ -19,6 +18,64 @@
 - v2.0 大蓝图：`docs/blueprint-v2.md` 已签发；v2.x 评分体系：`docs/quality-rubric-v2.md`
 - F 波（应力约束）仅做 verification-time 检查；SIMP 梯度集成（adjoint method）留给未来 ADR
 - G 波 algorithm plug-in 抽象：基于 ABC + 注册表（同 solver backend 模式）
+- H 波 scipy 作为 optional dep（`[project.optional-dependencies].sparse`）；runtime mandatory 仍仅 NumPy
+
+---
+
+## [1.8.0] — 2026-05-16
+
+### scipy sparse 可选求解器后端（Wave H）
+
+第四个 v2 增量：两个新求解器后端 `sparse` + `sparse_cg`，基于 scipy.sparse。运行时仍只依赖 NumPy（scipy 进 `[project.optional-dependencies].sparse`）。大网格上**单次 solve 实测 24× 加速** vs `dense`。
+
+### Added
+- **`pyproject.toml` 新 optional-dependencies 组 `sparse = ["scipy>=1.11"]`**
+  - mandatory runtime deps 仍是 `numpy>=2.0`（红线 7.2 ✓）
+  - dev 组同步增加 scipy 以支持 CI
+- **`adapters/solver_base.py` 增 `ScipySparseSolver` + `ScipySparseCGSolver`**
+  - `LinearSolver.prefers_sparse: bool = False` 新类属性
+  - scipy 不可用时这两个 backend **不注册**（registry 自动适应）
+  - sparse 直接：`scipy.sparse.linalg.spsolve`（SuperLU）+ NaN 守卫 + MatrixRankWarning 升级为错误
+  - sparse CG：`scipy.sparse.linalg.cg`，兼容 1.11 (`tol`) ↔ 1.12+ (`rtol`) 参数 rename
+- **`core/fem2d.py` 双路径 assembly**
+  - `_assemble_stiffness_dense(...)` — 既有 N×N 路径
+  - `_assemble_stiffness_sparse(...)` — 向量化 COO → CSR，O(non-zeros) 内存
+  - dispatch 由 `solver.prefers_sparse` 决定，调用方零改动
+- **`tests/test_sparse_solver.py`** — 16 个测试：
+  - registry: sparse / sparse_cg 在；prefers_sparse 标记正确；dense/cg 不 prefer
+  - 装配等价: sparse COO/CSR vs dense N×N 在 1e-12 absolute 精度一致
+  - 4 backend 等价: compliance 1e-6 relative + 位移 ndarray 1e-6 close
+  - E2E SIMP 跑通 sparse / sparse_cg
+  - SIMP final compliance 跨 backend 1e-3 relative 一致
+  - 错误路径: sparse 奇异 → SolverError；sparse_cg 不收敛 → SolverError
+  - config 接受 sparse / sparse_cg；拒绝未注册 backend
+- **`docs/performance.md`** 增 v1.8 表：
+  - 100×30 网格 (6262 DOF) 实测：`sparse` **24×** faster than `dense`
+  - `sparse_cg` 18× faster; `cg` 实际比 `dense` 慢（因为它用 dense matrix-vector）
+
+### Changed
+- `core/fem2d.py` — assembly 抽出独立函数；`solve_linear_elastic` 通过 `solver.prefers_sparse` dispatch
+- `pyproject.toml` — 新 `[[tool.mypy.overrides]] module = "scipy.*"` 忽略未类型化 scipy
+- `pyproject.toml` version: 1.7.0 → 1.8.0
+
+### Coverage
+- 全测试 205 → **221** (+16)
+- `adapters/solver_base.py`: 96.6% → 92.4%（多了 scipy fallback 分支未覆盖）
+- `core/fem2d.py`: 98.7% → **98.9%**
+- 整体覆盖率：93.2% → **93.1%**（新增的 scipy fallback 分支无法在 with-scipy 环境覆盖）
+
+### Engineering principles
+- 默认行为零改动：未指定 `solver.backend` 时仍走 `dense`
+- 红线 7.2 严守：mandatory runtime 仍仅 NumPy；scipy 是 opt-in `[sparse]` extra
+- registry 动态：scipy 缺失时 `sparse` / `sparse_cg` 不在 `available_backends()` 列表里
+- 不引入 pyamg / petsc / suitesparse-python（避免依赖链膨胀；列为未来 hooks）
+
+### v2.x rubric 增量
+- 3.1 scipy sparse optional backend 实装: +4
+- 3.2 大网格 sparse vs dense ≥3× 加速 benchmark: +2 (24× 实测)
+- 3.3 optional dep 分类清晰（`[sparse]` group）: +2
+
+总分 29/100 → **37/100**
 
 ---
 

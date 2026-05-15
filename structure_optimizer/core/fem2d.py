@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -79,13 +80,16 @@ def solve_linear_elastic(
         raise SolverError("density vector length does not match element count")
 
     ke = element_stiffness(config.material.young_modulus, config.material.poisson_ratio)
-    stiffness = np.zeros((mesh.ndof, mesh.ndof), dtype=float)
     active_density = np.where(mesh.void_mask, opt.min_density, densities)
     density_scale = opt.min_density + (active_density**opt.penalty) * (1.0 - opt.min_density)
 
-    for element_id, scale in enumerate(density_scale):
-        edofs = mesh.element_dofs(element_id)
-        stiffness[np.ix_(edofs, edofs)] += scale * ke
+    from structure_optimizer.adapters.solver_base import get_linear_solver
+
+    linear_solver = get_linear_solver(config.solver.backend)
+    if linear_solver.prefers_sparse:
+        stiffness = _assemble_stiffness_sparse(mesh, density_scale, ke)
+    else:
+        stiffness = _assemble_stiffness_dense(mesh, density_scale, ke)
 
     force = mesh.force_vector(loads if loads is not None else config.loads)
     fixed = mesh.fixed_dofs(config.boundary_conditions)
@@ -93,12 +97,9 @@ def solve_linear_elastic(
     if free.size == 0:
         raise SolverError("all degrees of freedom are fixed")
 
-    from structure_optimizer.adapters.solver_base import get_linear_solver
-
     displacements = np.zeros(mesh.ndof, dtype=float)
-    kff = stiffness[np.ix_(free, free)]
+    kff = stiffness.tocsr()[free, :][:, free] if linear_solver.prefers_sparse else stiffness[np.ix_(free, free)]
     ff = force[free]
-    linear_solver = get_linear_solver(config.solver.backend)
     displacements[free] = linear_solver.solve(kff, ff)
 
     element_energy = np.zeros(mesh.elements.shape[0], dtype=float)
@@ -123,6 +124,32 @@ def solve_linear_elastic(
         mass=mass,
         element_strain_energy=element_energy,
     )
+
+
+def _assemble_stiffness_dense(mesh: StructuredMesh, density_scale: np.ndarray, ke: np.ndarray) -> np.ndarray:
+    """Dense N×N stiffness assembly. O(N^2) memory; reference path."""
+    stiffness = np.zeros((mesh.ndof, mesh.ndof), dtype=float)
+    for element_id, scale in enumerate(density_scale):
+        edofs = mesh.element_dofs(element_id)
+        stiffness[np.ix_(edofs, edofs)] += scale * ke
+    return stiffness
+
+
+def _assemble_stiffness_sparse(mesh: StructuredMesh, density_scale: np.ndarray, ke: np.ndarray) -> Any:
+    """Vectorized COO → CSR stiffness assembly for scipy sparse solvers.
+
+    O(non-zeros) memory; required to make sparse solvers actually faster than
+    dense on large meshes.
+    """
+    import scipy.sparse as sp
+
+    n_elem = mesh.elements.shape[0]
+    edofs_all = np.array([mesh.element_dofs(eid) for eid in range(n_elem)])  # (n_elem, 8)
+    rows = np.repeat(edofs_all, 8, axis=1).flatten()  # (n_elem * 64,)
+    cols = np.tile(edofs_all, (1, 8)).flatten()
+    ke_flat = ke.flatten()
+    vals = (density_scale[:, None] * ke_flat[None, :]).flatten()
+    return sp.coo_matrix((vals, (rows, cols)), shape=(mesh.ndof, mesh.ndof)).tocsr()
 
 
 def compute_mass(config: BenchmarkConfig, mesh: StructuredMesh, densities: np.ndarray) -> float:
