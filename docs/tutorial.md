@@ -223,7 +223,119 @@ SIMP 循环每轮都会把这些投影应用到密度场上。验证产物 `veri
 
 ---
 
-## 8. 下一步
+## 8. v2.x 新能力（v1.5 → v2.0）
+
+> 以下章节对应 `docs/blueprint-v2.md` 中 E → J 波交付的功能。任何 v1.x 配置都向后兼容；新功能默认关闭，按需启用。
+
+### 8.1 多工况 robust formulation（Wave E）
+
+把单工况配置改成 multi-case，每个 case 一组载荷 + 权重 + 一个 aggregator：
+
+```json
+"load_cases": [
+  {"name": "down", "weight": 1.0, "loads": [{"selector": "right_mid", "fx": 0, "fy": -800}]},
+  {"name": "up",   "weight": 1.0, "loads": [{"selector": "right_mid", "fx": 0, "fy": 800}]},
+  {"name": "shear","weight": 1.0, "loads": [{"selector": "right_mid", "fx": 400, "fy": 0}]}
+],
+"optimization": {
+  ...,
+  "case_aggregator": "worst_case"
+}
+```
+
+可选 aggregator：`weighted_sum`（默认，按 weight 加权）/ `average`（忽略 weight，等权）/ `worst_case`（rubust min-max）。
+
+完整例：`structure-optimizer run --benchmark multi_load_cantilever --preset smoke`
+
+### 8.2 应力约束（Wave F）
+
+在 BenchmarkConfig 顶层加 `stress_constraint`：
+
+```json
+"stress_constraint": {
+  "enabled": true,
+  "aggregation": "p_norm",
+  "p": 8.0,
+  "limit": 250.0,
+  "density_threshold": 0.5
+}
+```
+
+verification 阶段计算 p-norm 或 KS von Mises 应力，超过 `limit` 时 `status = stress_constraint_failed`。
+
+**重要**：v1.6 仅做 verification-time 检查（D003-stress-verification-only.md）；SIMP 主循环不感知应力。
+
+例：`structure-optimizer run --benchmark stress_limited_bracket --preset smoke`
+
+### 8.3 BESO 算法（Wave G）
+
+切换到 BESO（Bidirectional Evolutionary Structural Optimization）：
+
+```bash
+structure-optimizer run --benchmark mbb_beam --preset smoke --algorithm beso
+
+# 或在配置文件里:
+"optimization": {
+  ...,
+  "algorithm": "beso",
+  "beso_er": 0.02
+}
+```
+
+BESO 是 hard-kill：每个 element 要么 solid 要么 void，没有 gray。设计上更接近 manufacturable，compliance 通常略劣于 SIMP。
+
+### 8.4 scipy sparse 求解器（Wave H）
+
+大网格启用 sparse 后端（**24× 加速** vs `dense` on 6262 DOF）：
+
+```bash
+pip install structure-optimizer[sparse]
+```
+
+```json
+"solver": {"backend": "sparse"}
+```
+
+可选 backend：`dense`（默认）/ `cg`（NumPy CG）/ `sparse`（scipy spsolve）/ `sparse_cg`（scipy CG，最低内存）。性能见 `docs/performance.md`。
+
+### 8.5 非结构三角网格（Wave I）
+
+```bash
+pip install structure-optimizer[mesh]
+```
+
+```python
+from structure_optimizer.adapters.mesh_source import MeshioReader
+from structure_optimizer.core.triangle import solve_tri_linear_elastic
+
+mesh = MeshioReader().load("my_mesh.msh")
+result = solve_tri_linear_elastic(
+    mesh, young_modulus=70000, poisson_ratio=0.33,
+    fixed_dofs=..., force=...,
+)
+```
+
+**重要**：v1.9 仅支持 triangle linear elastic **solve**，不支持 SIMP-on-triangle。详情见 D005-triangle-mesh-no-simp.md。
+
+### 8.6 几何导出（Wave J）
+
+从 run 目录输出 SVG / DXF / STL：
+
+```bash
+structure-optimizer export --run runs/mbb_beam/<run_id> --format svg
+structure-optimizer export --run runs/mbb_beam/<run_id> --format dxf
+structure-optimizer export --run runs/mbb_beam/<run_id> --format stl --extrusion-depth 5
+```
+
+- **SVG**: 2D 矢量边界，浏览器/CAD/SVG editor 直接打开
+- **DXF**: R12 ASCII，AutoCAD / FreeCAD / LibreCAD 直接 import
+- **STL**: ASCII，2.5D 棱柱挤出，3D 打印或 CAE 输入
+
+阈值用 `--threshold`（默认 0.5）。SIMP gray 元素按阈值二值化。
+
+---
+
+## 9. 下一步
 
 - `docs/architecture.md` — 模块边界、永久红线、扩展点
 - `docs/quality-rubric.md` — 质量评分体系（如果你想衡量整个项目工程化水平）

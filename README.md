@@ -11,20 +11,23 @@
 
 工程评审最害怕的不是"结构不漂亮"，而是"我没法复核它怎么来的"。StructureOptimizer 解决的是后者：每一个候选都有完整的配置快照、迭代历史、独立验证、制造性检查、限制声明，工程师评审时能在 5 分钟内信或拒。
 
-## 能力矩阵
+## 能力矩阵（v2.0）
 
 | 维度 | 覆盖 | 不覆盖 |
 |---|---|---|
-| **建模** | 2D 结构化 quad 网格 + 2.5D 厚度模型 | CAD 内核 / STEP 布尔 / 全 3D / 非线性 |
+| **建模** | 2D 结构化 quad 网格 + 2.5D 厚度模型 + **非结构三角网格读入**（v1.9） | CAD 内核 / STEP 布尔 / 全 3D / 非线性 |
 | **物理** | 线弹性平面应力 / 平面应变 | 非线性接触 / 疲劳 / 屈曲 / 多物理 |
-| **优化** | SIMP 拓扑 + 密度过滤 + OC update + 最小柔度目标 | MMA / 鲁棒优化 / 应力约束优化 / 大规模 HPC |
-| **设计域** | frozen_solid / void 区域选择器（box / circle） | 任意几何 / CAD topology 选择 |
-| **多载荷** | weighted compliance 多工况 | 时变 / 频域 / 谱响应 |
-| **制造约束** | 对称 / 单向挤出 / min member size 验证 | overhang / 后处理 anti-aliasing（v0.6.1 计划） |
-| **求解器** | NumPy dense（默认）/ Jacobi-PCG（pure NumPy） | scipy sparse / CalculiX / FEniCS（adapter 钩子留好） |
-| **批量 study** | 参数 grid search + Pareto 前沿提取 + 候选评审页 | DOE / 主动学习 / 通用 MDO |
-| **产物** | 本地静态 HTML + PNG/GIF + CSV + Markdown 报告 | Web UI / 云协同 / PLM |
-| **依赖** | NumPy + pytest 仅 | matplotlib（可选）/ scipy / pydantic / 其他 |
+| **优化算法** | **SIMP**（默认）/ **BESO**（hard-kill 进化算法，v1.7）；plug-in 抽象 | level-set / MMA / phase-field |
+| **设计域** | frozen_solid / void 区域选择器（box / circle / element_box） | 任意几何 / CAD topology 选择 |
+| **多工况** | **3 种 aggregator**: weighted_sum / average / **worst_case**（robust，v1.5） | 时变 / 频域 / 谱响应 |
+| **应力约束** | **p-norm / KS aggregation**（verification-time，v1.6）+ stress_constraint_failed | SIMP-梯度集成（需 adjoint method，留给未来）|
+| **制造约束** | 对称 / 单向挤出 / min member size 验证 | overhang（已 deferred 到 v3+，D001） |
+| **求解器后端** | dense / cg（NumPy）/ **sparse / sparse_cg**（scipy optional，**24× 加速**，v1.8）| CalculiX / FEniCS（adapter 钩子留好） |
+| **网格输入** | 结构 quad（内置 benchmark）/ **meshio adapter**（v1.9）| 任意 3D 网格 |
+| **批量 study** | 参数 grid search + Pareto 前沿 + 候选评审页 | DOE / 主动学习 / 通用 MDO |
+| **几何输出** | **SVG / DXF R12 / STL ASCII**（v2.0） | STEP / IGES / 真 3D solid CAD |
+| **产物** | 本地静态 HTML + PNG/GIF + CSV + Markdown + 几何文件 | Web UI / 云协同 / PLM |
+| **runtime 依赖** | NumPy（mandatory）/ scipy（optional `[sparse]`）/ meshio（optional `[mesh]`）| matplotlib / pydantic / 其他 |
 
 ---
 

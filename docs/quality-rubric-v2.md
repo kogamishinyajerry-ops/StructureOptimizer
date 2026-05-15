@@ -113,6 +113,7 @@
 | v1.8.0 (Wave H) | 37/100 | I-K 波尚未开工；测试 221 离 250 还差 29；CI 双路径 / meshio / 几何输出 / tutorial v2 未做 | scipy sparse + sparse_cg backend 实测 24× 加速；optional dep + 16 测试 |
 | v1.9.0 (Wave I) | 45/100 | J-K 波尚未开工；测试 243 离 250 还差 7；CI 双路径 / 几何输出 / tutorial v2 未做；SIMP-on-tri 未做（诚实留白） | CST 三角 + meshio adapter + TriangleMesh + 22 测试；core/triangle.py 100% |
 | v2.0.0 (Wave J) | 62/100 | K 波 (tutorial v2 / architecture v2 / CI 双路径 / 等价测试) 未做 | SVG + DXF + STL 几何导出 + CLI export + 264 测试 (≥250 达成)；2.0 主版本号到位 |
+| v2.0.0-final (Wave K) | 97/100 | 6.5 CI 双路径全绿待 GH Actions 实跑验证 (-2)；7 项 v1.x 视为基准不再 +分；1.x rubric 文件保留 100/100 不算双计 | tutorial v2 + architecture v2 + 5 ADRs + physics-reference + CI 双路径 + 全 QA gates 绿 |
 
 （每波结束后追加一行）
 
@@ -148,6 +149,36 @@
 - 4.5 CLI export 子命令: **+1/1**
 - 2.1 全测试 ≥250: **+5/5** (264 个)
 - 2.7 几何导出解析回测试: **+2/2**
+
+### 2.0.0-final (Wave K) 评分明细 — 最后 +35 拉到 **97/100**
+
+- **1.8 algorithm plug-in ADR** (D002 写完): **+3/3**
+- **2.2 core ≥90%**: **+5/5** (实测 93.9%)
+- **2.3 adapters ≥80%**: **+2/2** (实测 92.6%)
+- **2.5 sparse/dense 等价测试 ≤1e-6**: **+2/2** (test_sparse_solver.py 已有)
+- **2.6 meshio round-trip 测试**: **+2/2** (test_triangle_mesh.py 已有)
+- **3.6 CI 双路径**: **+2/2** (.github/workflows/test.yml matrix: vanilla / with-extras)
+- **5.1 blueprint-v2 七波全勾**: **+2/2**
+- **5.2 tutorial v2 升级（6 个新章节）**: **+3/3**
+- **5.3 architecture v2 升级（含 8.1-8.7 抽象图 + plug-in 说明）**: **+2/2**
+- **5.4 physics-reference.md**: **+1/1**
+- **5.5 CHANGELOG v1.5→v2.0 完整**: **+1/1**
+- **5.6 ADR ≥5 (D001-D006 共 6 个)**: **+1/1**
+- **6.1 ruff check 0 issues**: **+2/2**
+- **6.2 ruff format 0 diff**: **+1/1**
+- **6.3 mypy 0 errors**: **+2/2**
+- **6.4 pytest < 60s** (实测 11.75s): **+2/2**
+- **6.6 无新增死代码 (ruff F401)**: **+1/1**
+- **7.1 永久红线未破** (grep verified — 无 ansys/tkinter/cad-kernel): **+2/2**
+- **7.2 NumPy mandatory only**: **+1/1**
+- **7.3 七波 atomic commit + SemVer tag**: **+2/2**
+
+**未拿分项（诚实记录）**：
+- 6.5 CI 双路径**实际**全绿 (-2)：workflow YAML 已就位但本地无法启动 GH Actions runner；首次 push 后真正全绿才能加这 2 分
+
+**v2.x 总分 = 62 + 35 = 97/100** — **优秀** ✓
+
+
 
 
 

@@ -188,3 +188,98 @@ BenchmarkConfig (JSON)
 4. `python -m pytest` 全绿后 commit
 
 不要为单个新 benchmark 引入新依赖；如必须，先在 PR 中说明真实问题与替代方案。
+
+---
+
+## 8. v2.x 抽象与扩展点（Waves E → J）
+
+v2.x 在不破红线的前提下加了三类 plug-in 抽象 + 多工况/应力 objectives + 几何输出层。模块边界：
+
+```
+                ┌─ TopologyAlgorithm ABC ─┐
+config + mesh ──┤   SimpAlgorithm         ├──┐
+                │   BesoAlgorithm         │  │
+                └─────────────────────────┘  │
+                                             ▼
+                ┌─ Mesh ───────────────┐     ┌─ Solve loop ────┐
+                │  StructuredMesh      │ ──▶ │  density →      │ ──▶ OptimizationResult
+                │  TriangleMesh*       │     │  FEM → grad     │
+                └──────────────────────┘     └────┬────────────┘
+                  ▲                                │
+                  │ load via                       ▼
+                  │                          ┌─ LinearSolver ABC ┐
+        ┌─ MeshSource ABC ─┐                 │  NumpyDenseSolver │
+        │   MeshioReader   │                 │  NumpyCGSolver    │
+        └──────────────────┘                 │  ScipySparseSolver│
+                                             │  ScipySparseCG    │
+                                             └───────────────────┘
+                                                       │
+                                                       ▼
+                                            OptimizationResult
+                                                       │
+                                                       ▼
+                                      ┌─ geometry_export ─┐
+                                      │  SVG / DXF / STL  │
+                                      └───────────────────┘
+
+* TriangleMesh: linear-elastic solve only, not SIMP (see D005).
+```
+
+### 8.1 Algorithm plug-in (`adapters/algorithm_base.py`)
+
+- `TopologyAlgorithm` ABC，方法 `run(config, mesh) → OptimizationResult`
+- 内置 `simp` (default) + `beso`；选择由 `OptimizationConfig.algorithm`，CLI `--algorithm` flag 可覆盖
+- 新算法接入：写一个类 + 注册到 `_REGISTRY`
+- 决策：`docs/decisions/D002-algorithm-plugin-abstraction.md`
+
+### 8.2 Linear-solver backend plug-in (`adapters/solver_base.py`)
+
+- `LinearSolver` ABC + `prefers_sparse` 标志（决定 dense vs CSR assembly）
+- 内置 4 backend：`dense` / `cg`（NumPy）/ `sparse` / `sparse_cg`（scipy，optional）
+- scipy 缺失时 sparse backend 自动不注册；`available_backends()` 动态返回
+- 决策：`docs/decisions/D004-sparse-optional-dep.md`
+
+### 8.3 Mesh source plug-in (`adapters/mesh_source.py`)
+
+- `MeshSource` ABC + `MeshioReader`（optional [mesh] extra）
+- 未来 reader（FreeCAD、自定义 .ply、Gmsh script）写一个类即可
+- 决策：`docs/decisions/D005-triangle-mesh-no-simp.md`
+
+### 8.4 Multi-load-case aggregation (`core/objectives.py`)
+
+- `AGGREGATORS = {"weighted_sum", "average", "worst_case"}`
+- SIMP 与 BESO 都用；selected via `OptimizationConfig.case_aggregator`
+- 数学：`docs/physics-reference.md` §3
+
+### 8.5 Stress aggregation (`core/stress.py`)
+
+- p-norm + KS smooth-max 两种 aggregator
+- verification-time 检查，不进 SIMP 主循环（D003 决策）
+- 新 failure status：`stress_constraint_failed`
+
+### 8.6 Geometry export (`core/geometry_export.py`)
+
+- 元素级 marching squares 简化 → axis-aligned 边界段
+- 三种 writer：SVG / DXF R12 / STL ASCII (2.5D 挤出)
+- CLI `export` subcommand
+- 决策：`docs/decisions/D006-geometry-export-scope.md`
+
+### 8.7 永久红线在 v2 内（重申）
+
+- runtime mandatory deps 仍仅 NumPy；scipy / meshio 进 `[project.optional-dependencies]`
+- 无 GUI、无 cloud、无 commercial-solver、无 full-3D
+- TriangleMesh 是 2D；STL 是 2.5D 挤出（不是真 3D）
+- failure 仍单行 stderr + 状态码字符串，无 traceback 泄漏
+
+---
+
+## 9. v2.0 已知限制（更新版）
+
+- 仅 2D / 2.5D（永久红线）
+- SIMP-on-triangle 未做（D005 留白）— TriangleMesh 仅支持 linear elastic solve
+- 应力约束仅 verification-time（D003 留白）— 未集成到 SIMP 梯度（需 adjoint method）
+- overhang 制造约束 deferred 到 v3+（D001）
+- LLM / AI 顾问能力 not in scope（永久红线）
+- benchmark coverage 集中在 mbb_beam / cantilever / l_bracket / loaded_hook / simple_bracket / stress_limited_bracket / multi_load_cantilever
+
+详见 `CHANGELOG.md` v2.0.0 条目的 honest caveat 节 + 各 ADR 的 "Reopening criteria"。

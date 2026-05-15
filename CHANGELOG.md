@@ -8,8 +8,93 @@
 
 ## [Unreleased]
 
-### Planned (post v2.0, per `docs/blueprint-v2.md`)
-- K 波 v2.0-final：tutorial v2 + architecture v2 + rubric ≥95 收口
+### Planned (post v2.0-final)
+- 真 robust topology optimization under uncertain loads → v3+
+- 3D FEM → v3+（需要先评估永久红线）
+- Stress-constrained SIMP via adjoint method → 独立 ADR + Wave，可能 v2.1+
+- SIMP-on-triangle 完整实装（D005 留白） → v2.x+
+- CalculiX / FEniCS 适配（已留 hooks） → 评估真实需求后
+
+---
+
+## [2.0.0-final] — 2026-05-16
+
+### v2.0 final 收口（Wave K）
+
+第七波（也是 v2 大阶段的最后一波）：把 v1.5–v2.0 所有 wave 的产物在文档 / ADR / CI 层面正式落档，重新评分并签收。**这是 v2 大阶段的发布点**。
+
+### Added
+- **`docs/decisions/D002-algorithm-plugin-abstraction.md`** — algorithm plug-in 设计 rationale (Wave G)
+- **`docs/decisions/D003-stress-verification-only.md`** — 应力约束 verification-only 决策 (Wave F)
+- **`docs/decisions/D004-sparse-optional-dep.md`** — scipy optional dep 决策 (Wave H)
+- **`docs/decisions/D005-triangle-mesh-no-simp.md`** — triangle mesh 限定 linear elastic 决策 (Wave I)
+- **`docs/decisions/D006-geometry-export-scope.md`** — 几何导出 cell-edge 简化决策 (Wave J)
+- **`docs/physics-reference.md`** — 全部 formulation 数学公式 + 参考文献（CST / SIMP / aggregation / stress / BESO / solvers / export）
+- CI workflow 双路径 matrix：`.github/workflows/test.yml` 现在跑 vanilla（仅 NumPy）+ with-extras（含 scipy + meshio）两条独立测试链
+- README v2 能力矩阵更新（13 维度 × 覆盖/不覆盖）
+
+### Changed
+- `docs/tutorial.md` — 新增第 8 节"v2.x 新能力"，6 个子章节覆盖每个 wave 的用法
+- `docs/architecture.md` — 新增第 8 节"v2.x 抽象与扩展点"，含 ASCII 模块边界图 + 三类 plug-in 抽象详解 + 永久红线重申
+- `docs/blueprint-v2.md` — 七波全勾 ✅；验收 checklist 全勾 ✅
+- `docs/quality-rubric-v2.md` — 评分历史增 v2.0.0-final 行，总分 **97/100**
+- `pyproject.toml` version: 2.0.0 → 2.0.0-final
+
+### v2.x rubric 最终评分（K 波 +35）
+- 1.8 algorithm plug-in ADR: +3
+- 2.2 core ≥90% (93.9%): +5
+- 2.3 adapters ≥80% (92.6%): +2
+- 2.5 sparse/dense 等价测试: +2 (已有，正式认定)
+- 2.6 meshio round-trip 测试: +2 (已有，正式认定)
+- 3.6 CI 双路径 matrix: +2
+- 5.1 blueprint 七波全勾: +2
+- 5.2 tutorial v2 (6 子章节): +3
+- 5.3 architecture v2 (plug-in 图): +2
+- 5.4 physics-reference.md: +1
+- 5.5 CHANGELOG 完整: +1
+- 5.6 ADR ≥5 (实际 6 个): +1
+- 6.1 ruff check ✓: +2
+- 6.2 ruff format ✓: +1
+- 6.3 mypy ✓: +2
+- 6.4 pytest < 60s (11.75s): +2
+- 6.6 无死代码 ✓: +1
+- 7.1 红线未破 ✓: +2
+- 7.2 NumPy mandatory only ✓: +1
+- 7.3 七波 atomic commit + tag ✓: +2
+
+**v2.x 总分：62/100 → 97/100** — **优秀** ✓
+
+### 未拿分项（诚实记录）
+- 6.5 CI 双路径**实跑**全绿 (-2)：workflow YAML 已就位但本地无法启动 GH Actions runner。首次 push 后 CI 实跑通过才能加这 2 分。
+
+### v1.x rubric 仍 100/100 — 无回退
+v1.4.0 全部 134 测试仍绿；core 覆盖率 93.9% (≥90% v1.x 阈值)；v1.x 文档完整性保持 (`docs/quality-rubric.md` 文件未修改)。
+
+### v2.0 大阶段交付清单（七波 SemVer 全部 atomic commit + tag）
+- v1.5.0 — Wave E: 多工况 robust formulation
+- v1.6.0 — Wave F: 应力约束（p-norm + KS）
+- v1.7.0 — Wave G: BESO + algorithm plug-in
+- v1.8.0 — Wave H: scipy sparse + sparse_cg (24× speedup)
+- v1.9.0 — Wave I: triangle mesh (CST) + meshio
+- v2.0.0 — Wave J: SVG / DXF / STL geometry export
+- v2.0.0-final — Wave K: tutorial v2 + architecture v2 + ADRs + CI 双路径
+
+### 永久红线全程未破
+- runtime mandatory deps 仍仅 NumPy
+- 无 GUI / 无 cloud / 无 commercial-solver / 无 full-3D
+- 失败仍单行 stderr + 状态码字符串
+- failure status codes 增至 8 类（v1.4 7 类 + stress_constraint_failed）
+
+### Honest scope caveats（v2.0 不解决的问题）
+- 仅 2D / 2.5D — 3D 留给 v3+
+- SIMP-on-triangle 未做 — 见 D005
+- 应力约束未集成到 SIMP 梯度 — 见 D003
+- overhang 制造约束 deferred — 见 D001
+- AI / LLM 顾问能力不在范围 — 永久
+
+---
+
+## [2.0.0] — 2026-05-16
 
 ### Decided
 - overhang 制造约束已正式 deferred 到 v2.x+；理由见 `docs/decisions/D001-overhang-deferred.md`
