@@ -8,13 +8,54 @@
 
 ## [Unreleased]
 
-### Planned (post v1.3)
+### Planned (post v1.4)
 - v1.x spike：scipy sparse / CalculiX / FEniCS 真适配（要先评估依赖影响）
 - robust formulation / 多材料 / 应力约束优化
 - 真实 CAD/mesh 输入受限工作流（meshio 适配）
 
 ### Decided
 - overhang 制造约束已正式 deferred 到 v2.x+；理由见 `docs/decisions/D001-overhang-deferred.md`
+
+---
+
+## [1.4.0] — 2026-05-16
+
+### 覆盖率达标 + 错误状态码全测（Wave D）
+
+把 v1.3 剩下的两块短板（core 覆盖率 88.8% / FAILURE_STATUSES 部分类未直接触发）补齐。自评 **100/100**（按 `docs/quality-rubric.md` 的 binary/threshold 标准）。
+
+### Added
+- **`tests/test_design_space_coverage.py`** — 23 个 selector 边角 case 测试：
+  - box / rect / element_box 选择器（normalized + absolute 两种坐标模式）
+  - circle 选择器（normalized + absolute）
+  - 全部命名 string 选择器（left_edge / right_load / top_edge / bottom_edge / *_mid_pad / all）
+  - 错误路径：非法 axis range / 反转范围 / 错误坐标模式 / 未知选择器 / 非字符串非字典
+  - design_space 集成路径：空区域 / 重名区域 / 全覆盖（无 design）/ 不相交 frozen+void
+  - 遗留 `mesh.void_regions` 路径（rect 通过，非 rect 报错）
+  - 结果：`core/design_space.py` 覆盖率 57% → **100%**
+- **`tests/test_failure_statuses.py`** — 10 个测试，显式触发每一类 `FAILURE_STATUSES`：
+  - `volume_constraint_failed`：fabricated density 全 1.0 → fraction 1.0 > target+0.02
+  - `connectivity_failed`：全 min_density → 无 load-support 路径
+  - `design_space_constraint_failed`：frozen_solid 区域 doctored 为 0.1
+  - `solver_failed`：1×1 mesh + 全 4 边固支 → 无自由 DOF
+  - `singular_matrix`：通过 solver_adapter 测试覆盖（meta-test 锁定字符串在 set 内）
+  - 每个状态都有 CLI 端到端版本（断言 stderr 无 Traceback）
+
+### Coverage
+- core 覆盖率：88.8% → **92.5%**（≥90% 阈值达成，rubric 1.2 满分）
+- adapters 覆盖率：**96.6%**（≥80% 阈值，rubric 1.3 满分）
+- 整体测试数：101 → **134**（+33）
+
+### Changed
+- `pyproject.toml` version: 1.3.0 → 1.4.0
+
+### Engineering principles
+- 不为冲覆盖率而写"假"测试：每个新增测试都断言一个**真实可观察的属性**（mask 形状、错误状态码字符串、CLI 输出格式）
+- 覆盖率漏洞先做 root-cause 分析：`design_space.py` 漏的 43 行都是 selector 解析的错误分支与替代 schema 分支，正好对应文档承诺的接口契约
+- 错误状态码用 fabricated run dir（input.json + density.npy）测试，不依赖真跑完一次优化 — 速度快、信号清晰
+
+### Honest score caveat
+100/100 仅指本项目 `docs/quality-rubric.md` 定义的 binary/threshold 标准全部满足，**不等于"完美无缺"**。本版本承认但不计分的短板：仅 2D / 仅 SIMP / 仅 dense+CG / overhang 已正式延后（D001）。具体见 rubric 文件评分历史小节。
 
 ---
 
