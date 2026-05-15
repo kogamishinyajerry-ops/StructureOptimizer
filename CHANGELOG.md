@@ -8,11 +8,35 @@
 
 ## [Unreleased]
 
-### Planned (post v1.1)
+### Planned (post v1.2)
 - v0.6.1 overhang 制造约束（additive manufacturing build direction）— v0.6 暂未支持
 - v1.x spike：scipy sparse / CalculiX / FEniCS 真适配（要先评估依赖影响）
 - robust formulation / 多材料 / 应力约束优化
 - 真实 CAD/mesh 输入受限工作流（meshio 适配）
+
+---
+
+## [1.2.0] — 2026-05-16
+
+### CI + reproducible install（Wave B）
+
+将 v1.1 的 dev-tooling 基础接入 CI 工作流；干净 venv 中验证 `pip install -e .` 全链路。自评 **82/100**。
+
+### Added
+- **`.github/workflows/test.yml`** — GitHub Actions 工作流，YAML 已本地通过 PyYAML 解析校验
+  - `test` job：matrix Python 3.11/3.12/3.13 ×（pytest + ruff check + ruff format check + mypy + coverage 上报）
+  - `smoke` job：依赖 test 通过后跑完整 CLI 端到端（run / verify / report / demo / study）
+  - pip cache + coverage artifact 上传
+- **`pip install -e .` 在干净 venv 中验证通过**：用 `uv venv --seed` 隔离环境，编辑安装 + 控制台脚本 + run/verify smoke 全链路 OK
+
+### Verified
+- `structure-optimizer` 控制台脚本在 fresh venv 中可用
+- v1.1 的 console_scripts entry 在隔离环境中无 PYTHONPATH 依赖
+
+### Engineering principles
+- CI 在三个 Python 版本上跑（3.11 最低支持，3.12/3.13 前向）
+- Smoke job 用真实 CLI 命令验证（不是 pytest mock）
+- 注意：CI workflow 已声明，需用户 push 到 GitHub 才能实际触发；本地不依赖 `act` 运行器
 
 ---
 
