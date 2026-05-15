@@ -6,7 +6,6 @@ that contract so a future refactor cannot accidentally collapse them.
 """
 
 import pytest
-
 from structure_optimizer.core.review_package import (
     format_metric_value,
     limitation_disclaimer_html,

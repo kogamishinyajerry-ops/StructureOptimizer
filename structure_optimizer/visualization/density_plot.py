@@ -33,7 +33,9 @@ def write_baseline_png(path: Path, mesh: StructuredMesh, scale: int = 8) -> None
     write_rgb_png(path, pixels)
 
 
-def write_loadcase_png(path: Path, mesh: StructuredMesh, boundary_conditions: list[dict], loads: list[dict], scale: int = 8) -> None:
+def write_loadcase_png(
+    path: Path, mesh: StructuredMesh, boundary_conditions: list[dict], loads: list[dict], scale: int = 8
+) -> None:
     densities = np.ones(mesh.elements.shape[0], dtype=float)
     densities[~mesh.design_mask] = 0.0
     pixels = density_pixels(mesh, densities, scale=scale)
@@ -65,8 +67,8 @@ def write_loadcase_png(path: Path, mesh: StructuredMesh, boundary_conditions: li
 
 def _node_to_pixel(mesh: StructuredMesh, node_id: int, scale: int, image_height: int) -> tuple[int, int]:
     x, y = mesh.nodes[node_id]
-    px = int(round(x / mesh.width * mesh.nelx * scale))
-    py = image_height - 1 - int(round(y / mesh.height * mesh.nely * scale))
+    px = round(x / mesh.width * mesh.nelx * scale)
+    py = image_height - 1 - round(y / mesh.height * mesh.nely * scale)
     return px, py
 
 
@@ -110,7 +112,9 @@ def _draw_line(pixels: np.ndarray, x0: int, y0: int, x1: int, y1: int, color: tu
     err = dx + dy
     while True:
         if 0 <= y0 < pixels.shape[0] and 0 <= x0 < pixels.shape[1]:
-            pixels[max(0, y0 - 1):min(pixels.shape[0], y0 + 2), max(0, x0 - 1):min(pixels.shape[1], x0 + 2), :] = color
+            pixels[max(0, y0 - 1) : min(pixels.shape[0], y0 + 2), max(0, x0 - 1) : min(pixels.shape[1], x0 + 2), :] = (
+                color
+            )
         if x0 == x1 and y0 == y1:
             break
         e2 = 2 * err

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from structure_optimizer.benchmarks.registry import available_benchmarks
 from structure_optimizer.core.demo import generate_demo_package

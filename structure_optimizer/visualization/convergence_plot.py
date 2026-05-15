@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from pathlib import Path
 
 import numpy as np
@@ -8,13 +9,15 @@ from structure_optimizer.core.simp import IterationMetric
 from structure_optimizer.visualization.png import write_grayscale_png
 
 
-def write_convergence_png(path: Path, metrics: list[IterationMetric] | list[dict], width: int = 640, height: int = 360) -> None:
+def write_convergence_png(
+    path: Path, metrics: list[IterationMetric] | list[dict], width: int = 640, height: int = 360
+) -> None:
     canvas = np.full((height, width), 255, dtype=np.uint8)
     _draw_axes(canvas)
     values = [_value(metric, "compliance") for metric in metrics]
     if len(values) >= 2:
         points = _scale_points(values, width, height)
-        for start, end in zip(points, points[1:]):
+        for start, end in itertools.pairwise(points):
             _draw_line(canvas, start, end, color=40)
     write_grayscale_png(path, canvas)
 
@@ -64,4 +67,3 @@ def _draw_line(canvas: np.ndarray, start: tuple[int, int], end: tuple[int, int],
         if e2 <= dx:
             err += dx
             y0 += sy
-

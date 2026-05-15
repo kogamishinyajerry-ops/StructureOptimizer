@@ -10,11 +10,8 @@ Strategy:
 
 from __future__ import annotations
 
-import copy
-
 import numpy as np
 import pytest
-
 from structure_optimizer.core.config import (
     BenchmarkConfig,
     ConfigError,
@@ -101,9 +98,9 @@ def test_apply_symmetry_projection_unit_case():
     # synthetic asymmetric pattern
     grid = np.zeros((mesh.nely, mesh.nelx))
     grid[2, 3] = 1.0
-    projected = apply_symmetry_projection(
-        mesh, grid.reshape(-1), config.manufacturing_constraints.symmetry
-    ).reshape(mesh.nely, mesh.nelx)
+    projected = apply_symmetry_projection(mesh, grid.reshape(-1), config.manufacturing_constraints.symmetry).reshape(
+        mesh.nely, mesh.nelx
+    )
     # mirror about y at position 0.5: mirror of row 2 (out of 8) is row 5
     assert projected[2, 3] == pytest.approx(0.5)
     assert projected[5, 3] == pytest.approx(0.5)
@@ -113,9 +110,9 @@ def test_apply_extrusion_projection_unit_case():
     config = _make_config({"extrusion": {"axis": "y"}})
     mesh = create_structured_mesh(config)
     grid = np.arange(mesh.nely * mesh.nelx, dtype=float).reshape(mesh.nely, mesh.nelx)
-    projected = apply_extrusion_projection(
-        mesh, grid.reshape(-1), config.manufacturing_constraints.extrusion
-    ).reshape(mesh.nely, mesh.nelx)
+    projected = apply_extrusion_projection(mesh, grid.reshape(-1), config.manufacturing_constraints.extrusion).reshape(
+        mesh.nely, mesh.nelx
+    )
     # extrusion along y: each column uniform = mean of that column
     expected_means = grid.mean(axis=0)
     for col in range(mesh.nelx):
@@ -160,45 +157,40 @@ def test_extrusion_residual_zero_for_uniform_field():
     config = _make_config({"extrusion": {"axis": "y"}})
     mesh = create_structured_mesh(config)
     uniform_columns = np.tile(np.arange(mesh.nelx, dtype=float), (mesh.nely, 1)).reshape(-1)
-    assert (
-        extrusion_residual(mesh, uniform_columns, config.manufacturing_constraints.extrusion)
-        < 1e-12
-    )
+    assert extrusion_residual(mesh, uniform_columns, config.manufacturing_constraints.extrusion) < 1e-12
 
 
 def test_validate_rejects_bad_symmetry_axis():
     raw = _base_raw_config()
     raw["manufacturing_constraints"] = {"symmetry": {"axis": "z", "position": 0.5}}
-    with pytest.raises(ConfigError, match="symmetry.axis"):
+    with pytest.raises(ConfigError, match=r"symmetry\.axis"):
         validate_config(parse_config(raw))
 
 
 def test_validate_rejects_bad_extrusion_axis():
     raw = _base_raw_config()
     raw["manufacturing_constraints"] = {"extrusion": {"axis": "z"}}
-    with pytest.raises(ConfigError, match="extrusion.axis"):
+    with pytest.raises(ConfigError, match=r"extrusion\.axis"):
         validate_config(parse_config(raw))
 
 
 def test_validate_rejects_nonpositive_min_member_size():
     raw = _base_raw_config()
     raw["manufacturing_constraints"] = {"min_member_size": 0.0}
-    with pytest.raises(ConfigError, match="min_member_size"):
+    with pytest.raises(ConfigError, match=r"min_member_size"):
         validate_config(parse_config(raw))
 
 
 def test_validate_rejects_symmetry_position_out_of_range():
     raw = _base_raw_config()
     raw["manufacturing_constraints"] = {"symmetry": {"axis": "x", "position": 1.5}}
-    with pytest.raises(ConfigError, match="symmetry.position"):
+    with pytest.raises(ConfigError, match=r"symmetry\.position"):
         validate_config(parse_config(raw))
 
 
 def test_combined_symmetry_and_extrusion_along_orthogonal_axes():
     """Symmetry about y at mid + extrusion along x → field uniform per row AND mirror-symmetric."""
-    config = _make_config(
-        {"symmetry": {"axis": "y", "position": 0.5}, "extrusion": {"axis": "x"}}
-    )
+    config = _make_config({"symmetry": {"axis": "y", "position": 0.5}, "extrusion": {"axis": "x"}})
     mesh = create_structured_mesh(config)
     result = run_simp(config, mesh)
     grid = result.densities.reshape(mesh.nely, mesh.nelx)

@@ -36,19 +36,15 @@ import numpy as np
 from structure_optimizer.core.config import (
     BenchmarkConfig,
     ExtrusionConstraintConfig,
-    ManufacturingConstraintsConfig,
     SymmetryConstraintConfig,
 )
 from structure_optimizer.core.mesh import StructuredMesh
-
 
 SYMMETRY_TOLERANCE = 1e-3
 EXTRUSION_TOLERANCE = 1e-3
 
 
-def apply_manufacturing_projections(
-    config: BenchmarkConfig, mesh: StructuredMesh, densities: np.ndarray
-) -> np.ndarray:
+def apply_manufacturing_projections(config: BenchmarkConfig, mesh: StructuredMesh, densities: np.ndarray) -> np.ndarray:
     """Apply every active manufacturing projection in deterministic order.
 
     Order: symmetry → extrusion. The order matters when both are declared:
@@ -88,7 +84,7 @@ def apply_symmetry_projection(
     if symmetry.axis == "x":
         mirror_axis_x = symmetry.position * nelx - 0.5  # element-center coordinate of the line
         for ex in range(nelx):
-            mirror_ex = int(round(2 * mirror_axis_x - ex))
+            mirror_ex = round(2 * mirror_axis_x - ex)
             if 0 <= mirror_ex < nelx and mirror_ex != ex:
                 averaged = 0.5 * (grid[:, ex] + grid[:, mirror_ex])
                 grid[:, ex] = averaged
@@ -96,7 +92,7 @@ def apply_symmetry_projection(
     else:  # axis == 'y'
         mirror_axis_y = symmetry.position * nely - 0.5
         for ey in range(nely):
-            mirror_ey = int(round(2 * mirror_axis_y - ey))
+            mirror_ey = round(2 * mirror_axis_y - ey)
             if 0 <= mirror_ey < nely and mirror_ey != ey:
                 averaged = 0.5 * (grid[ey, :] + grid[mirror_ey, :])
                 grid[ey, :] = averaged
@@ -123,9 +119,7 @@ def apply_extrusion_projection(
     return grid.reshape(-1)
 
 
-def symmetry_residual(
-    mesh: StructuredMesh, densities: np.ndarray, symmetry: SymmetryConstraintConfig
-) -> float:
+def symmetry_residual(mesh: StructuredMesh, densities: np.ndarray, symmetry: SymmetryConstraintConfig) -> float:
     """Max absolute deviation from perfect mirror symmetry across the axis.
 
     Returns 0.0 if no paired cells exist (degenerate, position outside).
@@ -136,7 +130,7 @@ def symmetry_residual(
     if symmetry.axis == "x":
         mirror_axis_x = symmetry.position * nelx - 0.5
         for ex in range(nelx):
-            mirror_ex = int(round(2 * mirror_axis_x - ex))
+            mirror_ex = round(2 * mirror_axis_x - ex)
             if 0 <= mirror_ex < nelx and mirror_ex != ex:
                 diff = float(np.max(np.abs(grid[:, ex] - grid[:, mirror_ex])))
                 if diff > max_residual:
@@ -144,7 +138,7 @@ def symmetry_residual(
     else:
         mirror_axis_y = symmetry.position * nely - 0.5
         for ey in range(nely):
-            mirror_ey = int(round(2 * mirror_axis_y - ey))
+            mirror_ey = round(2 * mirror_axis_y - ey)
             if 0 <= mirror_ey < nely and mirror_ey != ey:
                 diff = float(np.max(np.abs(grid[ey, :] - grid[mirror_ey, :])))
                 if diff > max_residual:
@@ -152,9 +146,7 @@ def symmetry_residual(
     return max_residual
 
 
-def extrusion_residual(
-    mesh: StructuredMesh, densities: np.ndarray, extrusion: ExtrusionConstraintConfig
-) -> float:
+def extrusion_residual(mesh: StructuredMesh, densities: np.ndarray, extrusion: ExtrusionConstraintConfig) -> float:
     """Max absolute deviation from perfect axis-uniformity."""
     grid = densities.reshape(mesh.nely, mesh.nelx)
     if extrusion.axis == "x":
@@ -164,9 +156,7 @@ def extrusion_residual(
     return float(np.max(np.abs(grid - col_means)))
 
 
-def min_member_size_compliance(
-    config: BenchmarkConfig, mesh: StructuredMesh
-) -> dict[str, float | bool | str]:
+def min_member_size_compliance(config: BenchmarkConfig, mesh: StructuredMesh) -> dict[str, float | bool | str]:
     """Check whether the configured ``filter_radius`` is large enough to enforce
     the declared ``min_member_size`` under the standard SIMP filter heuristic
     ``min_member_length ≈ 2 * filter_radius * cell_size``.

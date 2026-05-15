@@ -66,19 +66,15 @@ def _string_selector_mask(mesh, selector: str) -> np.ndarray:
     for ey in range(mesh.nely):
         for ex in range(mesh.nelx):
             element_id = mesh.element_index(ex, ey)
-            if selector == "all":
-                mask[element_id] = True
-            elif selector in {"left_edge_band", "left_support_band"} and ex == 0:
-                mask[element_id] = True
-            elif selector in {"right_edge_band", "right_load_band"} and ex == mesh.nelx - 1:
-                mask[element_id] = True
-            elif selector == "top_edge_band" and ey == mesh.nely - 1:
-                mask[element_id] = True
-            elif selector == "bottom_edge_band" and ey == 0:
-                mask[element_id] = True
-            elif selector == "right_mid_pad" and ex == mesh.nelx - 1 and abs((ey + 0.5) / mesh.nely - 0.5) <= 0.12:
-                mask[element_id] = True
-            elif selector == "left_mid_pad" and ex == 0 and abs((ey + 0.5) / mesh.nely - 0.5) <= 0.12:
+            if (
+                selector == "all"
+                or (selector in {"left_edge_band", "left_support_band"} and ex == 0)
+                or (selector in {"right_edge_band", "right_load_band"} and ex == mesh.nelx - 1)
+                or (selector == "top_edge_band" and ey == mesh.nely - 1)
+                or (selector == "bottom_edge_band" and ey == 0)
+                or (selector == "right_mid_pad" and ex == mesh.nelx - 1 and abs((ey + 0.5) / mesh.nely - 0.5) <= 0.12)
+                or (selector == "left_mid_pad" and ex == 0 and abs((ey + 0.5) / mesh.nely - 0.5) <= 0.12)
+            ):
                 mask[element_id] = True
     if not np.any(mask):
         raise ConfigError(f"unknown or empty element selector '{selector}'")

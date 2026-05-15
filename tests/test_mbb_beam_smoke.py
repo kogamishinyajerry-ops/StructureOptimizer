@@ -1,5 +1,4 @@
 import numpy as np
-
 from structure_optimizer.benchmarks.registry import load_benchmark
 from structure_optimizer.core.fem2d import solve_linear_elastic
 from structure_optimizer.core.mesh import create_structured_mesh
@@ -34,4 +33,3 @@ def test_simp_density_bounds_and_smoke_iterations():
     assert len(result.metrics) == config.optimization.max_iterations
     assert np.all(result.densities >= config.optimization.min_density)
     assert np.all(result.densities <= 1.0)
-

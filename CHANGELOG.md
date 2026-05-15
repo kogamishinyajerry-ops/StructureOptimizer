@@ -8,11 +8,50 @@
 
 ## [Unreleased]
 
-### Planned (post v1.0)
+### Planned (post v1.1)
 - v0.6.1 overhang 制造约束（additive manufacturing build direction）— v0.6 暂未支持
-- v1.1 spike：scipy sparse / CalculiX / FEniCS 真适配（要先评估依赖影响）
-- v1.2 robust formulation / 多材料 / 应力约束优化
-- v1.3 真实 CAD/mesh 输入受限工作流（meshio 适配）
+- v1.x spike：scipy sparse / CalculiX / FEniCS 真适配（要先评估依赖影响）
+- robust formulation / 多材料 / 应力约束优化
+- 真实 CAD/mesh 输入受限工作流（meshio 适配）
+
+---
+
+## [1.1.0] — 2026-05-16
+
+### 质量基线建立（Wave A 工程化）
+
+跨过 v1.0 蓝图边界，开始按客观评分体系（`docs/quality-rubric.md`）向"优秀（95+）"迭代。本版自评 **74/100**（v1.0 = 42）。
+
+### Added
+- **`docs/quality-rubric.md`**：100 分客观评分体系（7 维度 + 评级界线 + 评分历史表）
+- **dev tooling**（`pyproject.toml [project.optional-dependencies].dev`）：ruff / mypy / pytest-cov
+- **`tool.ruff` + `tool.mypy` + `tool.coverage` 配置**：项目级 lint / 类型 / 覆盖率规则
+- **`[build-system]` + `[project.scripts]`**：声明 setuptools 构建后端 + `structure-optimizer` console script
+- **`[tool.setuptools] packages`**：显式声明包列表，消除自动发现 warning
+- **新测试 34 个**（65 → 99）：
+  - `tests/test_cli.py`（18 测试）：每个 CLI 命令的 happy + 错误路径；CLI stderr 单行无 traceback 不变量
+  - `tests/test_reproducibility.py`（6 测试）：bit-identical 输出 / input_hash 稳定 / CG 后端确定性
+  - `tests/test_properties.py`（10 测试）：随机种子驱动 SIMP/Pareto/projection 不变式（无 hypothesis 依赖）
+- **`structure-optimizer` console script**：`pip install -e .` 后可直接 `structure-optimizer run ...`
+
+### Fixed (property test 抓出)
+- `format_metric_value("")` 之前返回空字符串 → HTML 表格会出现空 cell；现统一为 `"n/a"`
+
+### Refactor (mypy 友好)
+- `verification.py`：早期返回的 `result` dict 改用 `invalid_result` / `solver_failure` 局部变量避免类型重定义
+- ruff 规则：忽略 RUF001（中文全角标点是有意保留）
+- mypy override：`structure_optimizer.visualization.*` 排除（bespoke GIF/PNG 编码的 numpy/tuple 类型限制不值得深度重构）
+
+### Coverage (首次测量)
+- 总覆盖率 **88.8%**（omit visualization + adapter stubs + __main__）
+- core/ 文件群覆盖率分布：filtering 100% / manufacturability 98.5% / mesh 98.8% / simp 98% / fem2d 97.5% / workflow 97.8% / run_store 97.7% / review_package 95.7% / demo 94% / study 89.8% / verification 88.1% / reporting 87.3% / config 84.1% / manufacturing 78.9% / design_space 57%
+- adapters/solver_base.py 96.6%
+- cli.py 96.4%
+
+### Engineering principles
+- 零 runtime 新依赖；ruff/mypy/pytest-cov 全部在 `[dev]` optional
+- 中文文档保留全角标点（RUF001 ignored）
+- Property tests 不依赖 hypothesis，使用 stdlib `random` + 固定种子保证可复现
 
 ---
 

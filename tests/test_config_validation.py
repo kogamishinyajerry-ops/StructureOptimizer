@@ -1,7 +1,4 @@
-import copy
-
 import pytest
-
 from structure_optimizer.benchmarks.registry import available_benchmarks, load_benchmark
 from structure_optimizer.core.config import ConfigError, parse_config, validate_config
 
@@ -28,4 +25,3 @@ def test_required_benchmark_configs_validate():
     for name in ("mbb_beam", "cantilever", "l_bracket"):
         config = load_benchmark(name)
         assert config.name == name
-

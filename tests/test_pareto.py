@@ -8,10 +8,8 @@ SIMP. Integration is covered indirectly by test_study.py.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
-
 from structure_optimizer.core.study import (
     DEFAULT_OBJECTIVES,
     _assign_pareto_ranks,

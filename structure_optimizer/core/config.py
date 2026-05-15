@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import copy
 import json
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -299,9 +299,7 @@ def _validate_solver_config(solver: SolverConfig) -> None:
     from structure_optimizer.adapters.solver_base import available_backends
 
     if solver.backend not in available_backends():
-        raise ConfigError(
-            f"solver.backend must be one of {available_backends()}, got '{solver.backend}'"
-        )
+        raise ConfigError(f"solver.backend must be one of {available_backends()}, got '{solver.backend}'")
 
 
 def _validate_manufacturing_constraints(constraints: ManufacturingConstraintsConfig) -> None:
@@ -310,9 +308,8 @@ def _validate_manufacturing_constraints(constraints: ManufacturingConstraintsCon
             raise ConfigError("manufacturing_constraints.symmetry.axis must be 'x' or 'y'")
         if not (0.0 <= constraints.symmetry.position <= 1.0):
             raise ConfigError("manufacturing_constraints.symmetry.position must be in [0, 1]")
-    if constraints.extrusion is not None:
-        if constraints.extrusion.axis not in {"x", "y"}:
-            raise ConfigError("manufacturing_constraints.extrusion.axis must be 'x' or 'y'")
+    if constraints.extrusion is not None and constraints.extrusion.axis not in {"x", "y"}:
+        raise ConfigError("manufacturing_constraints.extrusion.axis must be 'x' or 'y'")
     if constraints.min_member_size is not None and constraints.min_member_size <= 0:
         raise ConfigError("manufacturing_constraints.min_member_size must be positive")
 

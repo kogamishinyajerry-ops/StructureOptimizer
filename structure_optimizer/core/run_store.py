@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-from datetime import datetime
 import csv
 import hashlib
 import json
+from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
 
 from structure_optimizer.core.config import BenchmarkConfig
 from structure_optimizer.core.simp import IterationMetric
-
 
 RUNS_ROOT = Path("runs")
 
@@ -77,4 +76,3 @@ def write_json(path: Path, data: dict) -> None:
 
 def read_json(path: Path) -> dict:
     return json.loads(path.read_text())
-

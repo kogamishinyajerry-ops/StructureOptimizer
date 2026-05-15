@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "structure-optimizer"
 version = "1.0.0"
@@ -7,12 +11,92 @@ dependencies = [
   "numpy>=2.0",
 ]
 
+[project.scripts]
+structure-optimizer = "structure_optimizer.cli:main"
+
 [project.optional-dependencies]
 test = [
   "pytest>=8.0",
 ]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.5",
+  "mypy>=1.10",
+]
+
+[tool.setuptools]
+packages = ["structure_optimizer", "structure_optimizer.adapters", "structure_optimizer.benchmarks", "structure_optimizer.core", "structure_optimizer.visualization"]
+
+[tool.setuptools.package-data]
+structure_optimizer = ["benchmarks/configs/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["structure_optimizer"]
+omit = [
+  "structure_optimizer/visualization/*",          # bespoke binary GIF/PNG — exercised by tests producing valid files; line cov misleading
+  "structure_optimizer/adapters/optimizer_base.py", # documented future-extension Protocol stub
+  "structure_optimizer/adapters/file_export.py",    # documented future-extension Protocol stub
+  "structure_optimizer/__main__.py",              # one-line entry point
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+  "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+precision = 1
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["structure_optimizer", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # isort
+  "B",   # bugbear
+  "UP",  # pyupgrade
+  "SIM", # simplify
+  "RUF", # ruff-specific
+]
+ignore = [
+  "E501",   # line too long (we set our own length above; tolerate occasional long strings)
+  "RUF001", # Chinese fullwidth punctuation in strings is intentional (project is bilingual)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]  # assert False idiom
+
+[tool.mypy]
+python_version = "3.11"
+files = ["structure_optimizer"]
+exclude = ["structure_optimizer/visualization/"]
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+# Not strict mode: numpy stubs are coarse and projection helpers use np.ndarray heavily.
+# We aim for "obvious mistakes catch" not "academic strictness".
+# visualization/ is excluded: bespoke GIF/PNG encoding has unavoidable numpy/tuple
+# type-system quirks; correctness is verified by tests producing valid binary files.
+
+[[tool.mypy.overrides]]
+module = "numpy.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "structure_optimizer.visualization.*"
+ignore_errors = true
 

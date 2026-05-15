@@ -2,7 +2,6 @@ import copy
 
 import numpy as np
 import pytest
-
 from structure_optimizer.benchmarks.registry import load_benchmark
 from structure_optimizer.core.config import ConfigError, parse_config, validate_config
 from structure_optimizer.core.mesh import create_structured_mesh
@@ -18,9 +17,7 @@ def _design_space_config():
             {"name": "support_band", "selector": {"type": "box", "x": [0.0, 0.12], "y": [0.0, 1.0]}},
             {"name": "load_pad", "selector": {"type": "box", "x": [0.90, 1.0], "y": [0.40, 0.60]}},
         ],
-        "void": [
-            {"name": "bottom_clearance", "selector": {"type": "box", "x": [0.42, 0.58], "y": [0.0, 0.20]}}
-        ],
+        "void": [{"name": "bottom_clearance", "selector": {"type": "box", "x": [0.42, 0.58], "y": [0.0, 0.20]}}],
     }
     return raw
 

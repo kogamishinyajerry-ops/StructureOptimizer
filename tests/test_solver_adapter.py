@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 from structure_optimizer.adapters.solver_base import (
     NumpyCGSolver,
     NumpyDenseSolver,
@@ -100,7 +99,7 @@ def test_config_validation_rejects_unknown_backend():
         },
         "solver": {"backend": "ansys_pretend"},
     }
-    with pytest.raises(ConfigError, match="solver.backend"):
+    with pytest.raises(ConfigError, match=r"solver\.backend"):
         validate_config(parse_config(raw))
 
 

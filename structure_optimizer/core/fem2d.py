@@ -126,7 +126,7 @@ def _approx_element_stress(
     ue: np.ndarray,
     config: BenchmarkConfig,
 ) -> float:
-    ex, ey = mesh.element_grid_index(element_id)
+    _ex, _ey = mesh.element_grid_index(element_id)
     hx = mesh.width / mesh.nelx
     hy = mesh.height / mesh.nely
     ux = ue[[0, 2, 4, 6]]

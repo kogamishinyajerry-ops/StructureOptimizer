@@ -12,7 +12,6 @@ from structure_optimizer.core.manufacturing import evaluate_manufacturing_compli
 from structure_optimizer.core.mesh import StructuredMesh, create_structured_mesh
 from structure_optimizer.core.run_store import load_density, read_json, write_json
 
-
 PASS_STATUS = "passed"
 FAILURE_STATUSES = {
     "invalid_config",
@@ -34,9 +33,9 @@ def verify_run(run_dir: Path | str) -> dict[str, Any]:
         mesh = create_structured_mesh(config)
         densities = load_density(run_dir)
     except Exception as exc:
-        result = {"status": "invalid_config", "error": str(exc)}
-        write_json(run_dir / "verification.json", result)
-        return result
+        invalid_result: dict[str, Any] = {"status": "invalid_config", "error": str(exc)}
+        write_json(run_dir / "verification.json", invalid_result)
+        return invalid_result
 
     try:
         baseline_densities = np.ones(mesh.elements.shape[0], dtype=float)
@@ -46,9 +45,9 @@ def verify_run(run_dir: Path | str) -> dict[str, Any]:
         candidate, candidate_load_cases = _solve_load_case_metrics(config, mesh, densities)
     except SolverError as exc:
         status = "singular_matrix" if str(exc) == "singular_matrix" else "solver_failed"
-        result = {"status": status, "error": str(exc)}
-        write_json(run_dir / "verification.json", result)
-        return result
+        solver_failure: dict[str, Any] = {"status": status, "error": str(exc)}
+        write_json(run_dir / "verification.json", solver_failure)
+        return solver_failure
 
     active_volume = _active_volume(mesh, densities)
     volume_ok = active_volume <= config.optimization.volume_fraction + 0.02
@@ -145,7 +144,9 @@ def _elements_for_records(mesh: StructuredMesh, records: list[dict], node_to_ele
     return elements
 
 
-def _solve_load_case_metrics(config, mesh: StructuredMesh, densities: np.ndarray) -> tuple[dict[str, float], dict[str, dict]]:
+def _solve_load_case_metrics(
+    config, mesh: StructuredMesh, densities: np.ndarray
+) -> tuple[dict[str, float], dict[str, dict]]:
     load_cases = effective_load_cases(config)
     total_weight = sum(load_case.weight for load_case in load_cases)
     aggregate = {
@@ -239,44 +240,60 @@ def _manufacturing_constraint_records(report: dict[str, dict[str, Any]]) -> list
         if status == "missing":
             continue
         if name == "symmetry_compliance":
-            records.append({
-                "name": "symmetry_compliance",
-                "value": payload.get("residual"),
-                "limit": payload.get("tolerance"),
-                "unit": "density_residual",
-                "source": "manufacturing_projection",
-                "status": status,
-            })
+            records.append(
+                {
+                    "name": "symmetry_compliance",
+                    "value": payload.get("residual"),
+                    "limit": payload.get("tolerance"),
+                    "unit": "density_residual",
+                    "source": "manufacturing_projection",
+                    "status": status,
+                }
+            )
         elif name == "extrusion_compliance":
-            records.append({
-                "name": "extrusion_compliance",
-                "value": payload.get("residual"),
-                "limit": payload.get("tolerance"),
-                "unit": "density_residual",
-                "source": "manufacturing_projection",
-                "status": status,
-            })
+            records.append(
+                {
+                    "name": "extrusion_compliance",
+                    "value": payload.get("residual"),
+                    "limit": payload.get("tolerance"),
+                    "unit": "density_residual",
+                    "source": "manufacturing_projection",
+                    "status": status,
+                }
+            )
         elif name == "min_member_size_compliance":
-            records.append({
-                "name": "min_member_size_compliance",
-                "value": payload.get("enforced_length"),
-                "limit": payload.get("min_member_size"),
-                "unit": "model_length",
-                "source": "filter_radius_heuristic",
-                "status": status,
-            })
+            records.append(
+                {
+                    "name": "min_member_size_compliance",
+                    "value": payload.get("enforced_length"),
+                    "limit": payload.get("min_member_size"),
+                    "unit": "model_length",
+                    "source": "filter_radius_heuristic",
+                    "status": status,
+                }
+            )
     return records
 
 
 def _response_records(candidate: dict[str, float]) -> list[dict[str, Any]]:
     return [
         {"name": "mass", "value": candidate["mass"], "unit": "model_mass", "source": "independent_verification"},
-        {"name": "compliance", "value": candidate["compliance"], "unit": "force_length", "source": "independent_verification"},
+        {
+            "name": "compliance",
+            "value": candidate["compliance"],
+            "unit": "force_length",
+            "source": "independent_verification",
+        },
         {
             "name": "max_displacement",
             "value": candidate["max_displacement"],
             "unit": "model_length",
             "source": "independent_verification",
         },
-        {"name": "max_stress", "value": candidate["max_stress"], "unit": "model_stress", "source": "independent_verification"},
+        {
+            "name": "max_stress",
+            "value": candidate["max_stress"],
+            "unit": "model_stress",
+            "source": "independent_verification",
+        },
     ]

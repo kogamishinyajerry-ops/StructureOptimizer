@@ -67,7 +67,7 @@ def _lzw_codes(pixels: list[int], min_code_size: int) -> list[tuple[int, int]]:
     codes: list[tuple[int, int]] = [(clear, code_size)]
     current = (pixels[0],)
     for pixel in pixels[1:]:
-        candidate = current + (pixel,)
+        candidate = (*current, pixel)
         if candidate in dictionary:
             current = candidate
             continue

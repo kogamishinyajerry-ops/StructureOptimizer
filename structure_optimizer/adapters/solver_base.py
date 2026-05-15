@@ -143,9 +143,7 @@ def get_linear_solver(backend: str | None) -> LinearSolver:
     key = (backend or "dense").lower()
     impl = _REGISTRY.get(key)
     if impl is None:
-        raise ValueError(
-            f"Unknown linear solver backend '{backend}'. Available: {available_backends()}"
-        )
+        raise ValueError(f"Unknown linear solver backend '{backend}'. Available: {available_backends()}")
     return impl()
 
 

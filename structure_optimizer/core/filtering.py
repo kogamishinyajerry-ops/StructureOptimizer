@@ -27,4 +27,3 @@ def density_filter(
         denominator = max(min_density, densities[i]) * max(total_weight, 1e-12)
         filtered[i] = value / denominator
     return filtered
-

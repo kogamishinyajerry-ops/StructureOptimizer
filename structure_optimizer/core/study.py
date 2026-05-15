@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
 import copy
 import csv
 import html
 import itertools
 import json
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,6 @@ from structure_optimizer.core.review_package import (
 )
 from structure_optimizer.core.run_store import RUNS_ROOT, read_json, write_json
 from structure_optimizer.core.workflow import run_config
-
 
 DEFAULT_RANKING = ["verification_status", "mass", "compliance", "max_displacement"]
 DEFAULT_OBJECTIVES: list[dict[str, str]] = [
@@ -167,7 +166,9 @@ def _create_study_dir(study: StudyConfig) -> Path:
 
 def _parameter_matrix(parameters: dict[str, list[Any]]) -> list[dict[str, Any]]:
     names = list(parameters)
-    return [dict(zip(names, values, strict=True)) for values in itertools.product(*(parameters[name] for name in names))]
+    return [
+        dict(zip(names, values, strict=True)) for values in itertools.product(*(parameters[name] for name in names))
+    ]
 
 
 def _config_with_overrides(base_config: BenchmarkConfig, overrides: dict[str, Any]) -> BenchmarkConfig:
@@ -240,9 +241,7 @@ def _assign_pareto_ranks(rows: list[dict[str, Any]], objectives: list[dict[str, 
     Algorithm: iterative peeling — find the non-dominated set among remaining
     eligible candidates, assign current rank, remove, repeat.
     """
-    eligible: list[int] = [
-        idx for idx, row in enumerate(rows) if row.get("verification_status") == "passed"
-    ]
+    eligible: list[int] = [idx for idx, row in enumerate(rows) if row.get("verification_status") == "passed"]
     for row in rows:
         row["pareto_rank"] = ""
 
@@ -282,6 +281,8 @@ def _assign_pareto_ranks(rows: list[dict[str, Any]], objectives: list[dict[str, 
 
 def _objective_value(row: dict[str, Any], objective: dict[str, str]) -> float:
     raw = row.get(objective["name"])
+    if raw is None:
+        return float("inf") if objective["direction"] == "minimize" else float("-inf")
     try:
         return float(raw)
     except (TypeError, ValueError):
@@ -347,13 +348,12 @@ def _write_study_html(path: Path, study: StudyConfig, rows: list[dict[str, Any]]
         f'<a class="point {_point_class(row)}" href="{html.escape(row["candidate_id"])}/report.md" '
         f'style="left:{point["x"]:.1f}%; bottom:{point["y"]:.1f}%;" '
         f'title="{html.escape(row["candidate_id"])} pareto_rank={row.get("pareto_rank", "")} mass={row["mass"]} compliance={row["compliance"]}">'
-        f'{html.escape(str(row["rank"]))}</a>'
+        f"{html.escape(str(row['rank']))}</a>"
         for row, point in zip(rows, points, strict=True)
     )
     pareto_front_count = sum(1 for row in rows if row.get("pareto_rank") == 1)
     pareto_objective_text = " vs ".join(
-        f"{obj['name']} ({'最小化' if obj['direction'] == 'minimize' else '最大化'})"
-        for obj in study.objectives
+        f"{obj['name']} ({'最小化' if obj['direction'] == 'minimize' else '最大化'})" for obj in study.objectives
     )
     html_text = f"""<!doctype html>
 <html lang="zh-CN">

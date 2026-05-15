@@ -112,4 +112,3 @@ def _gray_density_fraction(mesh: StructuredMesh, densities: np.ndarray) -> float
         return 0.0
     gray = (active > 0.15) & (active < 0.85)
     return float(np.count_nonzero(gray) / active.size)
-

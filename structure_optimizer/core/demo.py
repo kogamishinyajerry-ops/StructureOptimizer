@@ -10,7 +10,6 @@ from structure_optimizer.core.review_package import (
     limitation_disclaimer_html,
     percent_reduction,
     status_badge_html,
-    status_class,
     zh_check_name,
     zh_status,
     zh_stop_reason,
@@ -29,7 +28,9 @@ def generate_demo_html(run_dir: Path | str) -> Path:
     run_dir = Path(run_dir)
     input_config = read_json(run_dir / "input.json")
     summary = read_json(run_dir / "summary.json") if (run_dir / "summary.json").exists() else {}
-    verification = read_json(run_dir / "verification.json") if (run_dir / "verification.json").exists() else verify_run(run_dir)
+    verification = (
+        read_json(run_dir / "verification.json") if (run_dir / "verification.json").exists() else verify_run(run_dir)
+    )
     metrics = load_metrics(run_dir)
     report_path = run_dir / "report.md"
     if not report_path.exists():
@@ -38,7 +39,7 @@ def generate_demo_html(run_dir: Path | str) -> Path:
     benchmark = input_config["name"]
     dimension = input_config["dimension"]
     mesh = input_config["mesh"]
-    optimization = input_config["optimization"]
+    input_config["optimization"]
     baseline = verification.get("baseline", {})
     candidate = verification.get("candidate", {})
     objective = verification.get("objective", {})
@@ -313,7 +314,7 @@ def generate_demo_html(run_dir: Path | str) -> Path:
   <header>
     <section class="hero">
       <div>
-        {status_badge_html(verification.get('status'), '验证状态：' + zh_status(verification.get('status')))}
+        {status_badge_html(verification.get("status"), "验证状态：" + zh_status(verification.get("status")))}
         <p class="eyebrow">StructureOptimizer 结构优化演示</p>
         <h1>从实心支架到轻量化候选结构</h1>
         <p>这是一页给非算法背景也能看懂的本地演示：先给定原始支架、固定边和载荷，再让 SIMP 拓扑优化自动移除低效材料，最后做一次独立验证检查。这里的结果是“优化候选方案”，不是可直接投产的认证设计。</p>
@@ -388,10 +389,10 @@ def generate_demo_html(run_dir: Path | str) -> Path:
           <tr><th>项目</th><th>值</th></tr>
           <tr><td>算例</td><td>{escape(benchmark)}</td></tr>
           <tr><td>模型维度</td><td>{escape(dimension)}</td></tr>
-          <tr><td>网格</td><td>{mesh.get('nelx')} x {mesh.get('nely')}</td></tr>
+          <tr><td>网格</td><td>{mesh.get("nelx")} x {mesh.get("nely")}</td></tr>
           <tr><td>目标</td><td>最小柔度</td></tr>
-          <tr><td>迭代次数</td><td>{summary.get('iterations', len(metrics))}</td></tr>
-          <tr><td>停止原因</td><td>{zh_stop_reason(summary.get('stop_reason', 'unknown'))}</td></tr>
+          <tr><td>迭代次数</td><td>{summary.get("iterations", len(metrics))}</td></tr>
+          <tr><td>停止原因</td><td>{zh_stop_reason(summary.get("stop_reason", "unknown"))}</td></tr>
         </table>
       </div>
     </section>
@@ -435,7 +436,7 @@ def generate_demo_html(run_dir: Path | str) -> Path:
         <a href="report.md">report.md</a>
       </div>
       <p>第一次迭代柔度：{format_metric_value(first_metric.get("compliance"))}。最终记录迭代柔度：{format_metric_value(last_metric.get("compliance"))}。</p>
-      <div class="bar"><span style="width: {_bar_width(verification.get('actual_volume_fraction'))}%"></span></div>
+      <div class="bar"><span style="width: {_bar_width(verification.get("actual_volume_fraction"))}%"></span></div>
       <p>上方进度条表示独立验证得到的材料保留比例。</p>
     </section>
   </main>
@@ -472,9 +473,17 @@ def _legend() -> str:
 def _metric_explainers() -> str:
     return (
         '<div class="metric-explainers">'
-        + _explain("柔度怎么读", "柔度越低，结构越不容易变形，通常越硬。减重后柔度上升是常见权衡，说明需要看使用场景能否接受。")
-        + _explain("最大位移怎么读", "最大位移越低，结构受力后的最大变形越小。位移变大并不必然失败，但需要和设计允许变形量比较。")
-        + _explain("近似应力怎么读", "应力越高，局部材料越吃力。当前是简化 2D/2.5D 近似值，只能做风险提示，不能替代高保真 FEA。")
+        + _explain(
+            "柔度怎么读", "柔度越低，结构越不容易变形，通常越硬。减重后柔度上升是常见权衡，说明需要看使用场景能否接受。"
+        )
+        + _explain(
+            "最大位移怎么读",
+            "最大位移越低，结构受力后的最大变形越小。位移变大并不必然失败，但需要和设计允许变形量比较。",
+        )
+        + _explain(
+            "近似应力怎么读",
+            "应力越高，局部材料越吃力。当前是简化 2D/2.5D 近似值，只能做风险提示，不能替代高保真 FEA。",
+        )
         + "</div>"
     )
 
@@ -488,7 +497,9 @@ def _comparison_table(baseline: dict[str, Any], candidate: dict[str, Any]) -> st
     }
     rows = ["<table><tr><th>指标</th><th>原始结构</th><th>优化候选</th></tr>"]
     for key in ("mass", "compliance", "max_displacement", "max_stress"):
-        rows.append(f"<tr><td>{labels[key]}</td><td>{format_metric_value(baseline.get(key))}</td><td>{format_metric_value(candidate.get(key))}</td></tr>")
+        rows.append(
+            f"<tr><td>{labels[key]}</td><td>{format_metric_value(baseline.get(key))}</td><td>{format_metric_value(candidate.get(key))}</td></tr>"
+        )
     rows.append("</table>")
     return "".join(rows)
 
@@ -523,11 +534,15 @@ def _manufacturability_table(manufacturability: dict[str, Any]) -> str:
     checks = manufacturability.get("checks", {})
     if not checks:
         return "<p>没有生成制造性检查结果。</p>"
-    rows = [f'<p>{status_badge_html(manufacturability.get("status"), "总体：" + zh_status(manufacturability.get("status")))}</p>']
+    rows = [
+        f"<p>{status_badge_html(manufacturability.get('status'), '总体：' + zh_status(manufacturability.get('status')))}</p>"
+    ]
     rows.append("<table><tr><th>检查项</th><th>状态</th><th>关键结果</th></tr>")
     for name, check in checks.items():
         detail = ", ".join(f"{key}={value}" for key, value in check.items() if key not in {"status", "rule"})
-        rows.append(f"<tr><td>{zh_check_name(name)}</td><td>{zh_status(check.get('status', 'unknown'))}</td><td>{escape(detail)}</td></tr>")
+        rows.append(
+            f"<tr><td>{zh_check_name(name)}</td><td>{zh_status(check.get('status', 'unknown'))}</td><td>{escape(detail)}</td></tr>"
+        )
     rows.append("</table>")
     return "".join(rows)
 

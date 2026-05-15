@@ -81,7 +81,9 @@ def format_metric_value(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, str):
-        return escape(value)
+        # Empty string would render as a blank table cell — collapse to n/a
+        # for visual consistency with None.
+        return escape(value) if value else "n/a"
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -101,22 +103,22 @@ def limitation_disclaimer_html(tone: str) -> str:
     if tone == "evaluator":
         return (
             '<section class="panel limitation" style="margin-top: 18px;">'
-            '<h2>结果适用范围</h2>'
-            '<p>本页展示的是结构优化候选方案，不是可直接投产的认证设计。'
-            '后续仍需要工程师完成高保真校核、制造性复核和必要的物理测试，'
-            '才能进入工程评审通过状态。</p>'
-            '<p>密度图反映载荷路径分布；柔度、最大位移和近似应力为简化模型下的'
-            '工程趋势指标，使用前请结合具体许用值与设计规范判断。</p>'
-            '</section>'
+            "<h2>结果适用范围</h2>"
+            "<p>本页展示的是结构优化候选方案，不是可直接投产的认证设计。"
+            "后续仍需要工程师完成高保真校核、制造性复核和必要的物理测试，"
+            "才能进入工程评审通过状态。</p>"
+            "<p>密度图反映载荷路径分布；柔度、最大位移和近似应力为简化模型下的"
+            "工程趋势指标，使用前请结合具体许用值与设计规范判断。</p>"
+            "</section>"
         )
     if tone == "engineering":
         return (
-            '<section>'
-            '<h2>限制说明</h2>'
+            "<section>"
+            "<h2>限制说明</h2>"
             '<p class="limits">这些结果是本地线弹性 SIMP 的 optimization candidate '
-            '对比，不是生产认证结论。当前模型仅覆盖 2D/2.5D benchmark model，'
-            '需要工程师继续做高保真校核、制造性复核和必要的物理测试。</p>'
-            '</section>'
+            "对比，不是生产认证结论。当前模型仅覆盖 2D/2.5D benchmark model，"
+            "需要工程师继续做高保真校核、制造性复核和必要的物理测试。</p>"
+            "</section>"
         )
     raise ValueError(f"Unknown limitation tone: {tone!r}; expected 'evaluator' or 'engineering'")
 

@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from structure_optimizer.core.reporting import generate_report
 from structure_optimizer.core.verification import FAILURE_STATUSES, PASS_STATUS, verify_run
 from structure_optimizer.core.workflow import run_benchmark

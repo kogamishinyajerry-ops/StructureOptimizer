@@ -22,7 +22,6 @@ from datetime import datetime
 from pathlib import Path
 
 from structure_optimizer.benchmarks.registry import available_benchmarks, load_benchmark
-from structure_optimizer.core.run_store import RUNS_ROOT
 from structure_optimizer.core.workflow import run_config
 
 
@@ -39,8 +38,9 @@ def _benchmarks_with_smoke() -> dict[str, str | None]:
     """Map each benchmark name to its preferred preset for perf benchmarking."""
     mapping: dict[str, str | None] = {}
     for name in available_benchmarks():
-        config_raw = (Path(__file__).resolve().parent.parent
-                      / "structure_optimizer" / "benchmarks" / "configs" / f"{name}.json")
+        config_raw = (
+            Path(__file__).resolve().parent.parent / "structure_optimizer" / "benchmarks" / "configs" / f"{name}.json"
+        )
         text = config_raw.read_text()
         if '"smoke"' in text:
             mapping[name] = "smoke"
@@ -65,8 +65,16 @@ def main() -> int:
         try:
             config = load_benchmark(name, preset=preset)
         except Exception as exc:
-            rows.append({"benchmark": name, "preset": preset or "default", "wall_s": float("nan"),
-                         "rss_delta_mb": float("nan"), "iterations": 0, "status": f"config_error: {exc}"})
+            rows.append(
+                {
+                    "benchmark": name,
+                    "preset": preset or "default",
+                    "wall_s": float("nan"),
+                    "rss_delta_mb": float("nan"),
+                    "iterations": 0,
+                    "status": f"config_error: {exc}",
+                }
+            )
             continue
         start = time.perf_counter()
         rss_pre = _maxrss_mb()
@@ -76,18 +84,27 @@ def main() -> int:
             rss_post = _maxrss_mb()
             verification = (run_dir / "verification.json").read_text()
             verified = '"status": "passed"' in verification
-            rows.append({
-                "benchmark": name,
-                "preset": preset or "default",
-                "mesh": f"{config.mesh.nelx}×{config.mesh.nely}",
-                "max_iterations": config.optimization.max_iterations,
-                "wall_s": elapsed,
-                "rss_delta_mb": max(0.0, rss_post - rss_pre),
-                "verification": "passed" if verified else "see verification.json",
-            })
+            rows.append(
+                {
+                    "benchmark": name,
+                    "preset": preset or "default",
+                    "mesh": f"{config.mesh.nelx}×{config.mesh.nely}",
+                    "max_iterations": config.optimization.max_iterations,
+                    "wall_s": elapsed,
+                    "rss_delta_mb": max(0.0, rss_post - rss_pre),
+                    "verification": "passed" if verified else "see verification.json",
+                }
+            )
         except Exception as exc:
-            rows.append({"benchmark": name, "preset": preset or "default", "wall_s": float("nan"),
-                         "rss_delta_mb": float("nan"), "verification": f"error: {exc}"})
+            rows.append(
+                {
+                    "benchmark": name,
+                    "preset": preset or "default",
+                    "wall_s": float("nan"),
+                    "rss_delta_mb": float("nan"),
+                    "verification": f"error: {exc}",
+                }
+            )
 
     total_rss_delta = _maxrss_mb() - rss_before
     timestamp = datetime.now().isoformat(timespec="seconds")
