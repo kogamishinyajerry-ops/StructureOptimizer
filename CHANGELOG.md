@@ -8,10 +8,66 @@
 
 ## [Unreleased]
 
-### Planned
-- v1.0 性能基线 + 已知限制清单 + README polish（可冻结里程碑）
+### Planned (post v1.0)
 - v0.6.1 overhang 制造约束（additive manufacturing build direction）— v0.6 暂未支持
-- v0.9+ spike：scipy sparse / CalculiX / FEniCS 真适配（要先评估依赖影响）
+- v1.1 spike：scipy sparse / CalculiX / FEniCS 真适配（要先评估依赖影响）
+- v1.2 robust formulation / 多材料 / 应力约束优化
+- v1.3 真实 CAD/mesh 输入受限工作流（meshio 适配）
+
+---
+
+## [1.0.0] — 2026-05-16
+
+### 首个可冻结里程碑
+
+v1.0.0 是 StructureOptimizer 第一个标记为"可冻结"（freezable）的版本：MVP slice 1-7 + v0.5 评审包 + v0.6 制造约束 + v0.7 Pareto + v0.8 求解器抽象屏障，叠加 README / 文档 / 性能基线。
+
+### Added
+- **`scripts/benchmark_performance.py`**：自动生成 `docs/performance.md` 性能基线
+  - 跑全部内置 benchmark（smoke preset 优先）
+  - 记录 wall time + ΔRSS + 验证状态
+  - 加入平台 / Python / 解释器 metadata，便于跨机对照
+  - 支持 `--dry-run` / `--preset` 选项
+- **`docs/performance.md`**：自动生成的性能基线表格（首版于 macOS arm64 / Python 3.12 / NumPy 2.x）
+- **README 全面 polish**：
+  - 一句话定位 + 能力矩阵（覆盖 vs 不覆盖）
+  - 完整 CLI 参考表
+  - Run 目录布局图
+  - **v1.0 验收清单**：可复制粘贴的 7 条命令
+  - 9 条**已知限制**清单（评审前必告知）
+  - 项目结构 + 文档导航
+  - 贡献指南（如何加 benchmark）
+- **`pyproject.toml`**：version 0.1.0 → 1.0.0，description 升级反映完整能力
+
+### Acceptance (v1.0.0 验收)
+所有以下命令成功完成：
+
+```bash
+python -m pytest                                                              # 65/65 passed
+python -m structure_optimizer run     --benchmark mbb_beam      --preset smoke
+python -m structure_optimizer verify  --run runs/mbb_beam/<latest>            # status=passed
+python -m structure_optimizer report  --run runs/mbb_beam/<latest>
+python -m structure_optimizer demo    --benchmark simple_bracket --preset demo
+python -m structure_optimizer study   --config studies/simple_bracket_tradeoff.json
+PYTHONPATH=. python scripts/benchmark_performance.py                          # 5 benchmark 全 pass
+```
+
+### 累计能力（v0.1 → v1.0）
+- **5 个 benchmark**：mbb_beam / cantilever / l_bracket / loaded_hook / simple_bracket
+- **5 个 CLI 命令**：run / verify / report / demo / study
+- **8 类失败状态**：明确分类便于排错
+- **3 类制造约束**：symmetry / extrusion / min_member_size 投影 + 合规性度量
+- **2 种求解器后端**：dense / cg（adapter ABC 抽象屏障）
+- **真 Pareto 前沿**：非支配排序 + 视觉凸显
+- **65 个测试**：覆盖配置校验 / FEM 冒烟 / SIMP / verify / report / demo / study / Pareto / manufacturing constraints / solver adapter / review package
+
+### Engineering principles (v1.0 全程守住)
+- 零新框架依赖（仅 NumPy + pytest）
+- 本地优先：无云、无 GUI、无服务端
+- 配置优先：每个 benchmark 由显式 JSON 驱动
+- 验证优先：迭代指标与独立验证指标在所有产物中严格区分
+- 适配器边界清晰：solver / optimizer / file_export 三 stub，solver 已实装为示范
+- 渐进可逆：每个里程碑独立 commit + tag（v0.4.0 / v0.5.0 / v0.6.0 / v0.7.0 / v0.8.0 / v1.0.0）
 
 ---
 
