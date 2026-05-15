@@ -7,6 +7,7 @@ import numpy as np
 from structure_optimizer.core.config import BenchmarkConfig, LoadCaseConfig, effective_load_cases
 from structure_optimizer.core.fem2d import FEMResult, solve_linear_elastic
 from structure_optimizer.core.filtering import density_filter
+from structure_optimizer.core.manufacturing import apply_manufacturing_projections
 from structure_optimizer.core.mesh import StructuredMesh
 
 
@@ -53,6 +54,7 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
         sensitivities[~mesh.design_mask] = 0.0
         sensitivities = density_filter(mesh, densities, sensitivities, opt.filter_radius, opt.min_density)
         densities = _optimality_criteria_update(config, mesh, densities, sensitivities)
+        densities = apply_manufacturing_projections(config, mesh, densities)
         densities = _apply_density_masks(config, mesh, densities)
         density_history.append(densities.copy())
         change = float(np.max(np.abs(densities - previous)))

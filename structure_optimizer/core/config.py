@@ -47,6 +47,30 @@ class DesignSpaceConfig:
 
 
 @dataclass(frozen=True)
+class SymmetryConstraintConfig:
+    axis: str  # 'x' for mirror across vertical line, 'y' for horizontal line
+    position: float = 0.5  # normalized [0, 1]
+
+
+@dataclass(frozen=True)
+class ExtrusionConstraintConfig:
+    axis: str  # 'x' = uniform along x (varies in y); 'y' = uniform along y (varies in x)
+
+
+@dataclass(frozen=True)
+class ManufacturingConstraintsConfig:
+    """v0.6 manufacturing constraints applied during optimization.
+
+    All fields optional; absence means no constraint applied. Compatible with
+    earlier configs that omit ``manufacturing_constraints`` entirely.
+    """
+
+    symmetry: SymmetryConstraintConfig | None = None
+    extrusion: ExtrusionConstraintConfig | None = None
+    min_member_size: float | None = None  # length, same units as mesh.width/height
+
+
+@dataclass(frozen=True)
 class LoadCaseConfig:
     name: str
     weight: float
@@ -65,6 +89,7 @@ class BenchmarkConfig:
     optimization: OptimizationConfig
     design_space: DesignSpaceConfig = field(default_factory=DesignSpaceConfig)
     load_cases: list[LoadCaseConfig] = field(default_factory=list)
+    manufacturing_constraints: ManufacturingConstraintsConfig = field(default_factory=ManufacturingConstraintsConfig)
     thickness: float = 1.0
     source_path: str | None = None
 
@@ -107,6 +132,7 @@ def parse_config(raw: dict[str, Any], source_path: str | None = None) -> Benchma
             LoadCaseConfig(name=str(case["name"]), weight=float(case.get("weight", 1.0)), loads=list(case["loads"]))
             for case in raw.get("load_cases", [])
         ]
+        manufacturing_constraints = _parse_manufacturing_constraints(raw.get("manufacturing_constraints", {}))
         return BenchmarkConfig(
             name=raw["name"],
             dimension=raw["dimension"],
@@ -119,12 +145,45 @@ def parse_config(raw: dict[str, Any], source_path: str | None = None) -> Benchma
             optimization=optimization,
             design_space=design_space,
             load_cases=load_cases,
+            manufacturing_constraints=manufacturing_constraints,
             source_path=source_path,
         )
     except KeyError as exc:
         raise ConfigError(f"Missing required config field: {exc.args[0]}") from exc
     except TypeError as exc:
         raise ConfigError(f"Invalid config structure: {exc}") from exc
+
+
+def _parse_manufacturing_constraints(raw: dict[str, Any]) -> ManufacturingConstraintsConfig:
+    if not isinstance(raw, dict):
+        raise ConfigError("manufacturing_constraints must be an object")
+    symmetry_raw = raw.get("symmetry")
+    extrusion_raw = raw.get("extrusion")
+    min_member_size = raw.get("min_member_size")
+
+    symmetry = None
+    if symmetry_raw is not None:
+        if not isinstance(symmetry_raw, dict):
+            raise ConfigError("manufacturing_constraints.symmetry must be an object")
+        symmetry = SymmetryConstraintConfig(
+            axis=str(symmetry_raw.get("axis", "")),
+            position=float(symmetry_raw.get("position", 0.5)),
+        )
+
+    extrusion = None
+    if extrusion_raw is not None:
+        if not isinstance(extrusion_raw, dict):
+            raise ConfigError("manufacturing_constraints.extrusion must be an object")
+        extrusion = ExtrusionConstraintConfig(axis=str(extrusion_raw.get("axis", "")))
+
+    if min_member_size is not None:
+        min_member_size = float(min_member_size)
+
+    return ManufacturingConstraintsConfig(
+        symmetry=symmetry,
+        extrusion=extrusion,
+        min_member_size=min_member_size,
+    )
 
 
 def validate_config(config: BenchmarkConfig) -> None:
@@ -190,6 +249,7 @@ def validate_config(config: BenchmarkConfig) -> None:
             if float(load.get("fx", 0.0)) == 0.0 and float(load.get("fy", 0.0)) == 0.0:
                 raise ConfigError("load case load must define nonzero fx or fy")
     _validate_design_space(config.design_space)
+    _validate_manufacturing_constraints(config.manufacturing_constraints)
 
 
 def _validate_selector_record(record: dict[str, Any], label: str) -> None:
@@ -210,6 +270,19 @@ def _validate_design_space(design_space: DesignSpaceConfig) -> None:
             selector = region.get("selector")
             if not isinstance(selector, (str, dict)):
                 raise ConfigError(f"design_space.{label} region requires a selector")
+
+
+def _validate_manufacturing_constraints(constraints: ManufacturingConstraintsConfig) -> None:
+    if constraints.symmetry is not None:
+        if constraints.symmetry.axis not in {"x", "y"}:
+            raise ConfigError("manufacturing_constraints.symmetry.axis must be 'x' or 'y'")
+        if not (0.0 <= constraints.symmetry.position <= 1.0):
+            raise ConfigError("manufacturing_constraints.symmetry.position must be in [0, 1]")
+    if constraints.extrusion is not None:
+        if constraints.extrusion.axis not in {"x", "y"}:
+            raise ConfigError("manufacturing_constraints.extrusion.axis must be 'x' or 'y'")
+    if constraints.min_member_size is not None and constraints.min_member_size <= 0:
+        raise ConfigError("manufacturing_constraints.min_member_size must be positive")
 
 
 def effective_load_cases(config: BenchmarkConfig) -> list[LoadCaseConfig]:

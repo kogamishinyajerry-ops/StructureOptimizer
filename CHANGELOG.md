@@ -9,9 +9,46 @@
 ## [Unreleased]
 
 ### Planned
-- v0.6 制造约束粗 warning → 实约束（min 构件尺寸 / 对称 / 单向挤出 / overhang 进入优化）
 - v0.7 真正 Pareto 前沿提取 + study.html 凸显前沿点
 - v0.8 求解器 adapter 稳固化（dense ⇄ sparse 透明切换，留 CalculiX/FEniCS 钩子）
+- v0.6.1 overhang 制造约束（additive manufacturing build direction）— v0.6 暂未支持
+
+---
+
+## [0.6.0] — 2026-05-16
+
+### Added (制造约束粗→实)
+- **新模块 `core/manufacturing.py`**：制造约束**预先**投影（区分 `manufacturability.py` 的事后 warning）
+  - `apply_symmetry_projection(mesh, densities, symmetry)`：沿 x 或 y 轴线镜像取均值
+  - `apply_extrusion_projection(mesh, densities, extrusion)`：沿轴取均值产出轴向均匀场
+  - `apply_manufacturing_projections(config, mesh, densities)`：deterministic 顺序应用所有声明的约束
+  - `symmetry_residual` / `extrusion_residual` / `min_member_size_compliance` / `evaluate_manufacturing_compliance`：合规性度量
+- **`BenchmarkConfig` 扩展**：新增 `manufacturing_constraints` 字段（`SymmetryConstraintConfig` + `ExtrusionConstraintConfig` + `min_member_size: float | None`）
+  - 完整向后兼容：缺失字段 = 无约束
+- **SIMP 循环 wire-in**：每轮 OC update 之后、design-space mask 之前应用 manufacturing projection
+  - frozen_solid / void mask 永远胜过 projection（design intent 是 hard，制造投影是 best-effort）
+- **`verification.json` 新增约束记录**：
+  - `symmetry_compliance`（residual ≤ 1e-3 为 passed）
+  - `extrusion_compliance`（residual ≤ 1e-3 为 passed）
+  - `min_member_size_compliance`（按 `2 * filter_radius * cell_size ≥ target` 启发式判断）
+  - 未声明的约束**不**写入 constraint 列表（避免噪音）
+- **`verification.json` 顶层新增 `manufacturing_compliance` 字段**：完整 projection 报告 + 残差数值
+- 完整 schema 校验：拒绝非法 axis（z 等）、负 min_member_size、超 [0,1] 的 symmetry position
+
+### Tests
+- 新 `tests/test_manufacturing_constraints.py`：14 个测试
+  - symmetry / extrusion projection 单元测试 + SIMP-loop 集成（小网格 5 iter）
+  - min_member_size 三态（passed / warning / missing）
+  - 4 条 ConfigError 校验路径
+  - 正交组合（symmetry-y + extrusion-x）
+
+### Engineering principles
+- 不引入新依赖（projection 全 NumPy 单步操作）
+- 双模块清晰分工：`manufacturing.py` = 预先约束（影响 SIMP 解），`manufacturability.py` = 事后检查（仅报告）
+- overhang 制造约束**故意**推迟到 v0.6.1（2D 下定义模糊，需要更明确的 build direction 语义）
+
+### Test coverage
+27 → 41（+14 新）
 
 ---
 

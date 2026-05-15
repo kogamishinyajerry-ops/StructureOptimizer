@@ -8,6 +8,7 @@ import numpy as np
 from structure_optimizer.core.config import effective_load_cases, parse_config, validate_config
 from structure_optimizer.core.fem2d import SolverError, solve_linear_elastic
 from structure_optimizer.core.manufacturability import analyze_manufacturability
+from structure_optimizer.core.manufacturing import evaluate_manufacturing_compliance
 from structure_optimizer.core.mesh import StructuredMesh, create_structured_mesh
 from structure_optimizer.core.run_store import load_density, read_json, write_json
 
@@ -55,6 +56,7 @@ def verify_run(run_dir: Path | str) -> dict[str, Any]:
     frozen_ok = _frozen_solid_ok(mesh, densities)
     void_ok = _void_ok(config, mesh, densities)
     manufacturability = analyze_manufacturability(config, mesh, densities)
+    manufacturing_compliance = evaluate_manufacturing_compliance(config, mesh, densities)
     if not frozen_ok or not void_ok:
         status = "design_space_constraint_failed"
     elif not volume_ok:
@@ -64,6 +66,7 @@ def verify_run(run_dir: Path | str) -> dict[str, Any]:
     else:
         status = PASS_STATUS
     constraints = _constraint_records(config, active_volume, volume_ok, connectivity_ok, frozen_ok, void_ok)
+    constraints.extend(_manufacturing_constraint_records(manufacturing_compliance))
     objective_name = "weighted_compliance" if len(effective_load_cases(config)) > 1 else "compliance"
 
     result = {
@@ -90,6 +93,7 @@ def verify_run(run_dir: Path | str) -> dict[str, Any]:
         "baseline": baseline,
         "candidate": candidate,
         "manufacturability": manufacturability,
+        "manufacturing_compliance": manufacturing_compliance,
         "limitations": "2D/2.5D SIMP results are optimization candidates and require engineering review before production use.",
     }
     write_json(run_dir / "verification.json", result)
@@ -226,6 +230,42 @@ def _constraint_records(
             "status": "passed" if void_ok else "failed",
         },
     ]
+
+
+def _manufacturing_constraint_records(report: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for name, payload in report.items():
+        status = str(payload.get("status", "missing"))
+        if status == "missing":
+            continue
+        if name == "symmetry_compliance":
+            records.append({
+                "name": "symmetry_compliance",
+                "value": payload.get("residual"),
+                "limit": payload.get("tolerance"),
+                "unit": "density_residual",
+                "source": "manufacturing_projection",
+                "status": status,
+            })
+        elif name == "extrusion_compliance":
+            records.append({
+                "name": "extrusion_compliance",
+                "value": payload.get("residual"),
+                "limit": payload.get("tolerance"),
+                "unit": "density_residual",
+                "source": "manufacturing_projection",
+                "status": status,
+            })
+        elif name == "min_member_size_compliance":
+            records.append({
+                "name": "min_member_size_compliance",
+                "value": payload.get("enforced_length"),
+                "limit": payload.get("min_member_size"),
+                "unit": "model_length",
+                "source": "filter_radius_heuristic",
+                "status": status,
+            })
+    return records
 
 
 def _response_records(candidate: dict[str, float]) -> list[dict[str, Any]]:
