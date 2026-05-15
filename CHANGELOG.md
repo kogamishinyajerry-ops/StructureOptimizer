@@ -8,9 +8,8 @@
 
 ## [Unreleased]
 
-### Planned (post v1.9, per `docs/blueprint-v2.md`)
-- J 波 v2.0：boundary extraction + SVG/DXF/STL 几何输出
-- K 波 v2.0-final：tutorial v2 + rubric ≥95 收口
+### Planned (post v2.0, per `docs/blueprint-v2.md`)
+- K 波 v2.0-final：tutorial v2 + architecture v2 + rubric ≥95 收口
 
 ### Decided
 - overhang 制造约束已正式 deferred 到 v2.x+；理由见 `docs/decisions/D001-overhang-deferred.md`
@@ -19,6 +18,62 @@
 - G 波 algorithm plug-in 抽象：基于 ABC + 注册表（同 solver backend 模式）
 - H 波 scipy 作为 optional dep（`[project.optional-dependencies].sparse`）；runtime mandatory 仍仅 NumPy
 - I 波 triangle mesh **只支持 linear elastic solve，不支持 SIMP**：SIMP-on-triangles 是独立的大重构（adjoint sensitivity 在三角元素上需重新推导），留到未来 wave
+- J 波 几何输出**轴对齐 cell-edge 简化**（不是完整 marching squares）：与结构网格的离散性质对齐，输出可直接被 CAD/CAE 工具消费
+
+---
+
+## [2.0.0] — 2026-05-16
+
+### 几何导出（SVG / DXF / STL）（Wave J）
+
+第六个 v2 增量：从 density field 中提取边界、输出可被 CAD/CAE/3D printer 消费的几何描述文件。**这是 v2.0 主版本号的最后一个增量** — 算法 + 物理 + 后端 + 输入 + 输出五条主线全数到位。
+
+### Added
+- **`core/geometry_export.py`** — boundary extraction + 3 export formats
+  - `BoundarySegment` dataclass (frozen): 一个轴对齐线段 (x1, y1, x2, y2)
+  - `extract_boundary_segments(mesh, densities, threshold=0.5)` — 元素级 marching-squares 简化：solid–void 边界 + solid–domain-edge 边界
+  - `write_svg(...)` — SVG 1.1，y 轴翻转匹配 SVG 顶向下惯例
+  - `write_dxf(...)` — DXF R12 ASCII (SECTION/ENTITIES/LINE/EOF)，可被 AutoCAD/FreeCAD/LibreCAD 消费
+  - `write_stl_extrusion(...)` — 2.5D 棱柱网格 → ASCII STL；每个 solid cell 12 三角面（6 face × 2 tri）；内部接合面自动剔除
+- **CLI `export` subcommand** — `structure-optimizer export --run <dir> --format {svg,dxf,stl}`
+  - `--threshold` (默认 0.5) 控制 solid 阈值
+  - `--extrusion-depth` (默认 1.0) STL 出图深度
+  - 输出落 `<run>/geometry.{svg,dxf,stl}`
+- **`tests/test_geometry_export.py`** — 21 个测试：
+  - boundary extraction: all-void / all-solid (= 2(nelx+nely) 段周长) / 单 solid 元素 (= 4 段) / threshold 行为 / 段轴对齐 / 周长完整性
+  - BoundarySegment is frozen (FrozenInstanceError on mutate)
+  - SVG: XML parseable, line count = segment count, empty density still writes valid svg, viewBox + width + height 匹配 mesh
+  - DXF: SECTION/ENTITIES/EOF present, LINE entity count == segment count, coordinates in mesh bounds
+  - STL: solid/endsolid keyword pair, facet count = 12 × n_solid_cells (for isolated cells), extrusion depth appears in vertex coords, void → 0 facets
+  - CLI: 三种 format 端到端在真实 run 目录上跑通 + threshold flag + 未知 format 被 argparse 拒
+
+### Changed
+- `structure_optimizer/cli.py` — 增 `export` subcommand
+- `pyproject.toml` version: 1.9.0 → **2.0.0**
+
+### Coverage
+- 全测试 243 → **264** (+21)
+- `core/geometry_export.py`: 测试覆盖率 ~95%
+- `cli.py`: 测试增加（新 export 路径）
+- 整体覆盖率：93.4% → **93.8%**
+
+### Engineering principles
+- 三种 export 都不引入新 mandatory 依赖：ASCII 字符串拼接，纯 NumPy → 红线 7.2 保留
+- 不写"完整 marching squares"：mesh 是 cell-centered，cell-edge 输出就是正确的离散边界
+- DXF R12 不引入 ezdxf：50 行 ASCII 字符串拼接覆盖 99% 用例
+- STL 用 ASCII 不用 binary：人可读 + 易测；binary 留给未来若需要压缩 size 时
+- SVG 翻转 y：sane 默认，符合 SVG 业界惯例（不让用户调）
+
+### v2.x rubric 增量
+- 4.1 marching squares boundary extraction: +3
+- 4.2 SVG 导出（含 element + boundary）: +2
+- 4.3 DXF R12 子集导出: +2
+- 4.4 STL ASCII 导出 (2.5D extrusion): +2
+- 4.5 CLI `export` 子命令: +1
+- 2.1 全测试 ≥250 达成 (264 ≥ 250): +5
+- 2.7 几何导出解析回测试 (XML/DXF/STL): +2
+
+总分 45/100 → **62/100**（仍缺 K 波 tutorial v2 / architecture v2 / CI 双路径 / 等价测试等到 K 波再拉到 ≥95）
 
 ---
 

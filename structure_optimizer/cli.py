@@ -102,6 +102,29 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--benchmark", required=True, choices=available_benchmarks())
     demo.add_argument("--preset", default=None, help="Optional benchmark preset, e.g. demo")
 
+    export = subcommands.add_parser(
+        "export",
+        help="Export geometry from a run directory (SVG / DXF / STL)",
+        description=(
+            "Extract boundary segments from density.npy and write the geometry "
+            "to SVG (vector 2D), DXF R12 (CAD line entities), or ASCII STL "
+            "(2.5D extrusion prism mesh). Output path is `<run>/geometry.<ext>`."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  structure-optimizer export --run runs/mbb_beam/<run_id> --format svg\n"
+            "  structure-optimizer export --run runs/mbb_beam/<run_id> --format dxf\n"
+            "  structure-optimizer export --run runs/mbb_beam/<run_id> --format stl --extrusion-depth 5"
+        ),
+    )
+    export.add_argument("--run", required=True, type=Path)
+    export.add_argument("--format", required=True, choices=["svg", "dxf", "stl"])
+    export.add_argument("--threshold", default=0.5, type=float, help="Density threshold for solid (default 0.5)")
+    export.add_argument(
+        "--extrusion-depth", default=1.0, type=float, help="STL extrusion depth (model length, default 1.0)"
+    )
+
     study = subcommands.add_parser(
         "study",
         help="Run a local parameter study and candidate comparison",
@@ -141,6 +164,32 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "study":
             study_path = run_study(args.config)
             print(study_path)
+            return 0
+        if args.command == "export":
+            from structure_optimizer.core.config import parse_config, validate_config
+            from structure_optimizer.core.geometry_export import (
+                write_dxf,
+                write_stl_extrusion,
+                write_svg,
+            )
+            from structure_optimizer.core.mesh import create_structured_mesh
+            from structure_optimizer.core.run_store import load_density, read_json
+
+            run_dir = args.run
+            config = parse_config(read_json(run_dir / "input.json"))
+            validate_config(config)
+            mesh = create_structured_mesh(config)
+            densities = load_density(run_dir)
+            out_path = run_dir / f"geometry.{args.format}"
+            if args.format == "svg":
+                write_svg(out_path, mesh, densities, threshold=args.threshold)
+            elif args.format == "dxf":
+                write_dxf(out_path, mesh, densities, threshold=args.threshold)
+            elif args.format == "stl":
+                write_stl_extrusion(
+                    out_path, mesh, densities, extrusion_depth=args.extrusion_depth, threshold=args.threshold
+                )
+            print(out_path)
             return 0
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)

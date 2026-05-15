@@ -112,6 +112,7 @@
 | v1.7.0 (Wave G) | 29/100 | H-K 波尚未开工；测试 205 离 250 还差 45；CI 双路径 / sparse / meshio / 几何输出 / tutorial v2 未做 | BESO + algorithm plug-in + CLI flag + 22 测试；algorithm_base.py 100%；core/beso.py 96.7% |
 | v1.8.0 (Wave H) | 37/100 | I-K 波尚未开工；测试 221 离 250 还差 29；CI 双路径 / meshio / 几何输出 / tutorial v2 未做 | scipy sparse + sparse_cg backend 实测 24× 加速；optional dep + 16 测试 |
 | v1.9.0 (Wave I) | 45/100 | J-K 波尚未开工；测试 243 离 250 还差 7；CI 双路径 / 几何输出 / tutorial v2 未做；SIMP-on-tri 未做（诚实留白） | CST 三角 + meshio adapter + TriangleMesh + 22 测试；core/triangle.py 100% |
+| v2.0.0 (Wave J) | 62/100 | K 波 (tutorial v2 / architecture v2 / CI 双路径 / 等价测试) 未做 | SVG + DXF + STL 几何导出 + CLI export + 264 测试 (≥250 达成)；2.0 主版本号到位 |
 
 （每波结束后追加一行）
 
@@ -138,6 +139,15 @@
 - 3.4 meshio adapter 读 2D 三角网格: **+3/3**
 - 3.5 三角元素 stiffness 实装 + 测试: **+2/2**
 - 3.6 非结构网格 + 三角元素 benchmark (meshio round-trip + E2E solve): **+3/3**
+
+### 2.0.0 (Wave J) 评分明细
+- 4.1 marching squares boundary extraction: **+3/3**
+- 4.2 SVG 导出: **+2/2**
+- 4.3 DXF R12 子集: **+2/2**
+- 4.4 STL ASCII 2.5D extrusion: **+2/2**
+- 4.5 CLI export 子命令: **+1/1**
+- 2.1 全测试 ≥250: **+5/5** (264 个)
+- 2.7 几何导出解析回测试: **+2/2**
 
 
 
