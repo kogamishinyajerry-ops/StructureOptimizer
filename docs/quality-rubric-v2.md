@@ -108,6 +108,7 @@
 |---|---:|---|---|
 | v1.4.0 (baseline) | 0/100 | v2 维度全空（仅有 v1.x 基线，无多工况/应力/BESO/sparse/meshio/export） | v2 roadmap 已签发；v1.x rubric 100/100 |
 | v1.5.0 (Wave E) | 10/100 | F-K 波尚未开工：应力 / BESO / sparse / meshio / 几何输出 / tutorial v2 / CI 双路径 / etc | 多工况三 aggregator + 1 benchmark + 18 测试；core/objectives.py 100% 覆盖 |
+| v1.6.0 (Wave F) | 18/100 | G-K 波尚未开工；测试 183 离 250 还差 67；CI 双路径未做；几何输出未做 | 应力 p-norm + KS + 1 benchmark + verification 集成 + 31 测试；core/stress.py 97.6% |
 
 （每波结束后追加一行）
 
@@ -115,6 +116,10 @@
 - 1.1 worst_case formulation + 1 benchmark: **+5/5**
 - 1.2 weighted_sum + average formulation: **+3/3**
 - 2.4 多工况 property test: **+2/2**
+
+### 1.6.0 (Wave F) 评分明细
+- 1.3 应力约束（p-norm + KS）+ 1 benchmark: **+6/6**
+- 1.4 stress_constraint_failed 专测: **+2/2**
 
 
 

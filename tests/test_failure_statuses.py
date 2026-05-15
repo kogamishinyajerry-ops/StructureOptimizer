@@ -193,6 +193,53 @@ def test_singular_matrix_status_reachable_via_solver_adapter():
     assert "singular_matrix" in FAILURE_STATUSES
 
 
+# --- stress_constraint_failed (Wave F) --------------------------------
+
+
+def test_stress_constraint_failed_status(tmp_path):
+    """Wave F: tight stress limit + non-zero density → stress_constraint_failed."""
+    from structure_optimizer.core.config import parse_config, validate_config
+
+    raw = load_benchmark("mbb_beam", preset="smoke").to_dict()
+    raw["stress_constraint"] = {
+        "enabled": True,
+        "aggregation": "p_norm",
+        "p": 8.0,
+        "limit": 1e-9,
+        "density_threshold": 0.05,
+    }
+    config = parse_config(raw)
+    validate_config(config)
+    mesh_size = config.mesh.nelx * config.mesh.nely
+    densities = np.full(mesh_size, 0.3)
+    run_dir = _fabricate_run(tmp_path, config, densities)
+    result = verify_run(run_dir)
+    assert result["status"] == "stress_constraint_failed"
+
+
+def test_stress_constraint_failed_via_cli(tmp_path, capsys):
+    from structure_optimizer.core.config import parse_config, validate_config
+
+    raw = load_benchmark("mbb_beam", preset="smoke").to_dict()
+    raw["stress_constraint"] = {
+        "enabled": True,
+        "aggregation": "p_norm",
+        "p": 8.0,
+        "limit": 1e-9,
+        "density_threshold": 0.05,
+    }
+    config = parse_config(raw)
+    validate_config(config)
+    mesh_size = config.mesh.nelx * config.mesh.nely
+    densities = np.full(mesh_size, 0.3)
+    run_dir = _fabricate_run(tmp_path, config, densities)
+    exit_code = main(["verify", "--run", str(run_dir)])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.out.strip() == "stress_constraint_failed"
+    assert "Traceback" not in captured.err
+
+
 # --- coverage summary -------------------------------------------------
 
 
@@ -206,6 +253,7 @@ def test_all_documented_failure_statuses_have_test_coverage_here():
         "volume_constraint_failed",
         "connectivity_failed",
         "design_space_constraint_failed",
+        "stress_constraint_failed",
         "report_failed",
     }
     assert expected.issubset(FAILURE_STATUSES), (

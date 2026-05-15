@@ -20,6 +20,7 @@ FAILURE_STATUSES = {
     "volume_constraint_failed",
     "connectivity_failed",
     "design_space_constraint_failed",
+    "stress_constraint_failed",
     "report_failed",
 }
 
@@ -61,6 +62,7 @@ def verify_run(run_dir: Path | str) -> dict[str, Any]:
     connectivity_ok = _connectivity_ok(config, mesh, densities)
     frozen_ok = _frozen_solid_ok(mesh, densities)
     void_ok = _void_ok(config, mesh, densities)
+    stress_ok, stress_value = _check_stress_constraint(config, mesh, densities)
     manufacturability = analyze_manufacturability(config, mesh, densities)
     manufacturing_compliance = evaluate_manufacturing_compliance(config, mesh, densities)
     if not frozen_ok or not void_ok:
@@ -69,10 +71,14 @@ def verify_run(run_dir: Path | str) -> dict[str, Any]:
         status = "volume_constraint_failed"
     elif not connectivity_ok:
         status = "connectivity_failed"
+    elif not stress_ok:
+        status = "stress_constraint_failed"
     else:
         status = PASS_STATUS
     constraints = _constraint_records(config, active_volume, volume_ok, connectivity_ok, frozen_ok, void_ok)
     constraints.extend(_manufacturing_constraint_records(manufacturing_compliance))
+    if config.stress_constraint.enabled:
+        constraints.append(_stress_constraint_record(config, stress_ok, stress_value))
     n_cases = len(effective_load_cases(config))
     objective_name = f"{config.optimization.case_aggregator}_compliance" if n_cases > 1 else "compliance"
 
@@ -180,6 +186,32 @@ def _analysis_metrics(analysis) -> dict[str, float]:
         "compliance": analysis.compliance,
         "max_displacement": analysis.max_displacement,
         "max_stress": analysis.max_stress,
+    }
+
+
+def _check_stress_constraint(config, mesh: StructuredMesh, densities: np.ndarray) -> tuple[bool, float | None]:
+    """Evaluate the stress constraint (if enabled). Returns (ok, aggregated_value)."""
+    if not config.stress_constraint.enabled:
+        return True, None
+    from structure_optimizer.core.objectives import solve_and_aggregate
+    from structure_optimizer.core.stress import aggregate_stress, element_von_mises_stresses
+
+    load_cases = effective_load_cases(config)
+    aggregated = solve_and_aggregate(config, mesh, densities, load_cases, config.optimization.case_aggregator)
+    stresses = element_von_mises_stresses(config, mesh, aggregated.displacements)
+    mask = densities >= config.stress_constraint.density_threshold
+    value = aggregate_stress(stresses, config.stress_constraint.aggregation, config.stress_constraint.p, mask)
+    return value <= config.stress_constraint.limit, value
+
+
+def _stress_constraint_record(config, stress_ok: bool, stress_value: float | None) -> dict[str, Any]:
+    return {
+        "name": "stress_constraint",
+        "value": stress_value,
+        "limit": config.stress_constraint.limit,
+        "unit": f"{config.stress_constraint.aggregation}_stress (p={config.stress_constraint.p})",
+        "source": "independent_verification",
+        "status": "passed" if stress_ok else "failed",
     }
 
 

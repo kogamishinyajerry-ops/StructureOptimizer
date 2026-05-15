@@ -8,8 +8,7 @@
 
 ## [Unreleased]
 
-### Planned (post v1.5, per `docs/blueprint-v2.md`)
-- F 波 v1.6：应力约束（p-norm aggregation） → stress_constraint_failed
+### Planned (post v1.6, per `docs/blueprint-v2.md`)
 - G 波 v1.7：BESO 算法 + algorithm plug-in 抽象
 - H 波 v1.8：scipy sparse optional backend
 - I 波 v1.9：非结构 2D 三角网格 + meshio adapter
@@ -19,6 +18,70 @@
 ### Decided
 - overhang 制造约束已正式 deferred 到 v2.x+；理由见 `docs/decisions/D001-overhang-deferred.md`
 - v2.0 大蓝图：`docs/blueprint-v2.md` 已签发；v2.x 评分体系：`docs/quality-rubric-v2.md`
+- F 波（应力约束）仅做 verification-time 检查；SIMP 梯度集成（adjoint method）留给未来 ADR
+
+---
+
+## [1.6.0] — 2026-05-16
+
+### 应力约束（Wave F）
+
+第二个 v2 增量：von Mises 应力 + p-norm / KS 两种 smooth-max aggregation + 新的失败状态码 `stress_constraint_failed`。**verification-time** 检查：检验生成的 density 是否满足应力上限；SIMP 优化循环本身不变（梯度集成留给未来 adjoint-method ADR）。
+
+### Added
+- **`core/stress.py`** — 应力聚合模块
+  - `element_von_mises_stresses(config, mesh, displacements)` — 每元素 σ_vm
+  - `p_norm_stress(stresses, p, mask=None)` — p-norm 平滑最大值，max-shift 防溢出
+  - `ks_stress(stresses, p, mask=None)` — Kreisselmeier-Steinhauser 平滑最大值
+  - `aggregate_stress(stresses, aggregation, p, mask=None)` — dispatch
+- **`StressConstraintConfig`** 新字段在 BenchmarkConfig：
+  - `enabled` / `aggregation` (`p_norm` | `ks`) / `p` / `limit` / `density_threshold`
+  - 默认 `enabled=False`，零侵入 v1.5 配置
+- **新失败状态码 `stress_constraint_failed`** 加入 FAILURE_STATUSES（共 8 类）
+- **`stress_limited_bracket` benchmark** — top_edge 固支 + right_mid 载荷 + σ_lim=250 MPa
+  - presets: `smoke` (small mesh) / `tight` (limit=50, 演示 violation) / `ks` (KS aggregation)
+- **`tests/test_stress.py`** — 31 个测试：
+  - p-norm 数学：单调递减 in p、上界 max σ、mask 行为、empty mask、p≤0 报错
+  - KS 数学：≥ max σ、p→∞ 收敛、p≤0 报错
+  - `aggregate_stress` dispatch + 未知 aggregation 报错
+  - `element_von_mises_stresses` 长度 + 与 FEMResult.max_stress 一致
+  - config 默认 disabled / 4 个 validation 错误路径
+  - verification 集成：disabled 时无 record；enabled+宽限通过；enabled+紧限 stress_constraint_failed；优先级在 volume 后
+  - benchmark 加载（smoke + ks preset）
+- **`tests/test_failure_statuses.py`** 增 2 测试：
+  - `test_stress_constraint_failed_status` 通过 verify_run 触发
+  - `test_stress_constraint_failed_via_cli` CLI E2E（断言 no traceback）
+
+### Changed
+- `core/verification.py` —
+  - FAILURE_STATUSES 加 `stress_constraint_failed`
+  - status 优先级：design_space → volume → connectivity → **stress** → passed
+  - constraints[] 在 enabled 时多一条 `stress_constraint` record
+  - 内部 `_check_stress_constraint` + `_stress_constraint_record` 私有 helpers
+- `pyproject.toml` version: 1.5.0 → 1.6.0
+
+### Coverage
+- 全测试 152 → **183** (+31)
+- `core/stress.py`: **97.6%**
+- `core/verification.py`: 94.7% → **95.3%**
+- 整体覆盖率：**93.0%**
+
+### Engineering principles
+- 应力评估走"重 solve 一次 + 静态计算"，不污染 SIMP 主循环（保持向后兼容）
+- p-norm 用 max-shift 归一化，p=64 仍稳定（不溢出 / 不下溢）
+- KS 用经典 `(1/p) log Σ exp(p (σ - max σ))` 形式
+- mask gate 用 `densities ≥ density_threshold`，避免低密度伪应力主导
+- 不引入 adjoint method（避免 v2 scope creep；留给独立 ADR）
+
+### v2.x rubric 增量
+- 1.3 应力约束（p-norm + KS）+ 1 benchmark: +6
+- 1.4 stress_constraint_failed 状态码有专测: +2
+- 2.5 总测试 ≥ 250 进度：134→183 (差 67 仍未到)
+- 6.4 全测试 < 60s: 还在 9.6s ✓
+- 7.1 红线未破 ✓
+- 7.2 仅 NumPy mandatory ✓
+
+总分 10/100 → **18/100**
 
 ---
 

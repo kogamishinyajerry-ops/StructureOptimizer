@@ -85,6 +85,29 @@ class ExtrusionConstraintConfig:
 
 
 @dataclass(frozen=True)
+class StressConstraintConfig:
+    """v1.6 stress constraint (verification-time).
+
+    Aggregates per-element von Mises stress via p-norm or KS function, then
+    compares to ``limit``. ``density_threshold`` masks out near-void
+    elements so spurious low-density stress concentrations don't dominate.
+
+    Fields:
+        enabled: master toggle. If False, no stress check is performed.
+        aggregation: ``"p_norm"`` (default) or ``"ks"``.
+        p: exponent (8-12 typical for p-norm, 50-100 for KS).
+        limit: stress upper bound in model_stress units.
+        density_threshold: include element only if density ≥ this (0..1).
+    """
+
+    enabled: bool = False
+    aggregation: str = "p_norm"
+    p: float = 8.0
+    limit: float = 0.0
+    density_threshold: float = 0.5
+
+
+@dataclass(frozen=True)
 class SolverConfig:
     """v0.8 solver-backend selector.
 
@@ -133,6 +156,7 @@ class BenchmarkConfig:
     load_cases: list[LoadCaseConfig] = field(default_factory=list)
     manufacturing_constraints: ManufacturingConstraintsConfig = field(default_factory=ManufacturingConstraintsConfig)
     solver: SolverConfig = field(default_factory=SolverConfig)
+    stress_constraint: StressConstraintConfig = field(default_factory=StressConstraintConfig)
     thickness: float = 1.0
     source_path: str | None = None
 
@@ -180,6 +204,7 @@ def parse_config(raw: dict[str, Any], source_path: str | None = None) -> Benchma
         ]
         manufacturing_constraints = _parse_manufacturing_constraints(raw.get("manufacturing_constraints", {}))
         solver = _parse_solver_config(raw.get("solver", {}))
+        stress_constraint = _parse_stress_constraint(raw.get("stress_constraint", {}))
         return BenchmarkConfig(
             name=raw["name"],
             dimension=raw["dimension"],
@@ -194,6 +219,7 @@ def parse_config(raw: dict[str, Any], source_path: str | None = None) -> Benchma
             load_cases=load_cases,
             manufacturing_constraints=manufacturing_constraints,
             solver=solver,
+            stress_constraint=stress_constraint,
             source_path=source_path,
         )
     except KeyError as exc:
@@ -306,6 +332,7 @@ def validate_config(config: BenchmarkConfig) -> None:
     _validate_design_space(config.design_space)
     _validate_manufacturing_constraints(config.manufacturing_constraints)
     _validate_solver_config(config.solver)
+    _validate_stress_constraint(config.stress_constraint)
 
 
 def _validate_selector_record(record: dict[str, Any], label: str) -> None:
@@ -328,6 +355,18 @@ def _validate_design_space(design_space: DesignSpaceConfig) -> None:
                 raise ConfigError(f"design_space.{label} region requires a selector")
 
 
+def _parse_stress_constraint(raw: dict[str, Any]) -> StressConstraintConfig:
+    if not isinstance(raw, dict):
+        raise ConfigError("stress_constraint must be an object")
+    return StressConstraintConfig(
+        enabled=bool(raw.get("enabled", False)),
+        aggregation=str(raw.get("aggregation", "p_norm")),
+        p=float(raw.get("p", 8.0)),
+        limit=float(raw.get("limit", 0.0)),
+        density_threshold=float(raw.get("density_threshold", 0.5)),
+    )
+
+
 def _parse_solver_config(raw: dict[str, Any]) -> SolverConfig:
     if not isinstance(raw, dict):
         raise ConfigError("solver must be an object")
@@ -341,6 +380,19 @@ def _validate_solver_config(solver: SolverConfig) -> None:
 
     if solver.backend not in available_backends():
         raise ConfigError(f"solver.backend must be one of {available_backends()}, got '{solver.backend}'")
+
+
+def _validate_stress_constraint(constraint: StressConstraintConfig) -> None:
+    if not constraint.enabled:
+        return
+    if constraint.aggregation not in {"p_norm", "ks"}:
+        raise ConfigError("stress_constraint.aggregation must be 'p_norm' or 'ks'")
+    if constraint.p <= 0:
+        raise ConfigError("stress_constraint.p must be positive")
+    if constraint.limit <= 0:
+        raise ConfigError("stress_constraint.limit must be positive when enabled")
+    if not (0.0 <= constraint.density_threshold <= 1.0):
+        raise ConfigError("stress_constraint.density_threshold must be in [0, 1]")
 
 
 def _validate_manufacturing_constraints(constraints: ManufacturingConstraintsConfig) -> None:
