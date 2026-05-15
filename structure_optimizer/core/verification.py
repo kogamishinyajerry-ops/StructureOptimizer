@@ -1,0 +1,242 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from structure_optimizer.core.config import effective_load_cases, parse_config, validate_config
+from structure_optimizer.core.fem2d import SolverError, solve_linear_elastic
+from structure_optimizer.core.manufacturability import analyze_manufacturability
+from structure_optimizer.core.mesh import StructuredMesh, create_structured_mesh
+from structure_optimizer.core.run_store import load_density, read_json, write_json
+
+
+PASS_STATUS = "passed"
+FAILURE_STATUSES = {
+    "invalid_config",
+    "solver_failed",
+    "singular_matrix",
+    "volume_constraint_failed",
+    "connectivity_failed",
+    "design_space_constraint_failed",
+    "report_failed",
+}
+
+
+def verify_run(run_dir: Path | str) -> dict[str, Any]:
+    run_dir = Path(run_dir)
+    try:
+        raw = read_json(run_dir / "input.json")
+        config = parse_config(raw)
+        validate_config(config)
+        mesh = create_structured_mesh(config)
+        densities = load_density(run_dir)
+    except Exception as exc:
+        result = {"status": "invalid_config", "error": str(exc)}
+        write_json(run_dir / "verification.json", result)
+        return result
+
+    try:
+        baseline_densities = np.ones(mesh.elements.shape[0], dtype=float)
+        baseline_densities[mesh.frozen_solid_mask] = 1.0
+        baseline_densities[mesh.void_mask] = config.optimization.min_density
+        baseline, baseline_load_cases = _solve_load_case_metrics(config, mesh, baseline_densities)
+        candidate, candidate_load_cases = _solve_load_case_metrics(config, mesh, densities)
+    except SolverError as exc:
+        status = "singular_matrix" if str(exc) == "singular_matrix" else "solver_failed"
+        result = {"status": status, "error": str(exc)}
+        write_json(run_dir / "verification.json", result)
+        return result
+
+    active_volume = _active_volume(mesh, densities)
+    volume_ok = active_volume <= config.optimization.volume_fraction + 0.02
+    connectivity_ok = _connectivity_ok(config, mesh, densities)
+    frozen_ok = _frozen_solid_ok(mesh, densities)
+    void_ok = _void_ok(config, mesh, densities)
+    manufacturability = analyze_manufacturability(config, mesh, densities)
+    if not frozen_ok or not void_ok:
+        status = "design_space_constraint_failed"
+    elif not volume_ok:
+        status = "volume_constraint_failed"
+    elif not connectivity_ok:
+        status = "connectivity_failed"
+    else:
+        status = PASS_STATUS
+    constraints = _constraint_records(config, active_volume, volume_ok, connectivity_ok, frozen_ok, void_ok)
+    objective_name = "weighted_compliance" if len(effective_load_cases(config)) > 1 else "compliance"
+
+    result = {
+        "status": status,
+        "volume_fraction_ok": volume_ok,
+        "connectivity_ok": connectivity_ok,
+        "frozen_solid_ok": frozen_ok,
+        "void_regions_ok": void_ok,
+        "target_volume_fraction": config.optimization.volume_fraction,
+        "actual_volume_fraction": active_volume,
+        "objective": {
+            "name": objective_name,
+            "role": "objective",
+            "sense": "minimize",
+            "value": candidate["compliance"],
+            "source": "independent_verification",
+        },
+        "responses": _response_records(candidate),
+        "constraints": constraints,
+        "load_cases": {
+            "baseline": baseline_load_cases,
+            "candidate": candidate_load_cases,
+        },
+        "baseline": baseline,
+        "candidate": candidate,
+        "manufacturability": manufacturability,
+        "limitations": "2D/2.5D SIMP results are optimization candidates and require engineering review before production use.",
+    }
+    write_json(run_dir / "verification.json", result)
+    write_json(run_dir / "manufacturability.json", manufacturability)
+    return result
+
+
+def _active_volume(mesh: StructuredMesh, densities: np.ndarray) -> float:
+    active_count = max(1, int(np.count_nonzero(mesh.design_mask)))
+    return float(np.sum(densities[mesh.design_mask]) / active_count)
+
+
+def _connectivity_ok(config, mesh: StructuredMesh, densities: np.ndarray) -> bool:
+    solid = (densities >= max(0.05, config.optimization.min_density)) & ~mesh.void_mask
+    node_to_elements: dict[int, set[int]] = {}
+    for element_id, nodes in enumerate(mesh.elements):
+        if not solid[element_id]:
+            continue
+        for node in nodes:
+            node_to_elements.setdefault(int(node), set()).add(element_id)
+
+    load_records = [load for load_case in effective_load_cases(config) for load in load_case.loads]
+    load_elements = _elements_for_records(mesh, load_records, node_to_elements)
+    fixed_elements = _elements_for_records(mesh, config.boundary_conditions, node_to_elements)
+    if not load_elements or not fixed_elements:
+        return False
+
+    visited = set(load_elements)
+    queue = list(load_elements)
+    while queue:
+        current = queue.pop(0)
+        if current in fixed_elements:
+            return True
+        cx, cy = mesh.element_grid_index(current)
+        for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+            if 0 <= nx < mesh.nelx and 0 <= ny < mesh.nely:
+                neighbor = mesh.element_index(nx, ny)
+                if solid[neighbor] and neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+    return False
+
+
+def _elements_for_records(mesh: StructuredMesh, records: list[dict], node_to_elements: dict[int, set[int]]) -> set[int]:
+    elements: set[int] = set()
+    for record in records:
+        for node in mesh.selector_nodes(record["selector"]):
+            elements.update(node_to_elements.get(node, set()))
+    return elements
+
+
+def _solve_load_case_metrics(config, mesh: StructuredMesh, densities: np.ndarray) -> tuple[dict[str, float], dict[str, dict]]:
+    load_cases = effective_load_cases(config)
+    total_weight = sum(load_case.weight for load_case in load_cases)
+    aggregate = {
+        "mass": 0.0,
+        "compliance": 0.0,
+        "max_displacement": 0.0,
+        "max_stress": 0.0,
+    }
+    by_case: dict[str, dict] = {}
+    for load_case in load_cases:
+        analysis = solve_linear_elastic(config, mesh, densities, loads=load_case.loads)
+        metrics = _analysis_metrics(analysis)
+        by_case[load_case.name] = {"weight": load_case.weight, **metrics}
+        weight = load_case.weight / total_weight
+        aggregate["mass"] = analysis.mass
+        aggregate["compliance"] += weight * analysis.compliance
+        aggregate["max_displacement"] = max(aggregate["max_displacement"], analysis.max_displacement)
+        aggregate["max_stress"] = max(aggregate["max_stress"], analysis.max_stress)
+    return aggregate, by_case
+
+
+def _analysis_metrics(analysis) -> dict[str, float]:
+    return {
+        "mass": analysis.mass,
+        "compliance": analysis.compliance,
+        "max_displacement": analysis.max_displacement,
+        "max_stress": analysis.max_stress,
+    }
+
+
+def _frozen_solid_ok(mesh: StructuredMesh, densities: np.ndarray) -> bool:
+    if not np.any(mesh.frozen_solid_mask):
+        return True
+    return bool(np.all(densities[mesh.frozen_solid_mask] >= 0.999))
+
+
+def _void_ok(config, mesh: StructuredMesh, densities: np.ndarray) -> bool:
+    if not np.any(mesh.void_mask):
+        return True
+    return bool(np.all(densities[mesh.void_mask] <= config.optimization.min_density + 1e-12))
+
+
+def _constraint_records(
+    config,
+    active_volume: float,
+    volume_ok: bool,
+    connectivity_ok: bool,
+    frozen_ok: bool,
+    void_ok: bool,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": "volume_fraction",
+            "value": active_volume,
+            "limit": config.optimization.volume_fraction + 0.02,
+            "unit": "ratio",
+            "source": "independent_verification",
+            "status": "passed" if volume_ok else "failed",
+        },
+        {
+            "name": "load_to_support_connectivity",
+            "value": connectivity_ok,
+            "limit": True,
+            "unit": "boolean",
+            "source": "independent_verification",
+            "status": "passed" if connectivity_ok else "failed",
+        },
+        {
+            "name": "frozen_solid_regions",
+            "value": frozen_ok,
+            "limit": True,
+            "unit": "boolean",
+            "source": "independent_verification",
+            "status": "passed" if frozen_ok else "failed",
+        },
+        {
+            "name": "void_regions",
+            "value": void_ok,
+            "limit": True,
+            "unit": "boolean",
+            "source": "independent_verification",
+            "status": "passed" if void_ok else "failed",
+        },
+    ]
+
+
+def _response_records(candidate: dict[str, float]) -> list[dict[str, Any]]:
+    return [
+        {"name": "mass", "value": candidate["mass"], "unit": "model_mass", "source": "independent_verification"},
+        {"name": "compliance", "value": candidate["compliance"], "unit": "force_length", "source": "independent_verification"},
+        {
+            "name": "max_displacement",
+            "value": candidate["max_displacement"],
+            "unit": "model_length",
+            "source": "independent_verification",
+        },
+        {"name": "max_stress", "value": candidate["max_stress"], "unit": "model_stress", "source": "independent_verification"},
+    ]

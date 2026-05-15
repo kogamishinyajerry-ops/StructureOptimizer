@@ -1,0 +1,9 @@
+{
+  "benchmark": "simple_bracket",
+  "preset": "smoke",
+  "parameters": {
+    "volume_fraction": [0.42, 0.5],
+    "filter_radius": [1.4, 1.9]
+  },
+  "ranking": ["verification_status", "mass", "compliance", "max_displacement"]
+}

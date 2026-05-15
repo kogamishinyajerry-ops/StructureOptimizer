@@ -1,0 +1,18 @@
+[project]
+name = "structure-optimizer"
+version = "0.1.0"
+description = "Local structural optimization MVP with 2D SIMP benchmarks and verification reports."
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
