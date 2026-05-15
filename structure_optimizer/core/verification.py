@@ -25,6 +25,13 @@ FAILURE_STATUSES = {
 
 
 def verify_run(run_dir: Path | str) -> dict[str, Any]:
+    """Re-run independent verification on an existing run directory.
+
+    Reads ``input.json`` + ``density.npy``, replays FEM at baseline + candidate,
+    checks all constraints, and writes ``verification.json`` + ``manufacturability.json``.
+    Returns the verification dict; never raises on config / solver errors (writes
+    them as status fields instead).
+    """
     run_dir = Path(run_dir)
     try:
         raw = read_json(run_dir / "input.json")

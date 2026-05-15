@@ -10,6 +10,8 @@ from structure_optimizer.core.config import BenchmarkConfig, ConfigError
 
 @dataclass(frozen=True)
 class DesignSpaceMasks:
+    """Per-element boolean masks: design (free SIMP) / frozen-solid (locked ρ=1) / void (locked ρ=min)."""
+
     design_mask: np.ndarray
     frozen_solid_mask: np.ndarray
     void_mask: np.ndarray
@@ -17,6 +19,7 @@ class DesignSpaceMasks:
 
 
 def build_design_space_masks(config: BenchmarkConfig, mesh) -> DesignSpaceMasks:
+    """Resolve all ``design_space`` region selectors into per-element masks; raises on overlap."""
     element_count = mesh.nelx * mesh.nely
     frozen = np.zeros(element_count, dtype=bool)
     void = np.zeros(element_count, dtype=bool)
@@ -49,6 +52,7 @@ def build_design_space_masks(config: BenchmarkConfig, mesh) -> DesignSpaceMasks:
 
 
 def element_mask_for_selector(mesh, selector: str | dict[str, Any]) -> np.ndarray:
+    """Resolve a single region selector (string name OR ``{type: box/circle, ...}`` dict) to a boolean element mask."""
     if isinstance(selector, str):
         return _string_selector_mask(mesh, selector)
     if not isinstance(selector, dict):

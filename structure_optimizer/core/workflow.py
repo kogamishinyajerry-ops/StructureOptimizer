@@ -26,11 +26,13 @@ from structure_optimizer.visualization import (
 
 
 def run_benchmark(benchmark: str, preset: str | None = None) -> Path:
+    """Load a built-in benchmark by name (+ optional preset) and run the full pipeline."""
     config = load_benchmark(benchmark, preset=preset)
     return run_config(config)
 
 
 def run_config(config, run_dir: Path | None = None) -> Path:
+    """Run mesh → SIMP → save artifacts → verify → report; return the run directory."""
     mesh = create_structured_mesh(config)
     result = run_simp(config, mesh)
     if run_dir is None:

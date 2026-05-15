@@ -13,6 +13,8 @@ class ConfigError(ValueError):
 
 @dataclass(frozen=True)
 class MeshConfig:
+    """Structured-quadrilateral mesh parameters (extent + element counts)."""
+
     type: str
     nelx: int
     nely: int
@@ -23,6 +25,8 @@ class MeshConfig:
 
 @dataclass(frozen=True)
 class MaterialConfig:
+    """Linear-elastic material properties (E, ν, ρ)."""
+
     young_modulus: float
     poisson_ratio: float
     density: float
@@ -30,6 +34,8 @@ class MaterialConfig:
 
 @dataclass(frozen=True)
 class OptimizationConfig:
+    """SIMP loop parameters: objective + volume target + filter + termination."""
+
     objective: str
     volume_fraction: float
     penalty: float
@@ -42,19 +48,33 @@ class OptimizationConfig:
 
 @dataclass(frozen=True)
 class DesignSpaceConfig:
+    """v0.3 design-space region selectors: frozen-solid + void."""
+
     frozen_solid: list[dict[str, Any]] = field(default_factory=list)
     void: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class SymmetryConstraintConfig:
-    axis: str  # 'x' for mirror across vertical line, 'y' for horizontal line
-    position: float = 0.5  # normalized [0, 1]
+    """v0.6 mirror-symmetry projection across one axis.
+
+    ``axis='x'`` mirrors across a vertical line; ``axis='y'`` across a horizontal
+    line. ``position`` is the line location in normalized mesh coordinates [0, 1].
+    """
+
+    axis: str
+    position: float = 0.5
 
 
 @dataclass(frozen=True)
 class ExtrusionConstraintConfig:
-    axis: str  # 'x' = uniform along x (varies in y); 'y' = uniform along y (varies in x)
+    """v0.6 axis-uniform projection — produces a density field invariant along the axis.
+
+    ``axis='x'`` → every row collapses to row-mean (varies only in y).
+    ``axis='y'`` → every column collapses to column-mean (varies only in x).
+    """
+
+    axis: str
 
 
 @dataclass(frozen=True)
@@ -83,6 +103,8 @@ class ManufacturingConstraintsConfig:
 
 @dataclass(frozen=True)
 class LoadCaseConfig:
+    """One named load case with a contribution weight + list of point loads."""
+
     name: str
     weight: float
     loads: list[dict[str, Any]]
@@ -90,6 +112,8 @@ class LoadCaseConfig:
 
 @dataclass(frozen=True)
 class BenchmarkConfig:
+    """Top-level benchmark configuration: mesh + material + loads + optimizer + constraints."""
+
     name: str
     dimension: str
     units: str
@@ -106,6 +130,7 @@ class BenchmarkConfig:
     source_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serialisable dict; drops ``source_path``."""
         data = asdict(self)
         data.pop("source_path", None)
         return data
@@ -122,6 +147,7 @@ def _deep_update(base: dict[str, Any], override: dict[str, Any]) -> dict[str, An
 
 
 def load_config(path: Path | str, preset: str | None = None) -> BenchmarkConfig:
+    """Load and validate a benchmark JSON config, optionally applying a named preset."""
     path = Path(path)
     raw = json.loads(path.read_text())
     presets = raw.pop("presets", {})
@@ -135,6 +161,7 @@ def load_config(path: Path | str, preset: str | None = None) -> BenchmarkConfig:
 
 
 def parse_config(raw: dict[str, Any], source_path: str | None = None) -> BenchmarkConfig:
+    """Convert a raw JSON dict into a typed ``BenchmarkConfig`` (no validation)."""
     try:
         mesh = MeshConfig(**raw["mesh"])
         material = MaterialConfig(**raw["material"])
@@ -201,6 +228,7 @@ def _parse_manufacturing_constraints(raw: dict[str, Any]) -> ManufacturingConstr
 
 
 def validate_config(config: BenchmarkConfig) -> None:
+    """Enforce all v0.x engineering invariants; raises ``ConfigError`` on first violation."""
     if config.dimension not in {"2d", "2.5d"}:
         raise ConfigError("dimension must be '2d' or '2.5d'")
     if config.mesh.type != "structured_quad":
@@ -315,6 +343,7 @@ def _validate_manufacturing_constraints(constraints: ManufacturingConstraintsCon
 
 
 def effective_load_cases(config: BenchmarkConfig) -> list[LoadCaseConfig]:
+    """Return the active load cases, synthesising a ``"primary"`` case from legacy ``loads`` if needed."""
     if config.load_cases:
         return config.load_cases
     return [LoadCaseConfig(name="primary", weight=1.0, loads=config.loads)]

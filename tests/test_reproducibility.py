@@ -14,10 +14,7 @@ We test at two levels:
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
-
 from structure_optimizer.benchmarks.registry import load_benchmark
 from structure_optimizer.core.mesh import create_structured_mesh
 from structure_optimizer.core.run_store import input_hash, load_density, read_json

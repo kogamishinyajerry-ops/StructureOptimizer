@@ -129,6 +129,7 @@ _REGISTRY: dict[str, type[LinearSolver]] = {
 
 
 def available_backends() -> list[str]:
+    """Return alphabetised list of registered linear-solver backend names."""
     return sorted(_REGISTRY)
 
 

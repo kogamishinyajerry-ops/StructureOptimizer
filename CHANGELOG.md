@@ -8,11 +8,41 @@
 
 ## [Unreleased]
 
-### Planned (post v1.2)
-- v0.6.1 overhang 制造约束（additive manufacturing build direction）— v0.6 暂未支持
+### Planned (post v1.3)
 - v1.x spike：scipy sparse / CalculiX / FEniCS 真适配（要先评估依赖影响）
 - robust formulation / 多材料 / 应力约束优化
 - 真实 CAD/mesh 输入受限工作流（meshio 适配）
+
+### Decided
+- overhang 制造约束已正式 deferred 到 v2.x+；理由见 `docs/decisions/D001-overhang-deferred.md`
+
+---
+
+## [1.3.0] — 2026-05-16
+
+### UX + 文档收口（Wave C）
+
+把 v1.2 的工程化基线往用户面 + 决策面收紧。自评 **93/100**。
+
+### Added
+- **`structure-optimizer --version`**：从 importlib.metadata 读取，console script + `python -m` 两种入口都支持
+- **每个子命令含 example epilog**：`structure-optimizer run --help` 等都带具体调用样例
+- **`docs/tutorial.md`** — 15 分钟新工程师入门：安装 → 跑 benchmark → 读产物 → demo → study + Pareto → 加制造约束 → 切换求解器后端 → 常见错误表
+- **`docs/decisions/D001-overhang-deferred.md`** — 正式 ADR 形式 deferral：overhang 在纯 2D 下定义模糊，需先有 3D FEM；明列重启条件
+- **公共 API docstring 全补**：所有 `core/` / `adapters/` / `benchmarks/` / `cli.py` 中的公共函数、方法、dataclass 都有简明 docstring（70 个原本缺失，全部补齐）
+- **`tests/test_cli.py` 扩展**：`--version` flag 测试 + 子命令 `--help` 含 Example 断言（20 测试）
+
+### Changed
+- `pyproject.toml` version: 1.0.0 → 1.3.0（与最新 tag 对齐）
+- README "已知限制" §6：overhang 措辞改为正式 deferred 引用 D001
+- ruff 配置增 `RUF002 + RUF003` 忽略：项目 docstring 用到 ν / ρ / ≈ / → 等数学/物理符号是有意保留
+
+### Engineering principles
+- docstring 不追求长篇大论：一句话说清"做什么"即可，避免过度文档化
+- decision records 跟随代码：`docs/decisions/` 目录保留所有需要明确"won't fix"的项
+
+### Test coverage
+99 → 101（CLI +2：--version, --help example）
 
 ---
 

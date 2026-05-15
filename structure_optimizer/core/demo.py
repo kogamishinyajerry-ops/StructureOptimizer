@@ -20,11 +20,13 @@ from structure_optimizer.core.workflow import run_benchmark
 
 
 def generate_demo_package(benchmark: str, preset: str | None = None) -> Path:
+    """Run a benchmark and emit a static ``demo.html`` review package; return its path."""
     run_dir = run_benchmark(benchmark, preset=preset)
     return generate_demo_html(run_dir)
 
 
 def generate_demo_html(run_dir: Path | str) -> Path:
+    """Generate ``demo.html`` for an existing run directory (does not re-run optimization)."""
     run_dir = Path(run_dir)
     input_config = read_json(run_dir / "input.json")
     summary = read_json(run_dir / "summary.json") if (run_dir / "summary.json").exists() else {}

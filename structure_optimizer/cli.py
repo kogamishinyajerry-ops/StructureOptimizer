@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from structure_optimizer.benchmarks.registry import available_benchmarks
@@ -12,30 +13,106 @@ from structure_optimizer.core.verification import FAILURE_STATUSES, PASS_STATUS,
 from structure_optimizer.core.workflow import run_benchmark
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="python -m structure_optimizer")
-    subcommands = parser.add_subparsers(dest="command", required=True)
+def _package_version() -> str:
+    try:
+        return version("structure-optimizer")
+    except PackageNotFoundError:
+        return "unknown"
 
-    run = subcommands.add_parser("run", help="Run a benchmark optimization")
+
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the top-level argparse parser (5 subcommands + --version + epilog examples)."""
+    parser = argparse.ArgumentParser(
+        prog="structure-optimizer",
+        description=(
+            "Local, verifiable 2D/2.5D structural optimization workbench. "
+            "Generates SIMP optimization candidates with independent verification "
+            "and static HTML review packages."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  structure-optimizer run --benchmark mbb_beam --preset smoke\n"
+            "  structure-optimizer verify --run runs/mbb_beam/<run_id>\n"
+            "  structure-optimizer demo --benchmark simple_bracket --preset demo\n"
+            "  structure-optimizer study --config studies/simple_bracket_tradeoff.json\n"
+            "\nDocs: README.md, docs/architecture.md, docs/tutorial.md"
+        ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"structure-optimizer {_package_version()}",
+    )
+    subcommands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
+
+    run = subcommands.add_parser(
+        "run",
+        help="Run a benchmark optimization",
+        description="Run a SIMP topology optimization on a built-in benchmark.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Example:\n"
+            "  structure-optimizer run --benchmark mbb_beam --preset smoke\n"
+            "Prints the run directory path to stdout on success."
+        ),
+    )
     run.add_argument("--benchmark", required=True, choices=available_benchmarks())
     run.add_argument("--preset", default=None, help="Optional benchmark preset, e.g. smoke")
 
-    verify = subcommands.add_parser("verify", help="Verify an existing run directory")
+    verify = subcommands.add_parser(
+        "verify",
+        help="Verify an existing run directory",
+        description=(
+            "Re-run independent verification on a previously-generated run "
+            "directory. Returns one of: passed, invalid_config, "
+            "solver_failed, singular_matrix, volume_constraint_failed, "
+            "connectivity_failed, design_space_constraint_failed."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Example:\n  structure-optimizer verify --run runs/mbb_beam/20260516-180000-123456",
+    )
     verify.add_argument("--run", required=True, type=Path)
 
-    report = subcommands.add_parser("report", help="Generate report.md for an existing run directory")
+    report = subcommands.add_parser(
+        "report",
+        help="Generate report.md for an existing run directory",
+        description="Regenerate the engineering Markdown report from a run directory.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Example:\n  structure-optimizer report --run runs/mbb_beam/<run_id>",
+    )
     report.add_argument("--run", required=True, type=Path)
 
-    demo = subcommands.add_parser("demo", help="Generate a self-contained static HTML demo package")
+    demo = subcommands.add_parser(
+        "demo",
+        help="Generate a self-contained static HTML demo package",
+        description=(
+            "Run a benchmark and produce a Chinese-localized review HTML "
+            "(demo.html) suitable for showing to non-technical reviewers."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Example:\n  structure-optimizer demo --benchmark simple_bracket --preset demo",
+    )
     demo.add_argument("--benchmark", required=True, choices=available_benchmarks())
     demo.add_argument("--preset", default=None, help="Optional benchmark preset, e.g. demo")
 
-    study = subcommands.add_parser("study", help="Run a local parameter study and candidate comparison")
+    study = subcommands.add_parser(
+        "study",
+        help="Run a local parameter study and candidate comparison",
+        description=(
+            "Sweep a parameter grid (volume_fraction, filter_radius, "
+            "load_weights), score every candidate, compute the Pareto "
+            "front, and emit a candidate-comparison study.html."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Example:\n  structure-optimizer study --config studies/simple_bracket_tradeoff.json",
+    )
     study.add_argument("--config", required=True, type=Path)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point. Returns 0 on success, 1 on caught error, 2 on argparse error."""
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

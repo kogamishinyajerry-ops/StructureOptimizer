@@ -18,6 +18,8 @@ class SolverError(RuntimeError):
 
 @dataclass(frozen=True)
 class FEMResult:
+    """Linear-elastic FEM result: displacements + scalar metrics + per-element strain energy."""
+
     displacements: np.ndarray
     compliance: float
     max_displacement: float
@@ -27,6 +29,7 @@ class FEMResult:
 
 
 def element_stiffness(young_modulus: float, poisson_ratio: float) -> np.ndarray:
+    """Build the 8×8 plane-stress quad-element stiffness matrix for unit-sized elements."""
     nu = poisson_ratio
     k = np.array(
         [
@@ -63,6 +66,13 @@ def solve_linear_elastic(
     densities: np.ndarray,
     loads: list[dict] | None = None,
 ) -> FEMResult:
+    """Assemble the SIMP-scaled stiffness matrix and solve for nodal displacements.
+
+    Uses ``config.solver.backend`` (``dense`` or ``cg``) to perform the actual
+    linear solve. Returns displacements + compliance + max displacement + max
+    von Mises stress (approx, per-element) + mass + per-element strain energy
+    (the SIMP sensitivity driver).
+    """
     opt = config.optimization
     densities = np.asarray(densities, dtype=float).reshape(-1)
     if densities.shape[0] != mesh.elements.shape[0]:
@@ -116,6 +126,7 @@ def solve_linear_elastic(
 
 
 def compute_mass(config: BenchmarkConfig, mesh: StructuredMesh, densities: np.ndarray) -> float:
+    """Integrate density × element area × thickness × material density. Void elements contribute zero."""
     active = np.where(mesh.void_mask, 0.0, densities)
     return float(np.sum(active) * mesh.element_area * config.thickness * config.material.density)
 

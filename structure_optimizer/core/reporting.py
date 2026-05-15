@@ -8,6 +8,7 @@ from structure_optimizer.core.verification import verify_run
 
 
 def generate_report(run_dir: Path | str) -> Path:
+    """Generate (or regenerate) ``report.md`` from a run directory; return its path."""
     run_dir = Path(run_dir)
     config = parse_config(read_json(run_dir / "input.json"))
     validate_config(config)

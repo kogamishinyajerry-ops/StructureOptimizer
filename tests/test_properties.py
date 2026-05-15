@@ -21,7 +21,6 @@ from __future__ import annotations
 import random
 
 import numpy as np
-
 from structure_optimizer.benchmarks.registry import load_benchmark
 from structure_optimizer.core.config import (
     ExtrusionConstraintConfig,
@@ -84,12 +83,14 @@ def test_simp_volume_target_approximately_satisfied():
 def _random_candidates(rng: random.Random, n: int) -> list[dict]:
     rows = []
     for i in range(n):
-        rows.append({
-            "candidate_id": f"cand_{i:03d}",
-            "mass": rng.uniform(0.1, 10.0),
-            "compliance": rng.uniform(0.1, 100.0),
-            "verification_status": "passed",
-        })
+        rows.append(
+            {
+                "candidate_id": f"cand_{i:03d}",
+                "mass": rng.uniform(0.1, 10.0),
+                "compliance": rng.uniform(0.1, 100.0),
+                "verification_status": "passed",
+            }
+        )
     return rows
 
 
@@ -106,8 +107,9 @@ def test_pareto_front_members_are_mutually_non_dominated():
                     continue
                 a_vec = [a["mass"], a["compliance"]]
                 b_vec = [b["mass"], b["compliance"]]
-                assert not _dominates(a_vec, b_vec, DEFAULT_OBJECTIVES), \
+                assert not _dominates(a_vec, b_vec, DEFAULT_OBJECTIVES), (
                     f"seed={seed}: {a['candidate_id']} dominates {b['candidate_id']} but both in front"
+                )
 
 
 def test_pareto_rank_N_dominated_by_at_least_one_in_rank_N_minus_one():

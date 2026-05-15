@@ -10,6 +10,8 @@ from structure_optimizer.core.design_space import build_design_space_masks
 
 @dataclass(frozen=True)
 class StructuredMesh:
+    """Structured quadrilateral mesh + design / frozen-solid / void masks."""
+
     nelx: int
     nely: int
     width: float
@@ -23,22 +25,28 @@ class StructuredMesh:
 
     @property
     def ndof(self) -> int:
+        """Total degrees of freedom (2 per node)."""
         return self.nodes.shape[0] * 2
 
     @property
     def element_area(self) -> float:
+        """Area of a single element in mesh units."""
         return (self.width / self.nelx) * (self.height / self.nely)
 
     def node_id(self, i: int, j: int) -> int:
+        """Flat node id for grid coords (i, j)."""
         return j * (self.nelx + 1) + i
 
     def element_index(self, ex: int, ey: int) -> int:
+        """Flat element id for element-grid coords (ex, ey)."""
         return ey * self.nelx + ex
 
     def element_grid_index(self, element_id: int) -> tuple[int, int]:
+        """Inverse of ``element_index`` — return (ex, ey)."""
         return element_id % self.nelx, element_id // self.nelx
 
     def element_dofs(self, element_id: int) -> np.ndarray:
+        """Return the 8 DOF indices (ux/uy pairs for 4 nodes) of an element."""
         nodes = self.elements[element_id]
         dofs: list[int] = []
         for node in nodes:
@@ -46,6 +54,7 @@ class StructuredMesh:
         return np.array(dofs, dtype=int)
 
     def selector_nodes(self, selector: str) -> list[int]:
+        """Map a string selector (e.g. ``"left_edge"``) to the nodes it covers."""
         mid_x = self.nelx // 2
         mid_y = self.nely // 2
         selectors = {
@@ -67,6 +76,7 @@ class StructuredMesh:
         return selectors[selector]
 
     def fixed_dofs(self, boundary_conditions: list[dict]) -> np.ndarray:
+        """Collect the set of DOFs constrained by all boundary-condition records."""
         dofs: set[int] = set()
         for bc in boundary_conditions:
             for node in self.selector_nodes(bc["selector"]):
@@ -78,6 +88,7 @@ class StructuredMesh:
         return np.array(sorted(dofs), dtype=int)
 
     def force_vector(self, loads: list[dict]) -> np.ndarray:
+        """Build the global force vector from a list of point-load records (distributed across selector nodes)."""
         force = np.zeros(self.ndof, dtype=float)
         for load in loads:
             fx = float(load.get("fx", 0.0))
@@ -90,6 +101,7 @@ class StructuredMesh:
 
 
 def create_structured_mesh(config: BenchmarkConfig) -> StructuredMesh:
+    """Build a structured-quadrilateral mesh + design / frozen / void masks from a ``BenchmarkConfig``."""
     nelx = config.mesh.nelx
     nely = config.mesh.nely
     width = float(config.mesh.width if config.mesh.width is not None else nelx)

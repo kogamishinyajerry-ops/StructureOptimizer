@@ -48,6 +48,8 @@ STANDARD_CANDIDATE_COLUMNS = [
 
 @dataclass(frozen=True)
 class StudyConfig:
+    """Parameter-study configuration: benchmark + parameter grid + ranking + Pareto objectives."""
+
     benchmark: str
     preset: str | None
     parameters: dict[str, list[Any]]
@@ -56,6 +58,7 @@ class StudyConfig:
     source_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-serialisable dict copy; ``preset`` / ``source_path`` omitted when ``None``."""
         data: dict[str, Any] = {
             "benchmark": self.benchmark,
             "parameters": self.parameters,
@@ -70,6 +73,7 @@ class StudyConfig:
 
 
 def load_study_config(path: Path | str) -> StudyConfig:
+    """Load + validate a study JSON config; raises ``ValueError`` on missing / malformed fields."""
     path = Path(path)
     raw = json.loads(path.read_text())
     try:
@@ -135,6 +139,12 @@ def _normalize_objectives(raw: Any) -> list[dict[str, str]]:
 
 
 def run_study(config_path: Path | str) -> Path:
+    """Run a parameter-grid study: for every override combination, run + verify + generate demo.
+
+    Then compute Pareto ranks across the chosen objectives, rank the table by
+    ``ranking`` criteria, write ``candidates.csv`` + ``study.html``. Returns the
+    path to ``study.html``.
+    """
     study = load_study_config(config_path)
     base_config = load_benchmark(study.benchmark, preset=study.preset)
     study_dir = _create_study_dir(study)

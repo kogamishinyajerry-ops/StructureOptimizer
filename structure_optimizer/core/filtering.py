@@ -12,6 +12,7 @@ def density_filter(
     radius: float,
     min_density: float,
 ) -> np.ndarray:
+    """Sigmund-style density-weighted sensitivity filter — enforces a minimum length scale."""
     filtered = np.zeros_like(sensitivities, dtype=float)
     for i in range(mesh.elements.shape[0]):
         ix, iy = mesh.element_grid_index(i)

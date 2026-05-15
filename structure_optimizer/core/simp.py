@@ -13,6 +13,8 @@ from structure_optimizer.core.mesh import StructuredMesh
 
 @dataclass(frozen=True)
 class IterationMetric:
+    """Per-iteration SIMP record: compliance, volume fraction, density change, max disp, mass."""
+
     iteration: int
     compliance: float
     volume_fraction: float
@@ -23,6 +25,8 @@ class IterationMetric:
 
 @dataclass(frozen=True)
 class OptimizationResult:
+    """Result of a SIMP optimization run: final density + per-iter metrics + baseline/final FEA."""
+
     densities: np.ndarray
     metrics: list[IterationMetric]
     baseline: FEMResult
@@ -33,6 +37,12 @@ class OptimizationResult:
 
 
 def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResult:
+    """Run the SIMP main loop: density init → FEA → sensitivity → filter → OC update → manufacturing projection → repeat.
+
+    Stops when ``change <= change_tolerance`` (after ``min_iterations``) or
+    ``max_iterations`` is reached. Returns ``OptimizationResult`` with the final
+    density field, full iteration history, and pre/post-optimization FEA results.
+    """
     opt = config.optimization
     load_cases = effective_load_cases(config)
     densities = np.full(mesh.elements.shape[0], opt.volume_fraction, dtype=float)

@@ -16,11 +16,13 @@ RUNS_ROOT = Path("runs")
 
 
 def input_hash(config: BenchmarkConfig) -> str:
+    """Deterministic SHA-256 fingerprint of the canonical-JSON config; used for provenance."""
     payload = json.dumps(config.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
 def create_run_dir(config: BenchmarkConfig, runs_root: Path = RUNS_ROOT) -> Path:
+    """Create ``runs/<benchmark>/<timestamp>/`` for a fresh run; never reuses an existing dir."""
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     run_dir = runs_root / config.name / timestamp
     run_dir.mkdir(parents=True, exist_ok=False)
@@ -28,10 +30,12 @@ def create_run_dir(config: BenchmarkConfig, runs_root: Path = RUNS_ROOT) -> Path
 
 
 def save_input(run_dir: Path, config: BenchmarkConfig) -> None:
+    """Persist the canonical config snapshot as ``input.json``."""
     write_json(run_dir / "input.json", config.to_dict())
 
 
 def save_metrics(run_dir: Path, metrics: list[IterationMetric]) -> None:
+    """Write per-iteration metrics to ``metrics.csv``."""
     with (run_dir / "metrics.csv").open("w", newline="") as fh:
         writer = csv.DictWriter(
             fh,
@@ -43,6 +47,7 @@ def save_metrics(run_dir: Path, metrics: list[IterationMetric]) -> None:
 
 
 def load_metrics(run_dir: Path) -> list[dict[str, float]]:
+    """Parse ``metrics.csv`` back into a list of typed records (or ``[]`` if absent)."""
     path = run_dir / "metrics.csv"
     if not path.exists():
         return []
@@ -63,16 +68,20 @@ def load_metrics(run_dir: Path) -> list[dict[str, float]]:
 
 
 def save_density(run_dir: Path, densities: np.ndarray) -> None:
+    """Persist the final density field as ``density.npy`` (numpy binary)."""
     np.save(run_dir / "density.npy", densities)
 
 
 def load_density(run_dir: Path) -> np.ndarray:
+    """Load the final density field from ``density.npy``."""
     return np.load(run_dir / "density.npy")
 
 
 def write_json(path: Path, data: dict) -> None:
+    """Atomic-ish JSON write with sorted keys + 2-space indent + trailing newline."""
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
 def read_json(path: Path) -> dict:
+    """Read JSON from a path; raises ``json.JSONDecodeError`` on malformed input."""
     return json.loads(path.read_text())

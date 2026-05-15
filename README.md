@@ -134,7 +134,7 @@ PYTHONPATH=. python scripts/benchmark_performance.py                          # 
 3. **网格** — 仅结构化 quadrilateral；FEM 装配是 dense NumPy，不适合 ≫ 200×200 网格。
 4. **应力指标** — 单元中心近似 von Mises，**不能**替代认证级 FEA。
 5. **几何选择器** — `box` / `circle` 二选一，无任意几何 / CAD topology。
-6. **制造约束** — symmetry / extrusion / min_member_size 已支持；overhang 推迟到 v0.6.1。
+6. **制造约束** — symmetry / extrusion / min_member_size 已支持；overhang 正式 deferred 到 v2.x+（见 `docs/decisions/D001-overhang-deferred.md` 的理由：2D 下定义模糊，需先有 3D FEM）。
 7. **study runner** — 仅参数 grid search，无 DOE / 主动学习 / 自适应采样。
 8. **求解器** — NumPy dense 默认；纯 NumPy CG 备用；scipy sparse / CalculiX / FEniCS adapter **钩子留好但未实装**。
 9. **结果定位** — **优化候选 ≠ 投产零件**。所有产物均标记 "engineering review required"。

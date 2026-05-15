@@ -44,14 +44,17 @@ ZH_STOP_REASON_MAP: dict[str, str] = {
 
 
 def zh_status(status: Any) -> str:
+    """Translate a verification status (e.g. ``"passed"``) to its Chinese label, or escape if unknown."""
     return ZH_STATUS_MAP.get(str(status), escape(str(status)))
 
 
 def zh_check_name(name: str) -> str:
+    """Translate a manufacturability check identifier to its Chinese label."""
     return ZH_CHECK_NAME_MAP.get(name, escape(name))
 
 
 def zh_stop_reason(reason: Any) -> str:
+    """Translate a SIMP-loop stop reason (e.g. ``"max_iterations"``) to its Chinese label."""
     return ZH_STOP_REASON_MAP.get(str(reason), escape(str(reason)))
 
 
@@ -133,6 +136,7 @@ def status_badge_html(status: Any, label_zh: str | None = None) -> str:
 
 
 def percent_reduction(baseline: Any, candidate: Any) -> str:
+    """Format ``(baseline - candidate) / baseline`` as a signed percentage; ``"n/a"`` on bad inputs."""
     try:
         base = float(baseline)
         cand = float(candidate)

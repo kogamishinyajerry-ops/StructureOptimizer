@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from structure_optimizer.cli import main
 
 
@@ -194,6 +193,25 @@ def test_main_help_flag_exits_zero(capsys):
     assert exc.value.code == 0
     out = capsys.readouterr().out
     assert "run" in out and "verify" in out and "demo" in out and "study" in out
+
+
+def test_main_version_flag_prints_version_and_exits_zero(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["--version"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "structure-optimizer" in out
+    # Should look like a semver, e.g. "1.3.0"
+    assert any(ch.isdigit() for ch in out)
+
+
+def test_subcommand_help_includes_example(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["run", "--help"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "Example" in out
+    assert "structure-optimizer run" in out
 
 
 # --- error format invariant -------------------------------------------

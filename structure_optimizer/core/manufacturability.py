@@ -11,6 +11,8 @@ from structure_optimizer.core.mesh import StructuredMesh
 
 @dataclass(frozen=True)
 class ComponentStats:
+    """Connected-component summary used by manufacturability checks."""
+
     count: int
     largest_size: int
     island_count: int
@@ -22,6 +24,7 @@ def analyze_manufacturability(
     mesh: StructuredMesh,
     densities: np.ndarray,
 ) -> dict[str, Any]:
+    """v0.2 post-hoc manufacturability warnings: isolated islands, thin members, local-density gray regions."""
     threshold = max(0.05, config.optimization.min_density)
     solid = (densities >= threshold) & mesh.design_mask
     components = _solid_components(mesh, solid)
