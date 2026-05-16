@@ -138,26 +138,40 @@ def _normalize_objectives(raw: Any) -> list[dict[str, str]]:
     return normalized
 
 
-def run_study(config_path: Path | str) -> Path:
+def run_study(config_path: Path | str, workers: int = 1) -> Path:
     """Run a parameter-grid study: for every override combination, run + verify + generate demo.
 
     Then compute Pareto ranks across the chosen objectives, rank the table by
     ``ranking`` criteria, write ``candidates.csv`` + ``study.html``. Returns the
     path to ``study.html``.
+
+    Args:
+        config_path: path to study JSON config.
+        workers: number of parallel processes (default 1 = serial; ≥ 2 enables
+            ``concurrent.futures.ProcessPoolExecutor``). Each candidate run is
+            independent so this is embarrassingly parallel; expect near-linear
+            speedup up to ``min(workers, num_candidates, num_cores)``.
     """
     study = load_study_config(config_path)
     base_config = load_benchmark(study.benchmark, preset=study.preset)
     study_dir = _create_study_dir(study)
     write_json(study_dir / "study_input.json", study.to_dict())
 
+    overrides_list = _parameter_matrix(study.parameters)
+    candidate_count = len(overrides_list)
+    effective_workers = max(1, min(int(workers), candidate_count))
+
+    if effective_workers <= 1:
+        results: list[tuple[int, dict[str, Any], BenchmarkConfig, dict[str, Any]]] = []
+        for index, overrides in enumerate(overrides_list, start=1):
+            results.append(_run_candidate_serial(study, base_config, study_dir, index, overrides))
+    else:
+        results = _run_candidates_parallel(study, base_config, study_dir, overrides_list, effective_workers)
+
     rows: list[dict[str, Any]] = []
-    for index, overrides in enumerate(_parameter_matrix(study.parameters), start=1):
+    for index, overrides, candidate_config, verification in results:
         candidate_id = f"candidate_{index:03d}"
         candidate_dir = study_dir / candidate_id
-        candidate_config = _config_with_overrides(base_config, overrides)
-        run_config(candidate_config, run_dir=candidate_dir)
-        generate_demo_html(candidate_dir)
-        verification = read_json(candidate_dir / "verification.json")
         rows.append(_candidate_row(study, candidate_id, candidate_dir, overrides, candidate_config, verification))
 
     _assign_pareto_ranks(rows, study.objectives)
@@ -165,6 +179,82 @@ def run_study(config_path: Path | str) -> Path:
     _write_candidates_csv(study_dir / "candidates.csv", ranked_rows)
     _write_study_html(study_dir / "study.html", study, ranked_rows)
     return study_dir / "study.html"
+
+
+def _run_candidate_serial(
+    study: StudyConfig,
+    base_config: BenchmarkConfig,
+    study_dir: Path,
+    index: int,
+    overrides: dict[str, Any],
+) -> tuple[int, dict[str, Any], BenchmarkConfig, dict[str, Any]]:
+    candidate_id = f"candidate_{index:03d}"
+    candidate_dir = study_dir / candidate_id
+    candidate_config = _config_with_overrides(base_config, overrides)
+    run_config(candidate_config, run_dir=candidate_dir)
+    generate_demo_html(candidate_dir)
+    verification = read_json(candidate_dir / "verification.json")
+    return (index, overrides, candidate_config, verification)
+
+
+def _run_candidates_parallel(
+    study: StudyConfig,
+    base_config: BenchmarkConfig,
+    study_dir: Path,
+    overrides_list: list[dict[str, Any]],
+    workers: int,
+) -> list[tuple[int, dict[str, Any], BenchmarkConfig, dict[str, Any]]]:
+    """Run candidates with ProcessPoolExecutor. Each worker is independent
+    (writes to its own subdir, reads its own verification.json) so this is
+    embarrassingly parallel. Results are collected in submission order.
+    """
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    base_config_dict = base_config.to_dict()
+    futures = {}
+    results: list[tuple[int, dict[str, Any], BenchmarkConfig, dict[str, Any]]] = []
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        for index, overrides in enumerate(overrides_list, start=1):
+            fut = executor.submit(
+                _candidate_worker,
+                base_config_dict,
+                base_config.source_path,
+                str(study_dir),
+                index,
+                overrides,
+            )
+            futures[fut] = (index, overrides)
+        for fut in as_completed(futures):
+            index, overrides = futures[fut]
+            verification, candidate_config_dict = fut.result()
+            candidate_config = parse_config(candidate_config_dict, source_path=base_config.source_path)
+            validate_config(candidate_config)
+            results.append((index, overrides, candidate_config, verification))
+    results.sort(key=lambda x: x[0])
+    return results
+
+
+def _candidate_worker(
+    base_config_dict: dict[str, Any],
+    base_source_path: str | None,
+    study_dir_str: str,
+    index: int,
+    overrides: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Top-level worker function for ProcessPoolExecutor (must be picklable).
+
+    Reconstructs config from dict, runs candidate, returns (verification dict,
+    final config dict). Main process re-parses to a BenchmarkConfig.
+    """
+    base_config = parse_config(base_config_dict, source_path=base_source_path)
+    validate_config(base_config)
+    candidate_id = f"candidate_{index:03d}"
+    candidate_dir = Path(study_dir_str) / candidate_id
+    candidate_config = _config_with_overrides(base_config, overrides)
+    run_config(candidate_config, run_dir=candidate_dir)
+    generate_demo_html(candidate_dir)
+    verification = read_json(candidate_dir / "verification.json")
+    return verification, candidate_config.to_dict()
 
 
 def _create_study_dir(study: StudyConfig) -> Path:

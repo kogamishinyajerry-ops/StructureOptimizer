@@ -39,7 +39,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from structure_optimizer.core.config import BenchmarkConfig, LoadCaseConfig
-from structure_optimizer.core.fem2d import FEMResult, solve_linear_elastic
+from structure_optimizer.core.fem2d import FEMResult, SparseAssemblyTemplate, solve_linear_elastic
 from structure_optimizer.core.mesh import StructuredMesh
 
 AGGREGATORS: frozenset[str] = frozenset({"weighted_sum", "average", "worst_case"})
@@ -59,13 +59,18 @@ def solve_all_cases(
     mesh: StructuredMesh,
     densities: np.ndarray,
     load_cases: Sequence[LoadCaseConfig],
+    sparse_template: SparseAssemblyTemplate | None = None,
 ) -> list[CaseResult]:
-    """Solve every load case independently. Caller chooses how to aggregate."""
+    """Solve every load case independently. Caller chooses how to aggregate.
+
+    ``sparse_template`` (optional) is forwarded to ``solve_linear_elastic`` so
+    a SIMP main loop can reuse the COO pattern across iterations.
+    """
     return [
         CaseResult(
             name=lc.name,
             weight=lc.weight,
-            result=solve_linear_elastic(config, mesh, densities, loads=lc.loads),
+            result=solve_linear_elastic(config, mesh, densities, loads=lc.loads, sparse_template=sparse_template),
         )
         for lc in load_cases
     ]
@@ -132,6 +137,7 @@ def solve_and_aggregate(
     densities: np.ndarray,
     load_cases: Sequence[LoadCaseConfig],
     aggregator: str,
+    sparse_template: SparseAssemblyTemplate | None = None,
 ) -> FEMResult:
     """Solve every case + aggregate. Convenience wrapper over solve_all_cases + aggregate."""
-    return aggregate(aggregator, solve_all_cases(config, mesh, densities, load_cases))
+    return aggregate(aggregator, solve_all_cases(config, mesh, densities, load_cases, sparse_template=sparse_template))

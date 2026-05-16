@@ -1,0 +1,41 @@
+{
+  "name": "large_cantilever",
+  "dimension": "2d",
+  "units": "mm_N_MPa",
+  "thickness": 1.0,
+  "mesh": {
+    "type": "structured_quad",
+    "nelx": 500,
+    "nely": 500,
+    "width": 100.0,
+    "height": 100.0
+  },
+  "material": {
+    "young_modulus": 210000.0,
+    "poisson_ratio": 0.3,
+    "density": 7.85e-9
+  },
+  "boundary_conditions": [
+    {"selector": "left_edge", "components": ["ux", "uy"]}
+  ],
+  "loads": [
+    {"selector": "right_mid", "fx": 0.0, "fy": -800.0}
+  ],
+  "solver": {"backend": "sparse"},
+  "optimization": {
+    "objective": "min_compliance",
+    "volume_fraction": 0.45,
+    "penalty": 3.0,
+    "filter_radius": 1.5,
+    "max_iterations": 5,
+    "min_iterations": 5,
+    "change_tolerance": 0.01,
+    "min_density": 0.001
+  },
+  "presets": {
+    "smoke": {
+      "mesh": {"nelx": 200, "nely": 200, "width": 100.0, "height": 100.0},
+      "optimization": {"max_iterations": 3, "min_iterations": 3}
+    }
+  }
+}

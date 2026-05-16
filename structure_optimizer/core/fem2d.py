@@ -66,6 +66,7 @@ def solve_linear_elastic(
     mesh: StructuredMesh,
     densities: np.ndarray,
     loads: list[dict] | None = None,
+    sparse_template: SparseAssemblyTemplate | None = None,
 ) -> FEMResult:
     """Assemble the SIMP-scaled stiffness matrix and solve for nodal displacements.
 
@@ -73,6 +74,13 @@ def solve_linear_elastic(
     linear solve. Returns displacements + compliance + max displacement + max
     von Mises stress (approx, per-element) + mass + per-element strain energy
     (the SIMP sensitivity driver).
+
+    Args:
+        sparse_template: optional pre-built template (see
+            :func:`build_sparse_assembly_template`). When provided AND the
+            solver prefers sparse, the (rows, cols) pattern is reused and only
+            ``vals`` are recomputed for the current densities. SIMP main loop
+            uses this for incremental assembly.
     """
     opt = config.optimization
     densities = np.asarray(densities, dtype=float).reshape(-1)
@@ -87,7 +95,10 @@ def solve_linear_elastic(
 
     linear_solver = get_linear_solver(config.solver.backend)
     if linear_solver.prefers_sparse:
-        stiffness = _assemble_stiffness_sparse(mesh, density_scale, ke)
+        if sparse_template is not None:
+            stiffness = assemble_with_template(sparse_template, density_scale)
+        else:
+            stiffness = _assemble_stiffness_sparse(mesh, density_scale, ke)
     else:
         stiffness = _assemble_stiffness_dense(mesh, density_scale, ke)
 
@@ -139,17 +150,63 @@ def _assemble_stiffness_sparse(mesh: StructuredMesh, density_scale: np.ndarray, 
     """Vectorized COO → CSR stiffness assembly for scipy sparse solvers.
 
     O(non-zeros) memory; required to make sparse solvers actually faster than
-    dense on large meshes.
+    dense on large meshes. **Each call rebuilds rows/cols from scratch** — use
+    :func:`build_sparse_assembly_template` + :func:`assemble_with_template`
+    for the SIMP main loop, which iterates with the same mesh + ke and only
+    changing density_scale.
+    """
+    template = build_sparse_assembly_template(mesh, ke)
+    return assemble_with_template(template, density_scale)
+
+
+@dataclass(frozen=True)
+class SparseAssemblyTemplate:
+    """Mesh + element-stiffness pattern cached for repeated sparse assembly.
+
+    SIMP iterates K(ρ) = Σ_e (ρ_min + ρ_e^p · (1-ρ_min)) · K_e^0 with the
+    same mesh and same K_e^0; only the per-element scale changes. The COO
+    triplets (rows, cols, ke_flat) are constant; recomputing them every
+    iteration wastes ~half the assembly time at moderate mesh size and more
+    at large mesh size. ``build_sparse_assembly_template`` precomputes once;
+    ``assemble_with_template`` reuses on every SIMP iter.
+    """
+
+    rows: np.ndarray
+    cols: np.ndarray
+    ke_flat: np.ndarray
+    ndof: int
+    n_elem: int
+
+
+def build_sparse_assembly_template(mesh: StructuredMesh, ke: np.ndarray) -> SparseAssemblyTemplate:
+    """Precompute the (rows, cols, ke_flat) pattern for a mesh + element matrix.
+
+    Call once per mesh+material; reuse via :func:`assemble_with_template` for
+    each SIMP iteration's stiffness rebuild.
+    """
+    n_elem = mesh.elements.shape[0]
+    edofs_all = np.array([mesh.element_dofs(eid) for eid in range(n_elem)])  # (n_elem, 8)
+    rows = np.repeat(edofs_all, 8, axis=1).flatten()
+    cols = np.tile(edofs_all, (1, 8)).flatten()
+    return SparseAssemblyTemplate(
+        rows=rows,
+        cols=cols,
+        ke_flat=ke.flatten(),
+        ndof=mesh.ndof,
+        n_elem=n_elem,
+    )
+
+
+def assemble_with_template(template: SparseAssemblyTemplate, density_scale: np.ndarray) -> Any:
+    """Build a CSR stiffness matrix from a cached template + current densities.
+
+    Skips the element_dofs loop + rows/cols recomputation — only the per-element
+    SIMP scaling factor is fresh. Returns ``scipy.sparse.csr_matrix``.
     """
     import scipy.sparse as sp
 
-    n_elem = mesh.elements.shape[0]
-    edofs_all = np.array([mesh.element_dofs(eid) for eid in range(n_elem)])  # (n_elem, 8)
-    rows = np.repeat(edofs_all, 8, axis=1).flatten()  # (n_elem * 64,)
-    cols = np.tile(edofs_all, (1, 8)).flatten()
-    ke_flat = ke.flatten()
-    vals = (density_scale[:, None] * ke_flat[None, :]).flatten()
-    return sp.coo_matrix((vals, (rows, cols)), shape=(mesh.ndof, mesh.ndof)).tocsr()
+    vals = (density_scale[:, None] * template.ke_flat[None, :]).flatten()
+    return sp.coo_matrix((vals, (template.rows, template.cols)), shape=(template.ndof, template.ndof)).tocsr()
 
 
 def compute_mass(config: BenchmarkConfig, mesh: StructuredMesh, densities: np.ndarray) -> float:

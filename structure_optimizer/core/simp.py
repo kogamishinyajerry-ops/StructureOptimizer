@@ -4,8 +4,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from structure_optimizer.adapters.solver_base import get_linear_solver
 from structure_optimizer.core.config import BenchmarkConfig, effective_load_cases
-from structure_optimizer.core.fem2d import FEMResult
+from structure_optimizer.core.fem2d import (
+    FEMResult,
+    build_sparse_assembly_template,
+    element_stiffness,
+)
 from structure_optimizer.core.filtering import density_filter
 from structure_optimizer.core.manufacturing import apply_manufacturing_projections
 from structure_optimizer.core.mesh import StructuredMesh
@@ -51,7 +56,19 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
     baseline_densities = np.ones(mesh.elements.shape[0], dtype=float)
     baseline_densities = _apply_density_masks(config, mesh, baseline_densities)
     aggregator = opt.case_aggregator
-    baseline = solve_and_aggregate(config, mesh, baseline_densities, load_cases, aggregator)
+
+    # Wave N: build sparse-assembly template once for the whole loop when the
+    # solver prefers sparse. Skipped for dense backends (template is cheap to
+    # rebuild but adds no value when assembly is dense).
+    sparse_template = None
+    linear_solver = get_linear_solver(config.solver.backend)
+    if linear_solver.prefers_sparse:
+        ke = element_stiffness(config.material.young_modulus, config.material.poisson_ratio)
+        sparse_template = build_sparse_assembly_template(mesh, ke)
+
+    baseline = solve_and_aggregate(
+        config, mesh, baseline_densities, load_cases, aggregator, sparse_template=sparse_template
+    )
 
     metrics: list[IterationMetric] = []
     density_history: list[np.ndarray] = [densities.copy()]
@@ -62,7 +79,7 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
     use_stress_adjoint = config.stress_constraint.enabled and opt.stress_penalty > 0
     for iteration in range(1, opt.max_iterations + 1):
         previous = densities.copy()
-        analysis = solve_and_aggregate(config, mesh, densities, load_cases, aggregator)
+        analysis = solve_and_aggregate(config, mesh, densities, load_cases, aggregator, sparse_template=sparse_template)
         sensitivities = -opt.penalty * (densities ** (opt.penalty - 1.0)) * analysis.element_strain_energy
         sensitivities[~mesh.design_mask] = 0.0
         if use_stress_adjoint:
@@ -102,7 +119,9 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
             stop_reason = "change_tolerance"
             break
 
-    final_analysis = solve_and_aggregate(config, mesh, densities, load_cases, aggregator)
+    final_analysis = solve_and_aggregate(
+        config, mesh, densities, load_cases, aggregator, sparse_template=sparse_template
+    )
     return OptimizationResult(
         densities=densities,
         metrics=metrics,
