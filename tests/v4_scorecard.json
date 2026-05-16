@@ -1,0 +1,283 @@
+{
+  "version": "v4.0.0",
+  "total_max": 100,
+  "total_earned": 11,
+  "items": [
+    {
+      "section": "\u00a71",
+      "code": "1.1",
+      "title": "Augmented Lagrangian stress",
+      "max_points": 8,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/augmented_lagrangian.py missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.2",
+      "title": "MMA optimizer",
+      "max_points": 8,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/mma.py missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.3",
+      "title": "BESO-on-triangle",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/triangle_beso.py missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.4",
+      "title": "Triangle manufacturing",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/triangle_manufacturing.py missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.5",
+      "title": "Buckling eigenvalue",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/buckling.py missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.6",
+      "title": "Heaviside / robust",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/robust.py missing"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.1",
+      "title": "1000\u00d71000 mesh < 10 min",
+      "max_points": 5,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "xlarge_cantilever benchmark missing"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.2",
+      "title": "AMG preconditioner",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "AMG solver class=\u2717 optional dep=\u2717"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.3",
+      "title": "Matrix-free CG",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/matrix_free_cg.py missing"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.4",
+      "title": "Perf baseline \u22653 mesh sizes",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "3 large-mesh references found"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.1",
+      "title": "Fingerprint DB \u2265 20",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "8 fingerprints (need \u226520)"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.2",
+      "title": "Triangle fingerprints \u2265 3",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "0 (need \u22653)"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.3",
+      "title": "Mutation kill rate \u2265 70%",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "tests/mutation_report.json missing"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.4",
+      "title": "Drift detection script",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "missing"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.5",
+      "title": "Reproducibility tests \u2265 30",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "10 (need \u226530)"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.1",
+      "title": "Test count \u2265 600",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "410 (need \u2265600)"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.2",
+      "title": "Core coverage \u2265 95%",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "94.2% (need \u226595%)"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.3",
+      "title": "Adapters coverage \u2265 90%",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "92.6% coverage"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.4",
+      "title": "Property tests \u2265 15",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "5 (need \u226515)"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.5",
+      "title": "Test agent present",
+      "max_points": 4,
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "scripts/test_agent.py present (this file)"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.6",
+      "title": "Test agent in CI",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no CI step"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.1",
+      "title": "Bayesian opt driver",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/bayesian_opt.py missing"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.2",
+      "title": "Auto-refinement loop",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/refinement.py missing"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.3",
+      "title": "Comparative HTML report",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "core/compare.py missing"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.4",
+      "title": "CLI color + diagnostics",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no color hooks in cli.py"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.1",
+      "title": "blueprint-v4 six waves ticked",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "9 ticks"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.2",
+      "title": "tutorial v4 \u22654 new sections",
+      "max_points": 3,
+      "earned": 0,
+      "status": "PARTIAL",
+      "evidence": "0"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.3",
+      "title": "architecture v4 + test agent doc",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no v4 section"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.4",
+      "title": "ADRs D017+ \u2265 8",
+      "max_points": 3,
+      "earned": 0,
+      "status": "PARTIAL",
+      "evidence": "0 (need \u22658)"
+    }
+  ],
+  "v1_check": {
+    "score": 100,
+    "regression": false,
+    "missing": []
+  },
+  "v2_check": {
+    "score": 97,
+    "regression": false,
+    "missing": []
+  },
+  "v3_check": {
+    "score": 99,
+    "regression": false,
+    "missing": []
+  }
+}
