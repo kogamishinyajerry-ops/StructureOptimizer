@@ -1,25 +1,25 @@
 {
   "version": "v4.0.0",
   "total_max": 100,
-  "total_earned": 11,
+  "total_earned": 27,
   "items": [
     {
       "section": "\u00a71",
       "code": "1.1",
       "title": "Augmented Lagrangian stress",
       "max_points": 8,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/augmented_lagrangian.py missing"
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "module exists + benchmark assertion present"
     },
     {
       "section": "\u00a71",
       "code": "1.2",
       "title": "MMA optimizer",
       "max_points": 8,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/mma.py missing"
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "core/mma.py + comparison test present"
     },
     {
       "section": "\u00a71",
@@ -145,7 +145,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "410 (need \u2265600)"
+      "evidence": "438 (need \u2265600)"
     },
     {
       "section": "\u00a74",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "94.2% (need \u226595%)"
+      "evidence": "94.6% (need \u226595%)"
     },
     {
       "section": "\u00a74",
@@ -262,7 +262,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "0 (need \u22658)"
+      "evidence": "1 (need \u22658)"
     }
   ],
   "v1_check": {
