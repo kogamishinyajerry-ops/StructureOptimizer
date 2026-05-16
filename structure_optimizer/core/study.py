@@ -10,6 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from structure_optimizer.benchmarks.registry import load_benchmark
 from structure_optimizer.core.config import BenchmarkConfig, parse_config, validate_config
 from structure_optimizer.core.demo import generate_demo_html
@@ -46,9 +48,17 @@ STANDARD_CANDIDATE_COLUMNS = [
 ]
 
 
+SAMPLING_METHODS: frozenset[str] = frozenset({"grid", "lhs", "sobol"})
+
+
 @dataclass(frozen=True)
 class StudyConfig:
-    """Parameter-study configuration: benchmark + parameter grid + ranking + Pareto objectives."""
+    """Parameter-study configuration: benchmark + parameter grid + ranking + Pareto objectives.
+
+    Wave O: also carries ``sampling`` (``grid`` | ``lhs`` | ``sobol``) and
+    optional ``n_samples`` (required when sampling != ``grid``) and ``seed``
+    for reproducibility of stochastic samplers.
+    """
 
     benchmark: str
     preset: str | None
@@ -56,9 +66,12 @@ class StudyConfig:
     ranking: list[str]
     objectives: list[dict[str, str]]
     source_path: str | None = None
+    sampling: str = "grid"
+    n_samples: int | None = None
+    seed: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serialisable dict copy; ``preset`` / ``source_path`` omitted when ``None``."""
+        """Return a JSON-serialisable dict copy; optional fields omitted when ``None`` / default."""
         data: dict[str, Any] = {
             "benchmark": self.benchmark,
             "parameters": self.parameters,
@@ -69,6 +82,12 @@ class StudyConfig:
             data["preset"] = self.preset
         if self.source_path is not None:
             data["source_path"] = self.source_path
+        if self.sampling != "grid":
+            data["sampling"] = self.sampling
+            if self.n_samples is not None:
+                data["n_samples"] = self.n_samples
+            if self.seed is not None:
+                data["seed"] = self.seed
         return data
 
 
@@ -86,14 +105,33 @@ def load_study_config(path: Path | str) -> StudyConfig:
         raise ValueError("study parameters must be a non-empty object")
 
     normalized: dict[str, list[Any]] = {}
-    candidate_count = 1
+    grid_size = 1
     for name, values in parameters.items():
         if not isinstance(name, str) or not name:
             raise ValueError("study parameter names must be non-empty strings")
         if not isinstance(values, list) or not values:
             raise ValueError(f"study parameter '{name}' must have non-empty values")
         normalized[name] = values
-        candidate_count *= len(values)
+        grid_size *= len(values)
+
+    sampling = str(raw.get("sampling", "grid"))
+    if sampling not in SAMPLING_METHODS:
+        raise ValueError(f"sampling must be one of {sorted(SAMPLING_METHODS)}, got '{sampling}'")
+
+    n_samples_raw = raw.get("n_samples")
+    n_samples: int | None = None
+    if sampling == "grid":
+        candidate_count = grid_size
+    else:
+        if n_samples_raw is None:
+            raise ValueError(f"sampling='{sampling}' requires 'n_samples' field")
+        n_samples = int(n_samples_raw)
+        if n_samples < 1:
+            raise ValueError("n_samples must be ≥1")
+        candidate_count = n_samples
+
+    seed_raw = raw.get("seed")
+    seed: int | None = int(seed_raw) if seed_raw is not None else None
 
     max_candidates = int(raw.get("max_candidates", 64))
     if max_candidates <= 0:
@@ -118,6 +156,9 @@ def load_study_config(path: Path | str) -> StudyConfig:
         ranking=ranking,
         objectives=objectives,
         source_path=str(path),
+        sampling=sampling,
+        n_samples=n_samples,
+        seed=seed,
     )
 
 
@@ -157,7 +198,21 @@ def run_study(config_path: Path | str, workers: int = 1) -> Path:
     study_dir = _create_study_dir(study)
     write_json(study_dir / "study_input.json", study.to_dict())
 
-    overrides_list = _parameter_matrix(study.parameters)
+    if study.sampling == "grid":
+        overrides_list = _parameter_matrix(study.parameters)
+    else:
+        from structure_optimizer.core.sampling import (
+            lhs_samples,
+            map_samples_to_grid,
+            sobol_samples,
+        )
+
+        n = study.n_samples or 1
+        n_dims = len(study.parameters)
+        rng = np.random.default_rng(study.seed) if study.seed is not None else np.random.default_rng()
+        samples = lhs_samples(n, n_dims, rng) if study.sampling == "lhs" else sobol_samples(n, n_dims, rng)
+        overrides_list = map_samples_to_grid(samples, study.parameters)
+
     candidate_count = len(overrides_list)
     effective_workers = max(1, min(int(workers), candidate_count))
 
@@ -178,6 +233,10 @@ def run_study(config_path: Path | str, workers: int = 1) -> Path:
     ranked_rows = _rank_candidates(rows, study.ranking)
     _write_candidates_csv(study_dir / "candidates.csv", ranked_rows)
     _write_study_html(study_dir / "study.html", study, ranked_rows)
+    # Wave O: aggregate per-candidate lineage into a study-level tree
+    from structure_optimizer.core.lineage import build_lineage_tree, write_lineage_tree
+
+    write_lineage_tree(study_dir, build_lineage_tree(study_dir))
     return study_dir / "study.html"
 
 
@@ -191,7 +250,7 @@ def _run_candidate_serial(
     candidate_id = f"candidate_{index:03d}"
     candidate_dir = study_dir / candidate_id
     candidate_config = _config_with_overrides(base_config, overrides)
-    run_config(candidate_config, run_dir=candidate_dir)
+    run_config(candidate_config, run_dir=candidate_dir, study_id=study_dir.name, generation=0)
     generate_demo_html(candidate_dir)
     verification = read_json(candidate_dir / "verification.json")
     return (index, overrides, candidate_config, verification)
@@ -251,7 +310,7 @@ def _candidate_worker(
     candidate_id = f"candidate_{index:03d}"
     candidate_dir = Path(study_dir_str) / candidate_id
     candidate_config = _config_with_overrides(base_config, overrides)
-    run_config(candidate_config, run_dir=candidate_dir)
+    run_config(candidate_config, run_dir=candidate_dir, study_id=Path(study_dir_str).name, generation=0)
     generate_demo_html(candidate_dir)
     verification = read_json(candidate_dir / "verification.json")
     return verification, candidate_config.to_dict()

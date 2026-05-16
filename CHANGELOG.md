@@ -8,11 +8,76 @@
 
 ## [Unreleased]
 
-### Planned (post v2.3.0 · v3 roadmap waves O–R)
-- O 波：DOE study runner（LHS + Sobol）+ design lineage tree → v2.4.0
+### Planned (post v2.4.0 · v3 roadmap waves P–R)
 - P 波：跨平台 bit-reproducibility + fingerprint DB → v2.5.0
 - Q 波：Jupyter rich display + interactive review HTML 升级 → v2.6.0
-- R 波：v3.0 final 收口（tutorial v3 + architecture v3 + ADR D010-D016+ + rubric ≥95） → v3.0.0
+- R 波：v3.0 final 收口（tutorial v3 + architecture v3 + ADR D011-D016+ + rubric ≥95） → v3.0.0
+
+---
+
+## [2.4.0] — 2026-05-16
+
+### O 波：DOE study runner + 设计 lineage tree
+
+v3 大阶段第四波。给 study runner 加 LHS / Sobol 两种采样，给每个 run 加 parent_id 字段并在 study 级别写 lineage tree。
+
+### Added
+- **`structure_optimizer/core/sampling.py`** (NEW)
+  - `lhs_samples(n, n_dims, rng)` — 纯 NumPy LHS（每维等概率分箱 + 跨维 permute）
+  - `sobol_samples(n, n_dims, rng)` — wraps `scipy.stats.qmc.Sobol`（缺 scipy 时 raise RuntimeError + install hint）
+  - `map_samples_to_grid(samples, parameters)` — 把 unit-cube 样本映射到具体参数值
+- **`structure_optimizer/core/lineage.py`** (NEW)
+  - `LineageRecord(run_id, parent_id, study_id, generation)` 数据类
+  - `write_lineage` / `read_lineage` — 每个 run 的 `lineage.json` 读写
+  - `build_lineage_tree(study_dir)` — 走 candidate_*/lineage.json 拼成 `{nodes, edges}`
+  - `write_lineage_tree(study_dir, tree)` — 写 `study_dir/lineage_tree.json`
+- **`structure_optimizer/core/study.py`**
+  - `StudyConfig` 加 `sampling: str = "grid"`、`n_samples: int | None`、`seed: int | None` 字段
+  - `load_study_config` 验证 `sampling ∈ {grid, lhs, sobol}` + 非 grid 时必须有 `n_samples`
+  - `run_study` 在非 grid sampling 时调 `lhs_samples` / `sobol_samples` → `map_samples_to_grid`
+  - 每个 candidate 写 `lineage.json`（study_id = study_dir.name）
+  - 跑完所有 candidate 后写 `lineage_tree.json`
+- **`structure_optimizer/core/workflow.py`** — `run_config(...)` 加 `parent_id` / `study_id` / `generation` 可选 kwargs，统一写 `lineage.json`
+- **`docs/decisions/D010-doe-sampling-and-lineage.md`** — 设计 rationale + 为何不自实现 Sobol + 为何 v2.4 只给 mechanism 不给 refinement policy
+- **`tests/test_doe_and_lineage.py`** (NEW, 24 测试)
+  - LHS shape / range / per-dim 等分性 / seed 决定性
+  - Sobol shape / range / seed 决定性（需 scipy）
+  - `map_samples_to_grid` 映射正确 + 维度 mismatch raise
+  - `LineageRecord` JSON roundtrip + 缺 lineage.json 时返回 None
+  - `build_lineage_tree` 处理 root-only / parent edge / non-candidate subdir 跳过
+  - `run_config` 写 lineage.json 字段正确（含/缺 kwargs 两路径）
+  - `run_study` 用 sampling="lhs"/"sobol"/"grid" 三种模式跑通且 lineage_tree.json 存在
+  - LHS seed 决定性：同 seed 两次 run_study 得相同 candidate 参数集
+  - StudyConfig schema 验证：unknown sampling raise / 缺 n_samples raise
+  - StudyConfig.to_dict 默认 grid 时不写 sampling 字段（向后兼容 v1.x/v2.x JSON）
+
+### Changed
+- `pyproject.toml` version: 2.3.0 → 2.4.0
+
+### v3.x rubric 评分（O 波贡献）
+- **5.1 DOE study runner ≥2 sampling methods (LHS + Sobol)**: +3 ✅
+- **5.2 设计 lineage tracking**: +3
+  - run 目录含 `parent_id` ✓（lineage.json）
+  - study 含 lineage tree ✓（lineage_tree.json）
+- **4.1 全测试 ≥400**（当前 325）：仍未达成
+- **4.2 core 覆盖率 ≥92%**（当前 **94.1%**）：✅
+- **4.4 property tests ≥5**：暂未盘点
+- **7.3 / 7.4**：v1/v2 rubric 仍 100/97 ✓
+
+**v3.x 累计：31 → 37/100**（L+M+N+O 拿下 37，主要剩 §3 可复现 / §4.1+§4.4 测试维度 / §6 文档 / §7.4 等）
+
+### 不拿分项（诚实记录）
+- **5.1 Sobol 走 scipy**：自己实现 Sobol 需要 direction vectors + carryover 簿记，~200 LOC + 易出错。复用 scipy.stats.qmc 是合理工程取舍；缺 scipy 时给清晰错误信息（D010 § "Why no auto-refinement loop"）
+- **5.2 没有自动 refinement loop**：v2.4 只提供 lineage **机制**（parent_id 字段），不规定 refinement **策略**（GA / Bayesian opt / 局部 LHS）。后续 wave 可加 `derive_study(...)` helper
+- **`map_samples_to_grid` 离散化**：连续参数被映射到用户提供的离散值列表。要做真正连续 LHS 需要 `parameters: {vol: {"min": 0.3, "max": 0.7}}` schema —— 已 D010 noted，未做
+
+### 工程卫生
+- ruff check ✓
+- ruff format ✓
+- mypy ✓
+- pytest 325 全绿（默认快速；3 个 slow 跳过），23.6 秒
+- core coverage **94.1%**（v3 阈值 92%）✓
+- 新模块覆盖：lineage.py 100% / sampling.py 88.4%（缺 scipy 路径在装了 scipy 的 CI 上不易触发）
 
 ---
 

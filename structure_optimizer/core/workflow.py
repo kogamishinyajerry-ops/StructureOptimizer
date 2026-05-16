@@ -4,6 +4,7 @@ from pathlib import Path
 
 from structure_optimizer.benchmarks.registry import load_benchmark
 from structure_optimizer.core.config import effective_load_cases
+from structure_optimizer.core.lineage import LineageRecord, write_lineage
 from structure_optimizer.core.mesh import create_structured_mesh
 from structure_optimizer.core.reporting import generate_report
 from structure_optimizer.core.run_store import (
@@ -38,12 +39,23 @@ def run_benchmark(benchmark: str, preset: str | None = None, algorithm: str | No
     return run_config(config)
 
 
-def run_config(config, run_dir: Path | None = None) -> Path:
+def run_config(
+    config,
+    run_dir: Path | None = None,
+    parent_id: str | None = None,
+    study_id: str | None = None,
+    generation: int = 0,
+) -> Path:
     """Run mesh → algorithm (SIMP or BESO) → save artifacts → verify → report.
 
     Returns the run directory. Algorithm selection is driven by
     ``config.optimization.algorithm``; the default ``"simp"`` preserves all
     pre-v1.7 behavior.
+
+    Lineage (Wave O): when ``parent_id`` / ``study_id`` / ``generation`` are
+    provided, a ``lineage.json`` is written into the run dir for downstream
+    tree-building. Defaults preserve v1/v2 behavior (no parent → fresh
+    root-of-tree run).
     """
     from structure_optimizer.adapters.algorithm_base import get_algorithm
 
@@ -59,6 +71,15 @@ def run_config(config, run_dir: Path | None = None) -> Path:
     save_input(run_dir, config)
     save_metrics(run_dir, result.metrics)
     save_density(run_dir, result.densities)
+    write_lineage(
+        run_dir,
+        LineageRecord(
+            run_id=run_dir.name,
+            parent_id=parent_id,
+            study_id=study_id,
+            generation=generation,
+        ),
+    )
     write_baseline_png(run_dir / "baseline.png", mesh)
     display_loads = [load for load_case in effective_load_cases(config) for load in load_case.loads]
     write_loadcase_png(run_dir / "loadcase.png", mesh, config.boundary_conditions, display_loads)
