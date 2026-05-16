@@ -283,3 +283,62 @@ config + mesh ──┤   SimpAlgorithm         ├──┐
 - benchmark coverage 集中在 mbb_beam / cantilever / l_bracket / loaded_hook / simple_bracket / stress_limited_bracket / multi_load_cantilever
 
 详见 `CHANGELOG.md` v2.0.0 条目的 honest caveat 节 + 各 ADR 的 "Reopening criteria"。
+
+---
+
+## 10. v3.x 抽象与扩展点（Waves L → R）
+
+### 10.1 Stress adjoint (`core/adjoint.py`)
+
+Wave L 填补 v1.6 D003 留白。`adjoint_stress_sensitivity(config, mesh, densities, displacements)` 解 K λ = ∂σ_PN/∂u 并返回 dσ_PN/dρ_e；`run_simp` 在 `stress_constraint.enabled and stress_penalty > 0` 时按 Le et al. 2010 normalization 加权叠加 stress sens 到 compliance sens。详 D007。
+
+### 10.2 Triangle SIMP (`core/triangle_simp.py` + `core/triangle_filter.py`)
+
+Wave M 填补 v1.9 D005 留白。`run_simp_triangle` 与 quad `run_simp` 并行存在；不共享 mesh-abstraction（v2.2 是 "two-loops" 风险更低，参 D008 § "Why parallel loops"）。centroid-distance Sigmund filter 取代 grid-neighbor filter；面积加权体积约束取代 unit-area 假设。
+
+### 10.3 增量 sparse 装配 (`core/fem2d.SparseAssemblyTemplate`)
+
+Wave N。`build_sparse_assembly_template(mesh, ke)` 一次性算 (rows, cols, ke_flat) pattern，`assemble_with_template(template, density_scale)` 每次只重算 vals。SIMP main loop 在 sparse backend 时一次建模板复用所有迭代。详 D009。
+
+### 10.4 并行 study (`core/study.run_study(workers=N)`)
+
+Wave N。`ProcessPoolExecutor` 跑独立 candidate；每 worker 重建 config（picklable），写入独立 subdir。`workers=1` 是默认，与 v1.x 行为完全一致。
+
+### 10.5 DOE 采样 (`core/sampling.py`)
+
+Wave O。`lhs_samples(n, n_dims, rng)` 纯 NumPy；`sobol_samples(n, n_dims, rng)` 包 scipy.stats.qmc.Sobol（缺 scipy 时 clear error）。`map_samples_to_grid(samples, parameters)` 把 unit-cube 样本映射到具体参数值。`StudyConfig.sampling` 字段 ∈ `{grid, lhs, sobol}`，默认 grid 保持 v1.x JSON 兼容。
+
+### 10.6 设计 lineage (`core/lineage.py`)
+
+Wave O。`LineageRecord(run_id, parent_id, study_id, generation)` 数据类；`write_lineage` / `read_lineage` 写读 `lineage.json`；`build_lineage_tree(study_dir)` 走 candidate_*/lineage.json 拼成 JSON tree。workflow.run_config 接 parent_id/study_id/generation kwargs。
+
+### 10.7 Fingerprint 数据库 (`tests/fingerprints/`)
+
+Wave P。每 benchmark 一个 JSON，含 input_hash / density_sha256 / scalar_sha256 + 人类可读的前 8 个值 + 全精度 scalars。`scripts/generate_fingerprints.py` 重新生成（仅在故意改 benchmark 行为时）。CI 在 canonical cell 严比对（`REQUIRE_BIT_EXACT_FINGERPRINT=1`），其他 cell 容忍 ≤1e-9（跨 LAPACK build 物理限制，详 D011）。
+
+### 10.8 Jupyter rich display (`core/repr_html.py`)
+
+Wave Q。`OptimizationResult` / `TriangleOptimizationResult` / `FEMResult` / `BenchmarkConfig` 都有 `_repr_html_`；`OptimizationResult` 还有 `_repr_png_`（pure NumPy + zlib 编 PNG，不引 Pillow）。`OptimizationResult.mesh_shape` 字段记录 (nelx, nely) 让 `_repr_png_` 知道 reshape 形状；默认 `(0, 0)` 时 graceful return None（向后兼容）。
+
+### 10.9 v3 永久红线（重申 + 增量）
+
+- 运行时仅依赖 NumPy（包 scipy / meshio 始终 optional）
+- 无 GUI / 无 cloud / 无 full-3D / 无 commercial CAE 求解器
+- 失败仍单行 stderr + 状态码字符串（v1 红线，v3 不破）
+- 跨平台 bit-exact 在 canonical CI cell 之外 **不强求**（D011 § "Reproducibility tolerance philosophy"）
+- demo HTML 仍 self-contained 单文件（D012 § "Why vanilla JS"）
+
+---
+
+## 11. v3.0 已知限制
+
+- 仍 2D（3D 永久红线）
+- Stress-adjoint 仅 quad SIMP；triangle 路径无 stress adjoint（D008 defer）
+- BESO 仅 quad（无 BESO-on-triangle；D013 defer）
+- 经典 penalty method 不保证 σ_PN ≤ limit 严格满足（D007 honest scope note）
+- AMG preconditioner / pyamg 未引（D009 defer；500×500 用 sparse direct）
+- 自动 refinement loop 未做（D010 只提供 lineage **机制** + parent_id，不规定 **策略**）
+- `_repr_png_` 仅 quad SIMP（triangle 是非结构化拓扑，需要多边形 raster）
+- LLM / AI 顾问能力 not in scope（永久红线）
+
+详 ADR D001-D016 各自的 "Reopening criteria" 节。

@@ -102,8 +102,22 @@
 | v2.4.0 (Wave O) | 37/100 | §5.1+§5.2 拿下；测试 325（未达 ≥400）；可复现/文档/红线 §3+§6+§7.4 未启动 | LHS + Sobol 采样；run 含 parent_id（lineage.json）；study 含 lineage_tree.json；325 测试全绿；core 94.1%；scipy 缺时 Sobol 给 clear error |
 | v2.5.0 (Wave P) | 52/100 | 过半；剩 §1.3/1.4 算法矩阵 + §4.1/4.4 测试规模 + §6 文档 + §7.4 红线 | 7 fingerprint JSON 落档；CI 矩阵 12 cells（2 OS × 3 Py × 2 install）；22 个 reproducibility tests；342 测试全绿；core 94.1%；跨 LAPACK 严格 bit-exact 不可行 → 容忍 ≤1e-9 + canonical cell 走严 SHA |
 | v2.6.0 (Wave Q) | 56/100 | 用户面 §5 拿满 10/10；剩 §1.3/1.4 + §4.1/4.4 + §6 文档 + §7.4 红线（约 36 分留 R 波拿） | 4 个 dataclass `_repr_html_` + OptimizationResult `_repr_png_`（pure NumPy + zlib PNG）；demo.html toggle/pan/zoom；352 测试全绿；core 94.2%；不引 Pillow / 不引 JS framework |
+| **v3.0.0 (Wave R · final)** | **99/100 · 优秀** | 仅 1.4 缺 BESO-on-triangle 1 分（D013 documented defer） | stress_multi_load_bracket benchmark + 矩阵 6/8 cells + 5 property tests + 40 per-benchmark + tutorial v3 + arch v3 + D013-D016；407 测试全绿（≥400）；core 94.2%；v1.x 100/100 ✓ v2.x 97/100 ✓ |
 
 （每波结束后追加一行）
+
+---
+
+## v3.x 大阶段完成签收
+
+- **总分 99/100 — 优秀** ✅
+- v1.x rubric 100/100 ✓ 无回退
+- v2.x rubric 97/100 ✓ 无回退
+- 所有 7 波 atomic commit + SemVer tag (v2.1.0 → v3.0.0)
+- 16 个 ADR (D001-D016) 覆盖所有架构决策 + 边界 + defer 项
+- 永久红线全程未破
+
+签发：v3.0.0 ready to publish。详细分项 breakdown 见 `docs/decisions/D016-v3-final-scoring-and-handoff.md`。
 
 ---
 

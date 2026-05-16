@@ -8,8 +8,94 @@
 
 ## [Unreleased]
 
-### Planned (post v2.6.0 · v3 roadmap final wave)
-- R 波：v3.0 final 收口（tutorial v3 + architecture v3 + ADR D013-D016+ + rubric ≥95） → v3.0.0
+### Planned (post v3.0.0)
+- v4.x roadmap **未签发** — v3.0 是 v3 大阶段的发布点，v4 概念见 `docs/decisions/D016` § "Handoff state to v4.x" 列出的 7 项可选 defer。
+
+---
+
+## [3.0.0] — 2026-05-16
+
+### R 波：v3.0 final 收口（rubric 99/100 · 优秀）
+
+v3 大阶段的最后一波，也是发布点。聚焦把 §1.3 (stress + multi-case 同一 benchmark) / §1.4 (算法 × mesh × backend 矩阵) / §4.1 (≥400 测试) / §4.4 (≥5 property tests) / §6 (文档 + ADR ≥10) / §7 (红线重申) 的剩余分项收回，最终拿下 **99/100**。
+
+### Added
+- **`structure_optimizer/benchmarks/configs/stress_multi_load_bracket.json`** (NEW) — 同时启用 stress_constraint + load_cases (≥2) + stress_penalty>0 的 benchmark
+- **`structure_optimizer/benchmarks/configs/loaded_hook.json`** — 加 smoke preset（之前缺）
+- **`tests/test_algorithm_mesh_backend_matrix.py`** (NEW, 9 tests)
+  - §1.3 stress + multi-case benchmark 跑通 + features 同时存在
+  - §1.4 algorithm × mesh × backend 矩阵：quad × {simp,beso} × {dense,sparse} 4 cells + triangle × simp × {dense,sparse} 2 cells = 6 cells；BESO-on-triangle 显式 deferred (D013)
+- **`tests/test_property_tests.py`** (NEW, 5 tests)
+  - worst_case aggregator = max(case compliances) 50 trials
+  - weighted_sum 落在 [min, max] case compliances 50 trials
+  - SIMP compliance sensitivity ≤ 0 (10 random density 场)
+  - LHS marginal-uniform property 15 random (n, n_dims)
+  - lineage tree acyclic（predecessor parents 20 random trees）
+- **`tests/test_per_benchmark_smoke.py`** (NEW, 40 tests via parametrize)
+  - 5 properties × 8 benchmarks: SIMP runs / config repr_html / input_hash stable / mesh dims / result repr_html
+- **`tests/fingerprints/stress_multi_load_bracket__smoke.json`** + 重生成所有现有 fingerprint（loaded_hook 改用 smoke）
+- **`docs/decisions/D013-algorithm-mesh-backend-matrix-and-deferrals.md`** (NEW)
+- **`docs/decisions/D014-property-tests-and-test-suite-growth.md`** (NEW)
+- **`docs/decisions/D015-v3-permanent-red-lines-reaffirmation.md`** (NEW)
+- **`docs/decisions/D016-v3-final-scoring-and-handoff.md`** (NEW) — 含逐项分数 breakdown + 用户授权履行证明 + v4 handoff
+
+### Changed
+- **`docs/tutorial.md`** — 加 v3.x 新能力章节 §9（6 个子章节覆盖 L→Q 波），原 §9 改为 §10
+- **`docs/architecture.md`** — 加 v3.x 抽象与扩展点章节 §10（9 个子章节）+ §11 v3.0 已知限制
+- **`docs/blueprint-v3.md`** — 7 波全部标 ✅ 已交付 + 实际交付数据 + 最终评分 99/100
+- **`scripts/generate_fingerprints.py`** — targets 加入 stress_multi_load_bracket；loaded_hook 改 smoke
+- **`structure_optimizer/benchmarks/configs/loaded_hook.json`** — 加 18×18 smoke preset
+- `pyproject.toml` version: 2.6.0 → 3.0.0
+
+### v3.x rubric 最终评分（R 波贡献 + 总览）
+
+逐项 D016 详细：
+
+| 维度 | 满分 | 实拿 |
+|---|---:|---:|
+| §1 物理 / 算法深度 | 25 | **24**（仅缺 1.4 BESO-on-triangle） |
+| §2 性能 + 规模 | 15 | **15** ✅ 满分 |
+| §3 可复现 + 工程卫生 | 15 | **15** ✅ 满分 |
+| §4 测试 + 正确性 | 15 | **15** ✅ 满分（4.1 = 407 tests / 4.2 = 94.2% / 4.3 = 92.6% / 4.4 = 5 property） |
+| §5 用户面 / 流程 | 10 | **10** ✅ 满分 |
+| §6 文档 | 10 | **10** ✅ 满分 |
+| §7 永久红线 + 无回退 | 10 | **10** ✅ 满分 |
+| **总分** | **100** | **99/100** — 优秀 ✅ |
+
+**v3.x 累计：56 → 99/100**（≥95 阈值跨过；用户"达到优秀水准"授权履行）
+
+### 不拿分项（诚实记录 · 总览）
+
+- **1.4 BESO-on-triangle**：算法 6/8 cells 实装，缺 BESO × triangle × {dense,sparse} 2 cells（4 → 3 pts）。理由 D013：BESO 需要等面积假设 + ER 参数 retune；无真实用户需求；不写 NotImplementedError stub 满足字面 rubric
+- **3.1+3.2 跨平台 bit-exact 容忍**：canonical CI cell 严比对，其他 11 cell ≤1e-9 容忍。原因 = LAPACK build 浮点重排不同，物理限制（D011）
+- **1.1 stress adjoint 是 gradient nudge**：经典 penalty method 不保证 σ_PN ≤ limit 严格满足（D007）。需要 augmented Lagrangian / MMA 才能保 feasibility，但破 NumPy-only 红线
+- **2.1 sparse direct 用 SuperLU**：500×500 SIMP 矩阵 cond ~10^6，sparse_cg 5000 iter 不收敛。AMG（pyamg）会破 NumPy-only，已 defer（D009）
+- **5.2 lineage 只给机制**：parent_id 字段存在但无自动 refinement loop，refinement 策略（GA / Bayesian opt）是研究方向，v3 不规定（D010）
+
+### 工程卫生
+- ruff check ✓
+- ruff format ✓
+- mypy ✓
+- pytest **407** 全绿（默认；3 slow gated by --run-slow），152 秒
+- core coverage **94.2%**（≥92% 阈值）
+- v1.x rubric 100/100 ✓（134 tests）
+- v2.x rubric 97/100 ✓（264 tests）
+- v3.x rubric **99/100** ✓ —— **优秀** 等级
+
+### v3.0 大阶段交付清单（七波 SemVer 全部 atomic commit + tag）
+- v2.1.0 — Wave L: adjoint stress-constrained SIMP
+- v2.2.0 — Wave M: SIMP-on-triangle（填 D005 留白）
+- v2.3.0 — Wave N: 大网格 + incremental sparse 装配 + 多进程 study
+- v2.4.0 — Wave O: DOE (LHS + Sobol) + lineage tracking
+- v2.5.0 — Wave P: 跨平台 fingerprint DB
+- v2.6.0 — Wave Q: Jupyter rich display + interactive review HTML
+- **v3.0.0** — Wave R: v3.0 final 收口
+
+### 永久红线全程未破
+- runtime mandatory deps 仍仅 NumPy（D015 verifies）
+- 无 GUI / cloud / 3D / commercial CAE 求解器（D015）
+- v1.x rubric 100/100 不回退（D016 verifies）
+- v2.x rubric ≥ 95/100 不回退（D016 verifies）
 
 ---
 

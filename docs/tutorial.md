@@ -335,11 +335,86 @@ structure-optimizer export --run runs/mbb_beam/<run_id> --format stl --extrusion
 
 ---
 
-## 9. 下一步
+## 9. v3.x 新能力（v2.1 → v3.0）
 
-- `docs/architecture.md` — 模块边界、永久红线、扩展点
-- `docs/quality-rubric.md` — 质量评分体系（如果你想衡量整个项目工程化水平）
-- `CHANGELOG.md` — v0.1 → v1.x 完整版本历史
+### 9.1 应力约束 SIMP 集成到梯度 — adjoint method（Wave L）
+
+v1.6 加了应力 verification，v2.1 把它真正接进 SIMP 的梯度：
+
+```bash
+structure-optimizer run --benchmark stress_limited_bracket --preset smoke
+```
+
+打开 `stress_limited_bracket.json` 把 `optimization.stress_penalty` 调到 `1.0` 即可启用 adjoint。`docs/decisions/D007-adjoint-stress-constrained-simp.md` 写明了数学推导、Le et al. 2010 normalization、以及"经典 penalty method 不保证严格约束满足"的诚实 caveat。
+
+### 9.2 SIMP-on-triangle（Wave M）
+
+```python
+from structure_optimizer.core.triangle_simp import run_simp_triangle, split_quad_to_triangles
+import numpy as np
+
+mesh = split_quad_to_triangles(20, 10, width=20.0, height=10.0)
+# ... 设置 fixed_dofs / force（见 tests/test_triangle_simp.py 的 _cantilever_setup）
+result = run_simp_triangle(mesh, young_modulus=210000, poisson_ratio=0.3,
+                           fixed_dofs=fixed_dofs, force=force,
+                           volume_fraction=0.45, max_iterations=30)
+result._repr_html_()  # Jupyter 会显示一个 HTML 表
+```
+
+填补 v1.9 的 D005 留白；centroid-distance 过滤器代替 grid-distance，面积加权体积约束。
+
+### 9.3 大网格 + 增量 sparse 装配 + 并行 study（Wave N）
+
+500×500 mesh（~50 万 DOF）通过 sparse direct 在 ~100 秒内跑完：
+
+```bash
+structure-optimizer run --benchmark large_cantilever
+# 启用 --run-slow 才会跑 500×500 capability test
+pytest tests/test_performance.py --run-slow
+```
+
+```python
+from structure_optimizer.core.study import run_study
+run_study("studies/my_study.json", workers=4)  # 4 进程并行，实测 3.0× 加速
+```
+
+### 9.4 DOE 采样（LHS + Sobol）+ 设计 lineage（Wave O）
+
+study JSON 加 `"sampling": "lhs", "n_samples": 16, "seed": 42` 即可改用拉丁超立方而非 Cartesian grid：
+
+```json
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "parameters": {"volume_fraction": [0.3, 0.4, 0.5, 0.6, 0.7]},
+  "sampling": "lhs",
+  "n_samples": 16,
+  "seed": 42
+}
+```
+
+每个 run 自动写 `lineage.json`，study 末尾汇总成 `lineage_tree.json`。
+
+### 9.5 跨平台可复现 + fingerprint 数据库（Wave P）
+
+`tests/fingerprints/<benchmark>__smoke.json` 是金标准 SHA-256，CI 在 Linux+Python3.12 canonical cell 走严比对，其他 11 cell 走 ≤1e-9 容忍。
+
+```bash
+# 重新生成 fingerprints（仅在故意改变 benchmark 行为时）
+python scripts/generate_fingerprints.py
+```
+
+### 9.6 Jupyter rich display + 交互式 demo HTML（Wave Q）
+
+在 JupyterLab / VS Code Notebook 直接 `result` 就会显示 HTML 表 + 密度 PNG 预览；`demo.html` 加了 toggle / pan / zoom 交互（vanilla JS，无依赖）。
+
+---
+
+## 10. 下一步
+
+- `docs/architecture.md` — 模块边界、永久红线、扩展点（含 v3.x 抽象）
+- `docs/quality-rubric.md` / `quality-rubric-v2.md` / `quality-rubric-v3.md` — 质量评分体系三代
+- `CHANGELOG.md` — v0.1 → v3.0 完整版本历史
 - `README.md` — CLI 完整表 + 已知限制
 
 如果 `verification.json` 出现 `volume_constraint_failed` / `connectivity_failed` 之类的失败状态，先看 `report.md` 的诊断段落。

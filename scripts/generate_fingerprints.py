@@ -38,9 +38,10 @@ FINGERPRINT_TARGETS: list[tuple[str, str | None]] = [
     ("cantilever", "smoke"),
     ("l_bracket", "smoke"),
     ("simple_bracket", "smoke"),
-    ("loaded_hook", None),
+    ("loaded_hook", "smoke"),
     ("multi_load_cantilever", "smoke"),
     ("stress_limited_bracket", "smoke"),
+    ("stress_multi_load_bracket", "smoke"),
 ]
 
 OUTPUT_DIR = Path(__file__).parent.parent / "tests" / "fingerprints"

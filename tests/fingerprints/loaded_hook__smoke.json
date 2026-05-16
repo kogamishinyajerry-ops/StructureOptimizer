@@ -1,0 +1,25 @@
+{
+  "benchmark": "loaded_hook",
+  "densities_first_8": [
+    "0.001",
+    "0.001",
+    "0.001",
+    "0.001",
+    "0.001",
+    "0.0022367981853839637",
+    "0.014278090060316028",
+    "0.05042879895352596"
+  ],
+  "density_sha256": "sha256:d71a705db2dcecd5a4d5521e9c60708bcb5d787ee9a7a460094513d702336c8b",
+  "input_hash": "sha256:42f2905bd13481754fd985d4215eac4bb9badee0613d3c3447dc44f8a6768632",
+  "n_elements": 324,
+  "preset": "smoke",
+  "scalar_sha256": "sha256:a4816f8736bd0108ff2e3036336232e1008db58439bc80fe7f2617ff7c0cff28",
+  "scalars": {
+    "baseline_compliance": "45.55543923654904",
+    "compliance": "84.45459020984654",
+    "mass": "1.1444623174315322e-06",
+    "max_displacement": "0.21909216746397261",
+    "max_stress": "2066.102335829198"
+  }
+}

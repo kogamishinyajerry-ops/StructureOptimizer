@@ -1,0 +1,25 @@
+{
+  "benchmark": "stress_multi_load_bracket",
+  "densities_first_8": [
+    "0.001",
+    "0.001",
+    "0.001",
+    "0.001",
+    "0.0031993543583381336",
+    "0.010841581308140218",
+    "0.008564681917556802",
+    "0.008828047072663367"
+  ],
+  "density_sha256": "sha256:44105906f4ae6e5adbe5f31851f9967b648232db37bd6e945000d1d3bf3f22a5",
+  "input_hash": "sha256:195c77217cc4b61c81c7290a860c13f61bcf7f38cae50704ebf0588faf710987",
+  "n_elements": 96,
+  "preset": "smoke",
+  "scalar_sha256": "sha256:491cca4c231bdac58d9c3baee4d7053bc17de8f9d07d6f8f2b71c7002cfdfa99",
+  "scalars": {
+    "baseline_compliance": "3.573757384291013",
+    "compliance": "4.664359277136594",
+    "mass": "1.0367738891194262e-07",
+    "max_displacement": "0.023149832792045303",
+    "max_stress": "267.6678553942089"
+  }
+}

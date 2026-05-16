@@ -31,6 +31,12 @@
     "min_iterations": 5,
     "change_tolerance": 0.01,
     "min_density": 0.001
+  },
+  "presets": {
+    "smoke": {
+      "mesh": {"nelx": 18, "nely": 18, "width": 18.0, "height": 18.0},
+      "optimization": {"max_iterations": 8, "min_iterations": 8}
+    }
   }
 }
 
