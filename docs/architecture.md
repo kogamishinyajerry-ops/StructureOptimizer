@@ -426,3 +426,72 @@ cat tests/v4_scorecard.json | jq '.total_earned'  # 当前分数
 - LLM / AI 顾问能力 not in scope（永久红线）
 
 详 ADR D017-D024 各自的 "Reopening criteria" 节。
+
+---
+
+## 14. v5.x 抽象与扩展点（multi-physics · Waves Y → DD · D025-D032）
+
+v5 把 v1-v4 的"单物理场 + 工程纪律"模式推广到 **multi-physics 2D**。所有新模块
+仍在 numpy-only + no-3D + no-GUI + no-commercial-solver 红线内。
+
+### 14.1 热传导 FEM + SIMP (`core/thermal.py`, `core/thermal_simp.py`)
+
+Wave Y, D025. 2D Poisson 热传导。Element matrix 形如
+`Ke = k·t/6 · [[4,-1,-2,-1],...]`（Cook 1989 §10.2）。
+DOF/node = 1 (scalar T)。`heat_sink` benchmark + 1D-rod 解析校验。
+
+### 14.2 模态 + 频响 (`core/modal.py`, `core/freq_response.py`)
+
+Wave Z, D026. 广义本征值问题 K φ = ω² M φ 用纯-numpy Cholesky 变换 + eigh
+求解（避免 scipy 依赖）。Consistent + lumped mass 两种 element matrix。
+Frequency-domain harmonic response (K - ω²M) u = f 无 damping。
+
+### 14.3 几何非线性 FEM + SIMP (`core/nonlinear_fem.py`, `core/nonlinear_simp.py`)
+
+Wave AA, D027. 简化的 Total-Lagrangian Newton-Raphson + 增量加载。复用
+v4 的 `core/buckling.assemble_geometric_stiffness`（同 SIMP penalty + 同符号约定）。
+Gere elastica 趋势校验（qualitative, not bit-exact）。
+
+### 14.4 多材料 SIMP (`core/multi_material.py`)
+
+Wave BB, D028. Sigmund-Tortorelli 形式：M 个独立 density field 每元素，
+`E_eff = E_min + Σᵢ ρ_{i,e}^p · (Eᵢ - E_min)`。Per-material 体积约束 +
+per-material OC update。
+
+### 14.5 随机 / 可靠性 (`core/stochastic.py`, `core/reliability.py`)
+
+Wave CC, D029. Monte Carlo UQ over uncertain loads / materials；预采样
+K 个 scenarios 的 worst-case (minimax) SIMP。所有 RNG 走 `default_rng(seed)`
+保证给定 seed + 平台 bit-exact 可复现；跨平台 bit-exact 不强求。
+
+### 14.6 Pareto + STL + Autodiff (`core/pareto_nsga.py`, `core/stl_export.py`, `core/autodiff.py`)
+
+Wave DD, D030-D032. 最小化 NSGA-II (bi-objective Pareto) + SBX crossover +
+polynomial mutation。2D voxel → 12-triangle-per-cell ASCII STL boundary 导出
+（3D 打印工程链 ready）。Pure-NumPy forward-mode AD（`Var` 类）+ central FD
+gradient check 用于敏感度验证。
+
+### 14.7 v5 永久红线（重申）
+
+- v5 不破任何 v1-v4 红线
+- 所有 multi-physics 模块仍纯 numpy；optional deps 不增
+- Stochastic 模块：RNG 给定 seed + 平台 bit-exact；跨平台不强求
+- Mass matrix / nonlinear / multi_material / autodiff / stl_export 均 dense-only
+- 测试 agent v5 rubric **机械评分**，包含 v4 不能回归的硬性 gate
+
+---
+
+## 15. v5.0 已知限制
+
+- 仍 2D（3D 永久红线，跨版本不变）
+- 热传导只支持 scalar conductivity（无 anisotropic / orthotropic）
+- 模态分析 dense eigh，~2000 DOFs 上限；更大需要 scipy sparse eigsh
+- 频响 undamped only；Rayleigh damping 是 v5+ option
+- 几何非线性 simplified TL — qualitative Gere match not bit-exact
+- 多材料 Poisson 比共享（只用 material[0] 的 ν）
+- Monte Carlo 只支持 Gaussian uncertainty；无 FORM / SORM / importance sampling
+- NSGA-II 只支持 2 个目标；≥3 需要 reference-point variants (NSGA-III)
+- STL export 是 voxelized；marching-cubes 是 v6+ option
+- LLM / AI advisor not in scope（永久红线）
+
+详 ADR D025-D032 各自的 "Reopening criteria" 节。

@@ -535,6 +535,142 @@ v4 没有放松任何 v1-v3 已建立的红线：
 - 失败仍单行 stderr + 状态码字符串（不抛 traceback）
 - 自我贬低优先于自我吹嘘（rubric 评分诚实优先）
 
+---
+
+## 12. v5.x 多物理场扩展（v4.0 → v5.0）
+
+> v5 阶段完整蓝图见 `docs/blueprint-v5.md` 与 `docs/quality-rubric-v5.md`（100 分制，目标 ≥ 99）。
+> 实施记录见 ADR `D025-D032`。
+> **主题**：把 v1-v4 的工程纪律（红线 + 测试 agent + 诚实评分）推广到 multi-physics 2D：
+> 热传导、模态、几何非线性、多材料、随机/可靠性、Pareto。
+
+### 12.1 热传导 SIMP + 散热器拓扑（Wave Y，D025）
+
+2D Poisson 热传导 + min-thermal-compliance SIMP。Element matrix 是
+经典 4-node bilinear quad conductivity matrix（Cook 1989 §10.2）：
+
+```python
+from structure_optimizer.core.thermal_simp import (
+    load_thermal_benchmark, run_thermal_simp,
+)
+from structure_optimizer.core.mesh import create_structured_mesh
+
+cfg, k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
+mesh = create_structured_mesh(cfg)
+result = run_thermal_simp(cfg, mesh, k, sources, bcs)
+print(result.final_result.max_temperature, result.metrics[-1].volume_fraction)
+```
+
+`heat_sink` benchmark：中心点热源 + top/bottom Dirichlet=0 + SIMP min-thermal-compliance。
+1D-rod analytical 校验（`test_thermal.py`）确保 FEM 与解析解一致。
+
+### 12.2 模态 + 频响 TO（Wave Z，D026）
+
+广义本征值问题 `K φ = ω² M φ` + 谐波激励响应 `(K - ω²M) u = f`。
+纯 numpy Cholesky 变换 + `np.linalg.eigh`（无 scipy 依赖）。
+Consistent 和 lumped mass 两种选择，Euler-Bernoulli 一阶频率校验。
+
+```python
+from structure_optimizer.core.modal import solve_modal
+from structure_optimizer.core.freq_response import solve_frequency_response
+
+result = solve_modal(cfg, mesh, densities, n_modes=3, mass_type="consistent")
+print(result.frequencies_hz)  # smallest 3 natural frequencies in Hz
+
+# Frequency-response at a single excitation freq:
+fr = solve_frequency_response(cfg, mesh, densities, omega=10.0)
+print(fr.max_displacement)
+```
+
+### 12.3 几何非线性 + 大变形 TO（Wave AA，D027）
+
+简化的 Total-Lagrangian Newton-Raphson + 增量加载。复用 v4 的 `K_g` 几何刚度矩阵
+（来自 buckling 模块）。Gere elastica 趋势校验：在大载荷下 `|u_nl| < |u_linear|`。
+
+```python
+from structure_optimizer.core.nonlinear_fem import solve_geometric_nonlinear
+from structure_optimizer.core.nonlinear_simp import run_nonlinear_simp
+
+# Direct FEM solve at fixed densities:
+fem = solve_geometric_nonlinear(cfg, mesh, densities, n_load_steps=5)
+print(fem.max_displacements)  # per-step max displacement trace
+
+# Full SIMP driver:
+opt = run_nonlinear_simp(cfg, mesh, n_load_steps=3)
+print(opt.final_result.max_displacements)
+```
+
+### 12.4 多材料 SIMP（Sigmund-Tortorelli, Wave BB, D028）
+
+M 种材料各自一个独立 density field；effective E = E_min + Σᵢ ρ_{i,e}^p · (E_i - E_min)。
+Per-material 体积约束，per-material OC update。
+
+```python
+from structure_optimizer.core.multi_material import (
+    MaterialProperty, run_multi_material_simp,
+)
+
+materials = [
+    MaterialProperty(name="aluminium", young_modulus=70_000, poisson_ratio=0.3, density=2.7),
+    MaterialProperty(name="steel",     young_modulus=210_000, poisson_ratio=0.3, density=7.85),
+]
+result = run_multi_material_simp(cfg, mesh, materials, volume_fractions=[0.2, 0.2])
+print(result.material_names, result.final_result.compliance)
+```
+
+### 12.5 随机 / 可靠性 TO（Wave CC，D029）
+
+Monte Carlo UQ + worst-case (minimax) SIMP。RNG-seed 化保证可复现。
+2 个 stochastic fingerprint 锁定 seed=20251201 输出。
+
+```python
+from structure_optimizer.core.stochastic import monte_carlo_uq, UncertaintySpec
+from structure_optimizer.core.reliability import worst_case_simp
+
+# UQ over uncertain loads on a fixed topology:
+spec = UncertaintySpec(load_magnitude_std=0.1, load_angle_std=0.05)
+uq = monte_carlo_uq(cfg, mesh, densities, rng_seed=42, n_samples=50, uncertainty=spec)
+print(uq.mean, uq.std, uq.p95, uq.max)
+
+# Robust SIMP (worst-case over K pre-sampled scenarios):
+robust = worst_case_simp(cfg, mesh, rng_seed=42, n_scenarios=5)
+print(robust.final_worst_compliance, robust.final_mean_compliance)
+```
+
+### 12.6 NSGA-II Pareto + 2D→STL + Autodiff（Wave DD，D030-D032）
+
+最小化 NSGA-II 实现（bi-objective Pareto），2D→STL boundary 导出（3D 打印），
+pure-NumPy 反向 AD（用于敏感度验证）。
+
+```python
+from structure_optimizer.core.pareto_nsga import nsga_ii, render_pareto
+from structure_optimizer.core.stl_export import write_stl
+from structure_optimizer.core.autodiff import gradient_check, Var
+
+# Pareto front for any bi-objective function:
+def my_objective(x):
+    return (float(x[0]), float(np.sum(x[1:])))
+front = nsga_ii(my_objective, n_vars=5, bounds_lower=np.zeros(5),
+                bounds_upper=np.ones(5), population_size=30, n_generations=20)
+render_pareto(front, "pareto.html")
+
+# Voxelized STL of a topology:
+info = write_stl(mesh, densities, "topology.stl", rho_threshold=0.5, z_thickness=2.0)
+print(info["n_triangles"], info["n_solid_cells"])
+
+# Sensitivity verification via central finite differences:
+def f(x):
+    return float(x @ x)
+g = gradient_check(f, np.array([1.0, 2.0]), h=1e-7)  # ≈ [2, 4]
+```
+
+### 12.7 v5 阶段的永久红线（不变）
+
+- v5 仍**在** v1-v4 红线**内**扩展，没有放宽任何
+- 所有 multi-physics 模块仍纯 numpy；optional deps 不增加
+- Stochastic 模块的 RNG 决定性给定 seed + 平台，跨平台 bit-exact 不强求
+- 测试 agent 的 v5 rubric 同样 mechanical 评分，不放水
+
 如果 `verification.json` 出现 `volume_constraint_failed` / `connectivity_failed` 之类的失败状态，先看 `report.md` 的诊断段落。
 
 ---

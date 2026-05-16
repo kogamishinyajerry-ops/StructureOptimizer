@@ -1,0 +1,20 @@
+{
+  "benchmark": "vibrating_beam",
+  "preset": "smoke",
+  "rubric_version": "v5.0-wave-Z",
+  "kind": "modal_eigenvalues",
+  "mass_type": "consistent",
+  "n_modes": 3,
+  "omega_squared_sha256": "sha256:ebe901b7b3b2746c7d959058ae71034fdf51ae2524064ea045fff2d12121bf3b",
+  "omega_squared": [
+    2694866515.855039,
+    79639191283.52621,
+    166026264736.61
+  ],
+  "frequencies_hz": [
+    8262.067918271663,
+    44914.18797319346,
+    64849.78345921721
+  ],
+  "n_dof_free": 200
+}

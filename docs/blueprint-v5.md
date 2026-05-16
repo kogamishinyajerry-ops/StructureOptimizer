@@ -74,10 +74,10 @@ v5 完成 = `python scripts/test_agent.py` 报告
 
 ## 完成进度
 
-- [ ] v5 foundation: blueprint + rubric + test_agent + scorecard baseline (this commit)
-- [ ] Wave Y · 热传导 TO + 热顺度
-- [ ] Wave Z · 模态 + 频响 TO
-- [ ] Wave AA · 几何非线性 + 大变形
-- [ ] Wave BB · 多材料 ordered SIMP
-- [ ] Wave CC · 随机 / 可靠性 TO
-- [ ] Wave DD · Pareto + STL + AD + v5 收口
+- [x] v5 foundation: blueprint + rubric + test_agent + scorecard baseline (v5.0-roadmap, 17/100)
+- [x] Wave Y · 热传导 TO + 热顺度 (v3.6.0, 23/100)
+- [x] Wave Z · 模态 + 频响 TO (v3.7.0, 42/100)
+- [x] Wave AA · 几何非线性 + 大变形 (v3.8.0, 50/100)
+- [x] Wave BB · 多材料 ordered SIMP (v3.9.0, 59/100)
+- [x] Wave CC · 随机 / 可靠性 TO (v3.10.0, 76/100)
+- [x] Wave DD · Pareto + STL + AD + v5 收口 (v5.0.0 target ≥99/100)

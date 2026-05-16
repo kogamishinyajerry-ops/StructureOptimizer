@@ -1,0 +1,21 @@
+{
+  "benchmark": "nonlinear_cantilever",
+  "preset": "smoke",
+  "rubric_version": "v5.0-wave-AA",
+  "kind": "geometric_nonlinear_fem",
+  "n_load_steps": 3,
+  "displacements_sha256": "sha256:2557dbb842aefcefea8ca944c06a48b8a09d03e831b288bb4d66e6993f3637f1",
+  "max_displacement": 0.1848214380112592,
+  "load_steps": [
+    0.3333333333333333,
+    0.6666666666666666,
+    1.0
+  ],
+  "max_disp_per_step": [
+    0.06160787382485753,
+    0.12321520176999387,
+    0.1848214380112592
+  ],
+  "n_newton_iters": 9,
+  "converged": true
+}

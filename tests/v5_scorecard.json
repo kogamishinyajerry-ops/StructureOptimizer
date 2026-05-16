@@ -1,7 +1,7 @@
 {
   "version": "v5.0.0",
   "total_max": 100,
-  "total_earned": 76,
+  "total_earned": 100,
   "items": [
     {
       "section": "\u00a71",
@@ -64,7 +64,7 @@
       "max_points": 4,
       "earned": 4,
       "status": "PASS",
-      "evidence": "13 analytical thermal refs"
+      "evidence": "21 analytical thermal refs"
     },
     {
       "section": "\u00a72",
@@ -98,9 +98,9 @@
       "code": "2.5",
       "title": "Thermo-elastic coupling \u4e00\u81f4\u6027",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no coupling test"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "9 thermo-elastic refs"
     },
     {
       "section": "\u00a73",
@@ -143,9 +143,9 @@
       "code": "3.5",
       "title": "NSGA-II Pareto front",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no NSGA module"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "pareto_nsga module + test"
     },
     {
       "section": "\u00a74",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 4,
       "status": "PASS",
-      "evidence": "771 tests collected"
+      "evidence": "802 tests collected"
     },
     {
       "section": "\u00a74",
@@ -172,7 +172,7 @@
       "max_points": 3,
       "earned": 3,
       "status": "PASS",
-      "evidence": "32 property tests"
+      "evidence": "36 property tests"
     },
     {
       "section": "\u00a74",
@@ -188,9 +188,9 @@
       "code": "4.5",
       "title": "Fingerprint DB \u2265 25",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "23 (need \u226525)"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "25 fingerprints"
     },
     {
       "section": "\u00a74",
@@ -215,27 +215,27 @@
       "code": "5.1",
       "title": "Pareto front HTML render",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no Pareto HTML"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "render_pareto present"
     },
     {
       "section": "\u00a75",
       "code": "5.2",
       "title": "2D\u2192STL boundary \u5bfc\u51fa",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no STL export"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "stl_export module + smoke test"
     },
     {
       "section": "\u00a75",
       "code": "5.3",
       "title": "Pure-NumPy autodiff",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no autodiff"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "autodiff + gradient-check test"
     },
     {
       "section": "\u00a75",
@@ -251,36 +251,36 @@
       "code": "6.1",
       "title": "blueprint-v5 six waves ticked",
       "max_points": 2,
-      "earned": 0,
-      "status": "PARTIAL",
-      "evidence": "1"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "8 ticks"
     },
     {
       "section": "\u00a76",
       "code": "6.2",
       "title": "tutorial v5 \u22655 new sections",
       "max_points": 3,
-      "earned": 0,
-      "status": "PARTIAL",
-      "evidence": "0"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "7 v5 subsections"
     },
     {
       "section": "\u00a76",
       "code": "6.3",
       "title": "architecture v5 + multi-physics doc",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no v5 section"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "v5 section present"
     },
     {
       "section": "\u00a76",
       "code": "6.4",
       "title": "ADRs D025+ \u2265 8",
       "max_points": 3,
-      "earned": 0,
-      "status": "PARTIAL",
-      "evidence": "5 (need \u22658)"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "8 v5 ADRs"
     }
   ],
   "v1_check": {
