@@ -1,7 +1,7 @@
 {
   "version": "v4.0.0",
   "total_max": 100,
-  "total_earned": 37,
+  "total_earned": 44,
   "items": [
     {
       "section": "\u00a71",
@@ -44,18 +44,18 @@
       "code": "1.5",
       "title": "Buckling eigenvalue",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/buckling.py missing"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "core/buckling.py present"
     },
     {
       "section": "\u00a71",
       "code": "1.6",
       "title": "Heaviside / robust",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/robust.py missing"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "core/robust.py present"
     },
     {
       "section": "\u00a72",
@@ -145,7 +145,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "457 (need \u2265600)"
+      "evidence": "476 (need \u2265600)"
     },
     {
       "section": "\u00a74",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "94.5% (need \u226595%)"
+      "evidence": "94.6% (need \u226595%)"
     },
     {
       "section": "\u00a74",
@@ -262,7 +262,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "2 (need \u22658)"
+      "evidence": "3 (need \u22658)"
     }
   ],
   "v1_check": {
