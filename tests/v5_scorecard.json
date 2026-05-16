@@ -1,7 +1,7 @@
 {
   "version": "v5.0.0",
   "total_max": 100,
-  "total_earned": 50,
+  "total_earned": 59,
   "items": [
     {
       "section": "\u00a71",
@@ -35,9 +35,9 @@
       "code": "1.4",
       "title": "\u591a\u6750\u6599 ordered SIMP",
       "max_points": 5,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "multi_material module missing"
+      "earned": 5,
+      "status": "PASS",
+      "evidence": "multi_material module + bimaterial test"
     },
     {
       "section": "\u00a71",
@@ -152,9 +152,9 @@
       "code": "4.1",
       "title": "Test count \u2265 750",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "732 (need \u2265750)"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "751 tests collected"
     },
     {
       "section": "\u00a74",
@@ -172,7 +172,7 @@
       "max_points": 3,
       "earned": 3,
       "status": "PASS",
-      "evidence": "28 property tests"
+      "evidence": "30 property tests"
     },
     {
       "section": "\u00a74",
@@ -280,7 +280,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "3 (need \u22658)"
+      "evidence": "4 (need \u22658)"
     }
   ],
   "v1_check": {
