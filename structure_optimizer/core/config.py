@@ -53,6 +53,7 @@ class OptimizationConfig:
     case_aggregator: str = "weighted_sum"
     algorithm: str = "simp"
     beso_er: float = 0.02
+    stress_penalty: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -316,6 +317,8 @@ def validate_config(config: BenchmarkConfig) -> None:
         raise ConfigError(f"optimization.algorithm must be one of {available_algorithms()}, got '{opt.algorithm}'")
     if not (0.0 < opt.beso_er < 1.0):
         raise ConfigError("optimization.beso_er must be in (0, 1)")
+    if opt.stress_penalty < 0.0:
+        raise ConfigError("optimization.stress_penalty must be ≥ 0")
 
     for bc in config.boundary_conditions:
         _validate_selector_record(bc, "boundary condition")

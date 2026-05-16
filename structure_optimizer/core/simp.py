@@ -59,11 +59,27 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
     final_analysis = baseline
     design_count = max(1, int(np.count_nonzero(mesh.design_mask)))
 
+    use_stress_adjoint = config.stress_constraint.enabled and opt.stress_penalty > 0
     for iteration in range(1, opt.max_iterations + 1):
         previous = densities.copy()
         analysis = solve_and_aggregate(config, mesh, densities, load_cases, aggregator)
         sensitivities = -opt.penalty * (densities ** (opt.penalty - 1.0)) * analysis.element_strain_energy
         sensitivities[~mesh.design_mask] = 0.0
+        if use_stress_adjoint:
+            from structure_optimizer.core.adjoint import adjoint_stress_sensitivity
+
+            sigma_pn, stress_sens, _ = adjoint_stress_sensitivity(config, mesh, densities, analysis.displacements)
+            violation_ratio = max(0.0, sigma_pn / config.stress_constraint.limit - 1.0)
+            if violation_ratio > 0.0:
+                # Normalize stress sensitivity to same magnitude scale as compliance
+                # sensitivity (Le et al. 2010 recipe). Otherwise large-magnitude
+                # stress gradients overwhelm OC's bisection range.
+                comp_scale = float(np.mean(np.abs(sensitivities[mesh.design_mask])))
+                stress_scale = float(np.mean(np.abs(stress_sens[mesh.design_mask])))
+                if stress_scale > 0:
+                    stress_sens_scaled = stress_sens * (comp_scale / stress_scale)
+                    sensitivities = sensitivities + opt.stress_penalty * violation_ratio * stress_sens_scaled
+                    sensitivities[~mesh.design_mask] = 0.0
         sensitivities = density_filter(mesh, densities, sensitivities, opt.filter_radius, opt.min_density)
         densities = _optimality_criteria_update(config, mesh, densities, sensitivities)
         densities = apply_manufacturing_projections(config, mesh, densities)
