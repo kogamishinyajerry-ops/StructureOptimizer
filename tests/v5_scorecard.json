@@ -1,7 +1,7 @@
 {
   "version": "v5.0.0",
   "total_max": 100,
-  "total_earned": 42,
+  "total_earned": 50,
   "items": [
     {
       "section": "\u00a71",
@@ -26,9 +26,9 @@
       "code": "1.3",
       "title": "\u51e0\u4f55\u975e\u7ebf\u6027 TO",
       "max_points": 5,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "nonlinear modules missing"
+      "earned": 5,
+      "status": "PASS",
+      "evidence": "nonlinear modules + Gere benchmark test"
     },
     {
       "section": "\u00a71",
@@ -80,9 +80,9 @@
       "code": "2.3",
       "title": "Gere \u5927\u53d8\u5f62 cantilever \u6821\u9a8c",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no Gere test"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "5 elastica refs"
     },
     {
       "section": "\u00a72",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "713 (need \u2265750)"
+      "evidence": "732 (need \u2265750)"
     },
     {
       "section": "\u00a74",
@@ -172,7 +172,7 @@
       "max_points": 3,
       "earned": 3,
       "status": "PASS",
-      "evidence": "25 property tests"
+      "evidence": "28 property tests"
     },
     {
       "section": "\u00a74",
@@ -280,7 +280,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "2 (need \u22658)"
+      "evidence": "3 (need \u22658)"
     }
   ],
   "v1_check": {

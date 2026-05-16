@@ -1,0 +1,43 @@
+{
+  "name": "nonlinear_cantilever",
+  "dimension": "2d",
+  "units": "mm_N_MPa",
+  "thickness": 1.0,
+  "mesh": {
+    "type": "structured_quad",
+    "nelx": 40,
+    "nely": 8,
+    "width": 40.0,
+    "height": 8.0
+  },
+  "material": {
+    "young_modulus": 70000.0,
+    "poisson_ratio": 0.3,
+    "density": 2.70e-9
+  },
+  "boundary_conditions": [
+    {"selector": "left_edge", "components": ["ux", "uy"]}
+  ],
+  "loads": [
+    {"selector": "right_mid", "fx": 0.0, "fy": -50.0}
+  ],
+  "optimization": {
+    "objective": "min_compliance",
+    "volume_fraction": 0.5,
+    "penalty": 3.0,
+    "filter_radius": 1.5,
+    "max_iterations": 15,
+    "min_iterations": 3,
+    "change_tolerance": 0.01,
+    "min_density": 0.001
+  },
+  "solver": {
+    "backend": "dense"
+  },
+  "presets": {
+    "smoke": {
+      "mesh": {"nelx": 16, "nely": 4, "width": 16.0, "height": 4.0},
+      "optimization": {"max_iterations": 5, "min_iterations": 5}
+    }
+  }
+}
