@@ -1,0 +1,23 @@
+{
+  "benchmark": "uncertain_load_bracket",
+  "preset": "smoke",
+  "rubric_version": "v5.0-wave-CC",
+  "kind": "worst_case_simp",
+  "rng_seed": 20251201,
+  "n_scenarios": 3,
+  "density_sha256": "sha256:69a40bf6f19ab9be85705dee7da10bc63a349772c7ae1c81951c372e0b43d10f",
+  "n_elements": 160,
+  "densities_first_8": [
+    "1",
+    "1",
+    "1",
+    "0.965216371978688037",
+    "0.914544054278796814",
+    "0.871079787556498064",
+    "0.827323162002234991",
+    "0.769004205859814105"
+  ],
+  "final_worst_compliance": 22.831412532357913,
+  "final_mean_compliance": 20.00572267965729,
+  "iteration_count": 5
+}

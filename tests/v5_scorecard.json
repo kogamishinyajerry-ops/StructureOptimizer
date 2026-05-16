@@ -1,7 +1,7 @@
 {
   "version": "v5.0.0",
   "total_max": 100,
-  "total_earned": 59,
+  "total_earned": 76,
   "items": [
     {
       "section": "\u00a71",
@@ -44,9 +44,9 @@
       "code": "1.5",
       "title": "\u968f\u673a / \u53ef\u9760\u6027 TO (Monte Carlo)",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "stochastic module missing"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "stochastic module + Monte Carlo test"
     },
     {
       "section": "\u00a71",
@@ -107,36 +107,36 @@
       "code": "3.1",
       "title": "Monte Carlo UQ entrypoint",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no UQ entry"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "UQ entrypoint present"
     },
     {
       "section": "\u00a73",
       "code": "3.2",
       "title": "Worst-case / minmax TO",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no reliability module"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "reliability module + worst-case entry"
     },
     {
       "section": "\u00a73",
       "code": "3.3",
       "title": "RNG-seed \u53ef\u590d\u73b0\u6027",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no seed-repro test"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "2 seed-repro refs"
     },
     {
       "section": "\u00a73",
       "code": "3.4",
       "title": "Stochastic fingerprints \u2265 2",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "0 (need \u22652)"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "2 stochastic fingerprints"
     },
     {
       "section": "\u00a73",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 4,
       "status": "PASS",
-      "evidence": "751 tests collected"
+      "evidence": "771 tests collected"
     },
     {
       "section": "\u00a74",
@@ -163,7 +163,7 @@
       "max_points": 4,
       "earned": 4,
       "status": "PASS",
-      "evidence": "96.2% coverage"
+      "evidence": "96.1% coverage"
     },
     {
       "section": "\u00a74",
@@ -172,7 +172,7 @@
       "max_points": 3,
       "earned": 3,
       "status": "PASS",
-      "evidence": "30 property tests"
+      "evidence": "32 property tests"
     },
     {
       "section": "\u00a74",
@@ -190,7 +190,7 @@
       "max_points": 2,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "21 (need \u226525)"
+      "evidence": "23 (need \u226525)"
     },
     {
       "section": "\u00a74",
@@ -280,7 +280,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "4 (need \u22658)"
+      "evidence": "5 (need \u22658)"
     }
   ],
   "v1_check": {
