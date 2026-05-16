@@ -211,6 +211,59 @@ class ScipySparseCGSolver(LinearSolver):
         return np.asarray(x)
 
 
+try:
+    import pyamg  # noqa: F401
+
+    _PYAMG_AVAILABLE = True
+except ImportError:
+    _PYAMG_AVAILABLE = False
+
+
+class AMGCGSolver(LinearSolver):
+    """Wave W: ``pyamg``-preconditioned CG for large sparse SPD systems.
+
+    Uses pyamg's smoothed-aggregation AMG (`smoothed_aggregation_solver`) as
+    a preconditioner for scipy's CG. AMG dramatically improves CG
+    convergence on stiff topology-optimization matrices, often 10-100×
+    fewer iterations vs Jacobi preconditioning.
+
+    Available only when both ``pyamg`` *and* ``scipy`` are installed:
+
+        pip install structure-optimizer[amg]
+
+    Graceful degradation: if pyamg is missing, the factory will not
+    register this backend at all; users requesting ``"amg"`` get a
+    clear ``ValueError`` listing valid backends (no silent fallback).
+    """
+
+    name = "amg"
+    prefers_sparse = True
+    tolerance: float = 1e-10
+    max_iterations: int = 1000
+
+    def solve(self, matrix: Any, rhs: np.ndarray) -> np.ndarray:
+        import pyamg
+        from scipy.sparse.linalg import cg
+
+        from structure_optimizer.core.fem2d import SolverError
+
+        matrix_csr = matrix.tocsr()
+        try:
+            ml = pyamg.smoothed_aggregation_solver(matrix_csr)
+            M = ml.aspreconditioner(cycle="V")
+        except Exception as exc:
+            raise SolverError("amg_setup_failed") from exc
+        try:
+            x, info = cg(matrix_csr, rhs, rtol=self.tolerance, maxiter=self.max_iterations, M=M)
+        except TypeError:
+            x, info = cg(matrix_csr, rhs, tol=self.tolerance, maxiter=self.max_iterations, M=M)
+        if info > 0:
+            raise SolverError("amg_cg_did_not_converge")
+        if info < 0:
+            raise SolverError("singular_matrix")
+        return np.asarray(x)
+
+
 _REGISTRY: dict[str, type[LinearSolver]] = {
     NumpyDenseSolver.name: NumpyDenseSolver,
     NumpyCGSolver.name: NumpyCGSolver,
@@ -218,6 +271,8 @@ _REGISTRY: dict[str, type[LinearSolver]] = {
 if _SCIPY_AVAILABLE:
     _REGISTRY[ScipySparseSolver.name] = ScipySparseSolver
     _REGISTRY[ScipySparseCGSolver.name] = ScipySparseCGSolver
+if _SCIPY_AVAILABLE and _PYAMG_AVAILABLE:
+    _REGISTRY[AMGCGSolver.name] = AMGCGSolver
 
 
 def available_backends() -> list[str]:

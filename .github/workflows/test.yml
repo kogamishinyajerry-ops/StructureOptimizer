@@ -79,6 +79,12 @@ jobs:
         if: matrix.os != 'ubuntu-latest' || matrix.python-version != '3.12' || matrix.install-variant != 'with-extras'
         run: pytest tests/test_fingerprints.py -q
 
+      - name: v4 test agent — rubric scorecard
+        # Wave X §4.6: dedicated test agent must run in CI on the canonical
+        # matrix cell. Non-zero exit indicates a v4 rubric regression.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --strict
+
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
     runs-on: ubuntu-latest

@@ -1,0 +1,187 @@
+{
+  "aggregate_kill_rate": 0.8,
+  "per_module": [
+    {
+      "details": [
+        {
+          "mutator_idx": 0,
+          "occurrence": 0,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 0,
+          "occurrence": 1,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 0,
+          "occurrence": 2,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 1,
+          "occurrence": 0,
+          "outcome": "survived"
+        },
+        {
+          "mutator_idx": 1,
+          "occurrence": 1,
+          "outcome": "survived"
+        },
+        {
+          "mutator_idx": 1,
+          "occurrence": 2,
+          "outcome": "survived"
+        },
+        {
+          "mutator_idx": 2,
+          "occurrence": 0,
+          "outcome": "survived"
+        },
+        {
+          "mutator_idx": 3,
+          "occurrence": 0,
+          "outcome": "survived"
+        },
+        {
+          "mutator_idx": 3,
+          "occurrence": 1,
+          "outcome": "survived"
+        },
+        {
+          "mutator_idx": 3,
+          "occurrence": 2,
+          "outcome": "killed"
+        }
+      ],
+      "kill_rate": 0.4,
+      "killed": 4,
+      "skipped": 2,
+      "survived": 6,
+      "target": "structure_optimizer/core/augmented_lagrangian.py",
+      "total_applied": 10
+    },
+    {
+      "details": [
+        {
+          "mutator_idx": 0,
+          "occurrence": 0,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 0,
+          "occurrence": 1,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 0,
+          "occurrence": 2,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 1,
+          "occurrence": 0,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 1,
+          "occurrence": 1,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 1,
+          "occurrence": 2,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 2,
+          "occurrence": 0,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 2,
+          "occurrence": 1,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 3,
+          "occurrence": 0,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 3,
+          "occurrence": 1,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 3,
+          "occurrence": 2,
+          "outcome": "killed"
+        }
+      ],
+      "kill_rate": 1.0,
+      "killed": 11,
+      "skipped": 1,
+      "survived": 0,
+      "target": "structure_optimizer/core/robust.py",
+      "total_applied": 11
+    },
+    {
+      "details": [
+        {
+          "mutator_idx": 0,
+          "occurrence": 0,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 0,
+          "occurrence": 1,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 0,
+          "occurrence": 2,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 1,
+          "occurrence": 0,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 1,
+          "occurrence": 1,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 1,
+          "occurrence": 2,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 3,
+          "occurrence": 0,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 3,
+          "occurrence": 1,
+          "outcome": "killed"
+        },
+        {
+          "mutator_idx": 3,
+          "occurrence": 2,
+          "outcome": "killed"
+        }
+      ],
+      "kill_rate": 1.0,
+      "killed": 9,
+      "skipped": 3,
+      "survived": 0,
+      "target": "structure_optimizer/core/matrix_free_cg.py",
+      "total_applied": 9
+    }
+  ],
+  "total_applied": 30,
+  "total_killed": 24
+}

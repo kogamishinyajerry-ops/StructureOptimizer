@@ -1,0 +1,25 @@
+{
+  "benchmark": "multi_load_cantilever",
+  "densities_first_8": [
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0"
+  ],
+  "density_sha256": "sha256:b6a86bb18201dd3f6b2685c34a045bf715d900fe1875ebc7985a6c672bac4624",
+  "input_hash": "sha256:b605b1f6102d3efd673b67487c9281674fd43af93d877d2d0da6e18906a10124",
+  "n_elements": 1000,
+  "preset": null,
+  "scalar_sha256": "sha256:4cdc9bad87a480d32eec78ddccc4fabff8081c97c4cf4699fb05235ebe1904bf",
+  "scalars": {
+    "baseline_compliance": "216.61109235231902",
+    "compliance": "419.50407819549673",
+    "mass": "3.532472222745448e-06",
+    "max_displacement": "0.5258549982036463",
+    "max_stress": "1399.7144457210559"
+  }
+}

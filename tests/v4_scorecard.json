@@ -1,7 +1,7 @@
 {
   "version": "v4.0.0",
   "total_max": 100,
-  "total_earned": 54,
+  "total_earned": 82,
   "items": [
     {
       "section": "\u00a71",
@@ -62,27 +62,27 @@
       "code": "2.1",
       "title": "1000\u00d71000 mesh < 10 min",
       "max_points": 5,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "xlarge_cantilever benchmark missing"
+      "earned": 5,
+      "status": "PASS",
+      "evidence": "1000\u00d71000 config + test present"
     },
     {
       "section": "\u00a72",
       "code": "2.2",
       "title": "AMG preconditioner",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "AMG solver class=\u2717 optional dep=\u2717"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "pyamg optional dep + AMG solver class present"
     },
     {
       "section": "\u00a72",
       "code": "2.3",
       "title": "Matrix-free CG",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/matrix_free_cg.py missing"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "core/matrix_free_cg.py present"
     },
     {
       "section": "\u00a72",
@@ -91,16 +91,16 @@
       "max_points": 3,
       "earned": 3,
       "status": "PASS",
-      "evidence": "3 large-mesh references found"
+      "evidence": "4 large-mesh references found"
     },
     {
       "section": "\u00a73",
       "code": "3.1",
       "title": "Fingerprint DB \u2265 20",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "11 fingerprints (need \u226520)"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "20 fingerprints"
     },
     {
       "section": "\u00a73",
@@ -116,27 +116,27 @@
       "code": "3.3",
       "title": "Mutation kill rate \u2265 70%",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "tests/mutation_report.json missing"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "80.0% kill rate"
     },
     {
       "section": "\u00a73",
       "code": "3.4",
       "title": "Drift detection script",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "missing"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "scripts/drift_check.py present"
     },
     {
       "section": "\u00a73",
       "code": "3.5",
       "title": "Reproducibility tests \u2265 30",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "10 (need \u226530)"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "53 tests"
     },
     {
       "section": "\u00a74",
@@ -145,7 +145,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "512 (need \u2265600)"
+      "evidence": "562 (need \u2265600)"
     },
     {
       "section": "\u00a74",
@@ -161,18 +161,18 @@
       "code": "4.3",
       "title": "Adapters coverage \u2265 90%",
       "max_points": 2,
-      "earned": 2,
-      "status": "PASS",
-      "evidence": "92.6% coverage"
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "83.5% (need \u226590%)"
     },
     {
       "section": "\u00a74",
       "code": "4.4",
       "title": "Property tests \u2265 15",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "5 (need \u226515)"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "16 property tests"
     },
     {
       "section": "\u00a74",
@@ -188,9 +188,9 @@
       "code": "4.6",
       "title": "Test agent in CI",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no CI step"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "CI references test_agent (1 mentions)"
     },
     {
       "section": "\u00a75",
@@ -262,7 +262,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "4 (need \u22658)"
+      "evidence": "5 (need \u22658)"
     }
   ],
   "v1_check": {

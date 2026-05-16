@@ -100,9 +100,13 @@ def _grep_count(pattern: str, file_glob: str) -> int:
     return n
 
 
-def _pytest_collect_count() -> int:
-    """Return total test count via pytest --collect-only -q."""
-    _rc, out, err = _run([str(VENV_PYTEST), "--collect-only", "-q"])
+def _pytest_collect_count(*targets: str) -> int:
+    """Return test count via pytest --collect-only -q (parametrize-expanded).
+
+    ``targets`` is an optional list of pytest paths/nodeids; with no args,
+    counts the entire suite.
+    """
+    _rc, out, err = _run([str(VENV_PYTEST), "--collect-only", "-q", *targets])
     match = re.search(r"(\d+)\s+tests?\s+collected", out + err)
     return int(match.group(1)) if match else 0
 
@@ -243,7 +247,7 @@ def check_3_3_mutation_kill_rate() -> tuple[int, str, str]:
     if not report.exists():
         return 0, "FAIL", "tests/mutation_report.json missing"
     data = json.loads(report.read_text())
-    kill_rate = data.get("kill_rate", 0.0)
+    kill_rate = data.get("aggregate_kill_rate", data.get("kill_rate", 0.0))
     return (
         (4, "PASS", f"{kill_rate * 100:.1f}% kill rate")
         if kill_rate >= 0.70
@@ -261,10 +265,12 @@ def check_3_4_drift_check() -> tuple[int, str, str]:
 
 
 def check_3_5_reproducibility_tests() -> tuple[int, str, str]:
-    """§3.5 Reproducibility tests ≥ 30 (2 pts)."""
-    n = _grep_count(r"^def test_", "tests/test_reproducibility.py") + _grep_count(
-        r"^def test_", "tests/test_fingerprints.py"
-    )
+    """§3.5 Reproducibility tests ≥ 30 (2 pts).
+
+    Count via pytest collection so parametrized cases expand (one ``def``
+    with @parametrize over 9 benchmarks is 9 tests, not 1).
+    """
+    n = _pytest_collect_count("tests/test_reproducibility.py", "tests/test_fingerprints.py")
     return (2, "PASS", f"{n} tests") if n >= 30 else (0, "FAIL", f"{n} (need ≥30)")
 
 

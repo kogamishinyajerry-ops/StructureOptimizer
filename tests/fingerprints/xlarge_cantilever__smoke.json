@@ -1,0 +1,25 @@
+{
+  "benchmark": "xlarge_cantilever",
+  "densities_first_8": [
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0"
+  ],
+  "density_sha256": "sha256:fe1fdac7679dcc09eb15c95daa487aeb48905d9d1d2aa60fbbb7f76e66e20ccc",
+  "input_hash": "sha256:f1dcced77bfffd07d458c836ef38255a12c5549d82204ef6bca1a5b4126fdb31",
+  "n_elements": 5000,
+  "preset": "smoke",
+  "scalar_sha256": "sha256:3747e0c0a33d81c0c329e5002a3ca205b0e1646455b2361ef9d44379f13cd240",
+  "scalars": {
+    "baseline_compliance": "5.709208544927035",
+    "compliance": "23.532033031011505",
+    "mass": "2.1596654953788074e-05",
+    "max_displacement": "0.24079733207357004",
+    "max_stress": "67.2627108083806"
+  }
+}

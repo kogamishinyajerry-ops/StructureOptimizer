@@ -1,0 +1,25 @@
+{
+  "benchmark": "mbb_beam",
+  "densities_first_8": [
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0"
+  ],
+  "density_sha256": "sha256:9c02ba78daf2d7854afe064456ca8abc508b5c84403cf426772884d32b6373cd",
+  "input_hash": "sha256:695cefa444a7b39a78dd3d995ceacc8a1c9532f83ef116e9fd6d65a00c75ace9",
+  "n_elements": 1200,
+  "preset": null,
+  "scalar_sha256": "sha256:fe808a47d8ca67cd46fbb80fd9486ede2ff6a9942104e93e5ff44b96d9aac9df",
+  "scalars": {
+    "baseline_compliance": "561.2141661154951",
+    "compliance": "1187.8768637283029",
+    "mass": "3.767921719121563e-06",
+    "max_displacement": "1.1934998446757699",
+    "max_stress": "2423.6950388118194"
+  }
+}

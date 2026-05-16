@@ -52,23 +52,28 @@ def cli_yellow(text: str) -> str:
 
 
 def diagnose_error(exc: Exception) -> str:
-    """Wave V: turn a caught exception into a more actionable hint.
+    """Wave V: turn a caught exception into a single-line actionable message.
 
-    Returns the original error text plus, when the exception type is
-    one we recognize, a one-line suggestion.
+    Returns one line ``error: <msg> [— hint: <hint>]``. The single-line
+    invariant is a v1+ permanent red line ("失败仍单行 stderr + 状态码字符串");
+    the hint is appended after `— hint: …` rather than on a new line so the
+    invariant holds.
     """
     msg = str(exc)
     hint = ""
     name = type(exc).__name__
     if name == "ConfigError":
-        hint = "  hint: check `docs/blueprint-v4.md` or run `structopt help` for valid config schema."
+        hint = "check docs/blueprint-v4.md or run `structopt help` for valid config schema"
     elif "No module named" in msg:
-        hint = "  hint: install optional dep with `pip install scipy` (or the missing package)."
+        hint = "install optional dep with `pip install scipy` (or the missing package)"
     elif "all degrees of freedom are fixed" in msg:
-        hint = "  hint: at least one DOF must be free; reduce the `boundary_conditions` extent."
+        hint = "at least one DOF must be free; reduce the boundary_conditions extent"
     elif "stress_constraint" in msg.lower():
-        hint = "  hint: set `stress_constraint.enabled = true` in your benchmark config."
-    return f"{cli_red('error:')} {msg}" + (f"\n{cli_yellow(hint)}" if hint else "")
+        hint = "set stress_constraint.enabled = true in your benchmark config"
+    base = f"{cli_red('error:')} {msg}"
+    if hint:
+        base = f"{base} — {cli_yellow('hint:')} {hint}"
+    return base
 
 
 def _package_version() -> str:

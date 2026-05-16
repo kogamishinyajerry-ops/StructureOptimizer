@@ -1,0 +1,25 @@
+{
+  "benchmark": "l_bracket",
+  "densities_first_8": [
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0"
+  ],
+  "density_sha256": "sha256:5ead4417677fd3797211ed1d84ae15fed6b263f8200c74ced89923977c1aa5a4",
+  "input_hash": "sha256:2dad810e8ab2b1a32f2952a1056fdc752eef9db96511b5e0176d545f9940408f",
+  "n_elements": 1600,
+  "preset": null,
+  "scalar_sha256": "sha256:5874cdb286df107906694b5cfa02f0414e643c5c606147853a0c0035015afff8",
+  "scalars": {
+    "baseline_compliance": "42.298044606151656",
+    "compliance": "55.68994277555946",
+    "mass": "4.709912578359981e-06",
+    "max_displacement": "0.10057756831753982",
+    "max_stress": "1028.4874168326303"
+  }
+}

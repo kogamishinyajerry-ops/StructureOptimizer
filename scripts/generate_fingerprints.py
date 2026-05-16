@@ -42,6 +42,18 @@ FINGERPRINT_TARGETS: list[tuple[str, str | None]] = [
     ("multi_load_cantilever", "smoke"),
     ("stress_limited_bracket", "smoke"),
     ("stress_multi_load_bracket", "smoke"),
+    # Wave W §3.1: extend fingerprint DB to ≥20.
+    # Default-preset variants (heavier than smoke but still tractable):
+    ("mbb_beam", None),
+    ("cantilever", None),
+    ("l_bracket", None),
+    ("simple_bracket", None),
+    ("loaded_hook", None),
+    ("multi_load_cantilever", None),
+    # Additional preset variants for stress benchmarks:
+    ("stress_limited_bracket", "tight"),
+    ("stress_limited_bracket", "ks"),
+    ("xlarge_cantilever", "smoke"),
 ]
 
 OUTPUT_DIR = Path(__file__).parent.parent / "tests" / "fingerprints"

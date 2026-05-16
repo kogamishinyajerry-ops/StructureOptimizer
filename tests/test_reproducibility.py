@@ -166,3 +166,140 @@ def test_beso_algorithm_also_reproducible_per_benchmark(benchmark, preset):
     b = algo_b.run(config, mesh_b)
     np.testing.assert_array_equal(a.densities, b.densities)
     assert a.final_analysis.compliance == b.final_analysis.compliance
+
+
+# --- Wave W: extend reproducibility coverage to ≥30 (rubric §3.5) ----
+
+
+@pytest.mark.parametrize(
+    "benchmark,preset",
+    [
+        ("mbb_beam", "smoke"),
+        ("cantilever", "smoke"),
+        ("l_bracket", "smoke"),
+        ("simple_bracket", "smoke"),
+        ("multi_load_cantilever", "smoke"),
+        ("stress_limited_bracket", "smoke"),
+        ("loaded_hook", "smoke"),
+        ("stress_multi_load_bracket", "smoke"),
+        ("xlarge_cantilever", "smoke"),
+    ],
+)
+def test_input_hash_reproducible_per_benchmark(benchmark, preset):
+    """Wave W §3.5: input_hash is stable across two load_benchmark calls
+    for every canonical benchmark + smoke preset (9 cases)."""
+    a = load_benchmark(benchmark, preset=preset)
+    b = load_benchmark(benchmark, preset=preset)
+    assert input_hash(a) == input_hash(b), f"input_hash drifted for {benchmark}/{preset}"
+
+
+@pytest.mark.parametrize(
+    "benchmark,preset",
+    [
+        ("cantilever", "smoke"),
+        ("simple_bracket", "smoke"),
+        ("l_bracket", "smoke"),
+        ("loaded_hook", "smoke"),
+    ],
+)
+def test_simp_compliance_stable_per_benchmark(benchmark, preset):
+    """For 4 canonical benchmarks, the final compliance must match
+    bit-exact across two runs (independent of density bit-exactness which
+    is tested elsewhere)."""
+    config = load_benchmark(benchmark, preset=preset)
+    mesh_a = create_structured_mesh(config)
+    mesh_b = create_structured_mesh(config)
+    r_a = run_simp(config, mesh_a)
+    r_b = run_simp(config, mesh_b)
+    assert r_a.final_analysis.compliance == r_b.final_analysis.compliance
+
+
+@pytest.mark.parametrize(
+    "benchmark,preset",
+    [
+        ("cantilever", "smoke"),
+        ("mbb_beam", "smoke"),
+        ("simple_bracket", "smoke"),
+    ],
+)
+def test_simp_mass_stable_per_benchmark(benchmark, preset):
+    """Mass (volume × density) must match across two runs (3 benchmarks)."""
+    config = load_benchmark(benchmark, preset=preset)
+    mesh_a = create_structured_mesh(config)
+    mesh_b = create_structured_mesh(config)
+    r_a = run_simp(config, mesh_a)
+    r_b = run_simp(config, mesh_b)
+    assert r_a.final_analysis.mass == r_b.final_analysis.mass
+
+
+@pytest.mark.parametrize(
+    "benchmark,preset",
+    [
+        ("cantilever", "smoke"),
+        ("simple_bracket", "smoke"),
+    ],
+)
+def test_simp_max_displacement_stable_per_benchmark(benchmark, preset):
+    """max_displacement must match bit-exact across two runs (2 benchmarks)."""
+    config = load_benchmark(benchmark, preset=preset)
+    mesh_a = create_structured_mesh(config)
+    mesh_b = create_structured_mesh(config)
+    r_a = run_simp(config, mesh_a)
+    r_b = run_simp(config, mesh_b)
+    assert r_a.final_analysis.max_displacement == r_b.final_analysis.max_displacement
+
+
+def test_triangle_simp_reproducible():
+    """Triangle SIMP (Wave M) is also reproducible across two calls."""
+    import numpy as np
+    from structure_optimizer.core.triangle_simp import run_simp_triangle, split_quad_to_triangles
+
+    mesh = split_quad_to_triangles(8, 4, width=1.0, height=0.5)
+    left_nodes = np.where(mesh.nodes[:, 0] < 1e-9)[0]
+    fixed = np.concatenate([[2 * n, 2 * n + 1] for n in left_nodes])
+    force = np.zeros(mesh.ndof)
+    right_mid = np.argmin(np.abs(mesh.nodes[:, 0] - 1.0) + np.abs(mesh.nodes[:, 1] - 0.25))
+    force[2 * right_mid + 1] = -1.0
+    kwargs = dict(
+        young_modulus=1.0,
+        poisson_ratio=0.3,
+        fixed_dofs=fixed,
+        force=force,
+        volume_fraction=0.4,
+        max_iterations=6,
+        min_iterations=2,
+        filter_radius=0.15,
+    )
+    a = run_simp_triangle(mesh, **kwargs)
+    b = run_simp_triangle(mesh, **kwargs)
+    np.testing.assert_array_equal(a.densities, b.densities)
+    assert a.final_compliance == b.final_compliance
+
+
+def test_triangle_beso_reproducible():
+    """Triangle BESO (Wave T) is also reproducible across two calls."""
+    import numpy as np
+    from structure_optimizer.core.triangle_beso import run_beso_triangle
+    from structure_optimizer.core.triangle_simp import split_quad_to_triangles
+
+    mesh = split_quad_to_triangles(8, 4, width=1.0, height=0.5)
+    left_nodes = np.where(mesh.nodes[:, 0] < 1e-9)[0]
+    fixed = np.concatenate([[2 * n, 2 * n + 1] for n in left_nodes])
+    force = np.zeros(mesh.ndof)
+    right_mid = np.argmin(np.abs(mesh.nodes[:, 0] - 1.0) + np.abs(mesh.nodes[:, 1] - 0.25))
+    force[2 * right_mid + 1] = -1.0
+    kwargs = dict(
+        young_modulus=1.0,
+        poisson_ratio=0.3,
+        fixed_dofs=fixed,
+        force=force,
+        volume_fraction=0.4,
+        er=0.1,
+        max_iterations=5,
+        min_iterations=2,
+        filter_radius=0.15,
+    )
+    a = run_beso_triangle(mesh, **kwargs)
+    b = run_beso_triangle(mesh, **kwargs)
+    np.testing.assert_array_equal(a.densities, b.densities)
+    assert a.final_compliance == b.final_compliance

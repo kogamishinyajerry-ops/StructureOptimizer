@@ -166,6 +166,49 @@ def test_large_cantilever_500x500_runs_within_5min(request):
     assert elapsed < 300.0, f"500×500 SIMP took {elapsed:.1f}s (> 5 min budget)"
 
 
+def test_xlarge_cantilever_smoke_runs(request):
+    """Wave W §2.1: xlarge_cantilever (default 1000×1000 mesh) is reachable
+    via its smoke preset (100×50 mesh, 5 iter) — verifies the config
+    parses and a tiny presentation of the mesh runs without scipy.
+
+    The full 1000×1000 path requires sparse + many minutes; that's
+    covered separately in test_xlarge_cantilever_full_when_slow.
+    """
+    config = load_benchmark("xlarge_cantilever", preset="smoke")
+    assert config.mesh.nelx == 100
+    assert config.mesh.nely == 50
+    mesh = create_structured_mesh(config)
+    # Smoke mesh should be reachable in seconds even without scipy
+    t0 = time.perf_counter()
+    result = run_simp(config, mesh)
+    elapsed = time.perf_counter() - t0
+    assert len(result.metrics) >= 1
+    assert elapsed < 60.0, f"xlarge_cantilever smoke preset took {elapsed:.1f}s (>60s budget)"
+
+
+def test_xlarge_cantilever_full_when_slow(request):
+    """Wave W §2.1: 1000×1000 mesh (≥ 2M DOFs) full run via sparse backend.
+
+    Slow test: requires --run-slow flag + scipy. Budget: 10 minutes
+    (rubric §2.1). On CI without scipy this skips; on local-with-scipy
+    + --run-slow it executes the full 1000×1000 (2M DOFs) 5-iter run.
+    """
+    _slow(request)
+    pytest.importorskip("scipy")
+    raw = load_benchmark("xlarge_cantilever").to_dict()
+    raw["optimization"]["max_iterations"] = 3  # 3 iters of 1000×1000 is enough proof of capability
+    raw["optimization"]["min_iterations"] = 3
+    config = parse_config(raw)
+    validate_config(config)
+    mesh = create_structured_mesh(config)
+    assert mesh.ndof >= 2_000_000
+    t0 = time.perf_counter()
+    result = run_simp(config, mesh)
+    elapsed = time.perf_counter() - t0
+    assert len(result.metrics) == 3
+    assert elapsed < 600.0, f"1000×1000 3-iter SIMP took {elapsed:.1f}s (>10 min budget)"
+
+
 # --- §2.3 parallel study ------------------------------------------------
 
 
