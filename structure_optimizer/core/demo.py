@@ -311,6 +311,65 @@ def generate_demo_html(run_dir: Path | str) -> Path:
       .grid, .visuals, .visuals.three, .metrics, .hero, .demo-story, .legend, .metric-explainers {{ grid-template-columns: 1fr; }}
     }}
   </style>
+  <style>
+    /* Wave Q (rubric §5.4): interactive review enhancements */
+    .interactive-toolbar {{
+      margin: 12px 0;
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }}
+    .interactive-toolbar label {{
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }}
+    .panzoom-stage {{
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #fff;
+      cursor: grab;
+      touch-action: none;
+    }}
+    .panzoom-stage img {{
+      display: block;
+      transform-origin: 0 0;
+      transition: transform 80ms;
+      max-width: none;
+    }}
+    .panzoom-stage:active {{
+      cursor: grabbing;
+    }}
+    .panzoom-controls {{
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255,255,255,0.94);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      display: flex;
+      gap: 4px;
+      padding: 2px;
+      font-size: 12px;
+    }}
+    .panzoom-controls button {{
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-weight: 600;
+      color: var(--ink);
+    }}
+    .panzoom-controls button:hover {{ background: var(--bg); }}
+    .toggleable-image.is-hidden {{ display: none; }}
+  </style>
 </head>
 <body>
   <header>
@@ -357,18 +416,31 @@ def generate_demo_html(run_dir: Path | str) -> Path:
     <section class="grid" style="margin-top: 18px;">
       <div class="panel">
         <h2>2分钟看懂</h2>
+        <div class="interactive-toolbar" data-panel="visuals-three">
+          <span>显示：</span>
+          <label><input type="checkbox" data-toggle="baseline" checked> 原始</label>
+          <label><input type="checkbox" data-toggle="loadcase" checked> 边界</label>
+          <label><input type="checkbox" data-toggle="density" checked> 候选</label>
+        </div>
         <div class="visuals three">
-          <div>
+          <div class="toggleable-image" data-key="baseline">
             <p class="image-label">原始实心设计域</p>
             <img src="baseline.png" alt="baseline design domain">
           </div>
-          <div>
+          <div class="toggleable-image" data-key="loadcase">
             <p class="image-label">受力与固定边界</p>
             <img src="loadcase.png" alt="load and constraint map">
           </div>
-          <div>
-            <p class="image-label">优化后的候选结构</p>
-            <img src="density.png" alt="final density field">
+          <div class="toggleable-image" data-key="density">
+            <p class="image-label">优化后的候选结构（可缩放）</p>
+            <div class="panzoom-stage" data-panzoom>
+              <img src="density.png" alt="final density field">
+              <div class="panzoom-controls">
+                <button type="button" data-zoom="out">−</button>
+                <button type="button" data-zoom="reset">100%</button>
+                <button type="button" data-zoom="in">+</button>
+              </div>
+            </div>
           </div>
         </div>
         <div class="visuals">
@@ -442,6 +514,57 @@ def generate_demo_html(run_dir: Path | str) -> Path:
       <p>上方进度条表示独立验证得到的材料保留比例。</p>
     </section>
   </main>
+  <script>
+    // Wave Q (rubric §5.4): toggle visibility of overlay images + pan/zoom
+    document.querySelectorAll('.interactive-toolbar input[data-toggle]').forEach(function(box) {{
+      box.addEventListener('change', function() {{
+        var panel = box.closest('.interactive-toolbar').dataset.panel;
+        var key = box.dataset.toggle;
+        var section = box.closest('.panel');
+        if (!section) return;
+        var card = section.querySelector('.toggleable-image[data-key="' + key + '"]');
+        if (card) card.classList.toggle('is-hidden', !box.checked);
+      }});
+    }});
+
+    document.querySelectorAll('[data-panzoom]').forEach(function(stage) {{
+      var img = stage.querySelector('img');
+      if (!img) return;
+      var state = {{ scale: 1, x: 0, y: 0 }};
+      var dragging = false;
+      var startX = 0, startY = 0;
+      function apply() {{
+        img.style.transform = 'translate(' + state.x + 'px,' + state.y + 'px) scale(' + state.scale + ')';
+      }}
+      function setScale(s) {{
+        state.scale = Math.max(0.5, Math.min(8, s));
+        apply();
+      }}
+      stage.addEventListener('wheel', function(ev) {{
+        ev.preventDefault();
+        var dir = ev.deltaY < 0 ? 1.1 : 0.9;
+        setScale(state.scale * dir);
+      }}, {{ passive: false }});
+      stage.addEventListener('pointerdown', function(ev) {{
+        dragging = true; startX = ev.clientX - state.x; startY = ev.clientY - state.y;
+        stage.setPointerCapture(ev.pointerId);
+      }});
+      stage.addEventListener('pointermove', function(ev) {{
+        if (!dragging) return;
+        state.x = ev.clientX - startX; state.y = ev.clientY - startY;
+        apply();
+      }});
+      stage.addEventListener('pointerup', function() {{ dragging = false; }});
+      stage.querySelectorAll('button[data-zoom]').forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+          var op = btn.dataset.zoom;
+          if (op === 'in') setScale(state.scale * 1.25);
+          else if (op === 'out') setScale(state.scale * 0.8);
+          else {{ state.scale = 1; state.x = 0; state.y = 0; apply(); }}
+        }});
+      }});
+    }});
+  </script>
 </body>
 </html>
 """

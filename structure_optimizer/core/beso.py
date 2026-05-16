@@ -123,6 +123,7 @@ def run_beso(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
         stop_reason=stop_reason,
         density_history=density_history,
         load_case_names=[lc.name for lc in load_cases],
+        mesh_shape=(mesh.nelx, mesh.nely),
     )
 
 

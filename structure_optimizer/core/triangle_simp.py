@@ -50,6 +50,12 @@ class TriangleOptimizationResult:
     final_displacements: np.ndarray
     stop_reason: str
 
+    def _repr_html_(self) -> str:
+        """Jupyter / VS Code Notebook rich display."""
+        from structure_optimizer.core.repr_html import triangle_optimization_result_repr_html
+
+        return triangle_optimization_result_repr_html(self)
+
 
 def run_simp_triangle(
     mesh: TriangleMesh,

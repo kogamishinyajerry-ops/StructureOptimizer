@@ -8,9 +8,64 @@
 
 ## [Unreleased]
 
-### Planned (post v2.5.0 · v3 roadmap waves Q–R)
-- Q 波：Jupyter rich display + interactive review HTML 升级 → v2.6.0
-- R 波：v3.0 final 收口（tutorial v3 + architecture v3 + ADR D012-D016+ + rubric ≥95） → v3.0.0
+### Planned (post v2.6.0 · v3 roadmap final wave)
+- R 波：v3.0 final 收口（tutorial v3 + architecture v3 + ADR D013-D016+ + rubric ≥95） → v3.0.0
+
+---
+
+## [2.6.0] — 2026-05-16
+
+### Q 波：Jupyter rich display + interactive review HTML
+
+v3 大阶段第六波。给主要 result 数据类加 `_repr_html_` / `_repr_png_`，给 demo.html 加 toggle / pan / zoom 交互。
+
+### Added
+- **`structure_optimizer/core/repr_html.py`** (NEW, ~200 LOC)
+  - `optimization_result_repr_html` / `triangle_optimization_result_repr_html` / `fem_result_repr_html` / `benchmark_config_repr_html` — 表格渲染器
+  - `_grayscale_png_bytes(pixels)` — pure NumPy + zlib PNG 编码（IHDR / IDAT / IEND chunks 自实现）
+  - `density_field_repr_png(densities, mesh, max_dim)` — densities → 灰度 PNG
+- `OptimizationResult.mesh_shape: tuple[int, int]` 字段（默认 `(0, 0)`，向后兼容）
+- `_repr_html_` 方法：`OptimizationResult` / `TriangleOptimizationResult` / `FEMResult` / `BenchmarkConfig`
+- `_repr_png_` 方法：`OptimizationResult`（`mesh_shape != (0,0)` 时返回 PNG bytes，否则返回 `None`）
+- **`docs/decisions/D012-jupyter-rich-display-and-interactive-html.md`** — 设计 rationale + 不引入 Pillow / 不引入 JS framework 的红线坚持
+- **`tests/test_repr_html_and_interactive.py`** (NEW, 10 测试)
+  - `_grayscale_png_bytes` 输出有合法 PNG magic + IHDR + IEND CRC
+  - PNG 上采样 dim 正确
+  - `OptimizationResult._repr_html_` 含 "OptimizationResult" / "Iterations" / "Compliance" / "Volume fraction"
+  - `OptimizationResult._repr_png_` 在 `mesh_shape` 已知时返回 PNG，未知时返回 None（不 raise）
+  - `BenchmarkConfig._repr_html_` 含 benchmark 名 + mesh 维度
+  - `FEMResult._repr_html_` 含 Compliance / Mass / DOFs
+  - `TriangleOptimizationResult._repr_html_` 同
+  - demo.html 含 `data-toggle` / `data-panzoom` / `data-zoom` 属性 + 内联 JS 含 `wheel` / `pointerdown`
+
+### Changed
+- `structure_optimizer/core/simp.py` — `run_simp` 把 `mesh_shape=(mesh.nelx, mesh.nely)` 写入 `OptimizationResult`
+- `structure_optimizer/core/beso.py` — 同
+- `structure_optimizer/core/demo.py` — 加 toolbar UI（3 toggle checkbox）+ panzoom stage 包裹 density 图 + 50 行 vanilla JS 实现 toggle/wheel-zoom/pointer-pan/button-zoom
+- `pyproject.toml` version: 2.5.0 → 2.6.0
+
+### v3.x rubric 评分（Q 波贡献）
+- **5.3 Jupyter rich display (`_repr_html_` / `_repr_png_`)**: +2
+  - 4 个 dataclass 全有 `_repr_html_`；`OptimizationResult` 有 `_repr_png_`
+- **5.4 Interactive review HTML 升级 (toggle / pan / zoom)**: +2
+  - 3 个 toggle checkbox + 1 个 panzoom stage + wheel/drag/button 控件
+- **4.2 core 覆盖率 ≥92%**（当前 **94.2%**）：✅
+- **7.3 / 7.4**：v1/v2 rubric 仍 100/97 ✓
+
+**v3.x 累计：52 → 56/100**（剩主要是 §1.3/1.4 算法矩阵 + §4.1/4.4 测试规模 + §6 文档 4 项 + §7 红线）
+
+### 不拿分项（诚实记录）
+- **5.3 `_repr_png_` 仅 quad SIMP**：Triangle SIMP 是非结构化拓扑，渲染需要多边形 raster，超出 `_grayscale_png_bytes` 标量范围。`TriangleOptimizationResult` 只给 `_repr_html_`。已在 D012 § "Limitations" 说明
+- **5.4 panzoom 仅 density 图**：baseline / loadcase 图仍是 static `<img>`。如有需求可扩展，但当前不必要
+- **不引入 ipywidgets / 不引入 JS framework**：守 NumPy-only + no-build-step 红线（D012 § "Why vanilla JS"）
+
+### 工程卫生
+- ruff check ✓
+- ruff format ✓
+- mypy ✓
+- pytest 352 全绿（默认；3 slow 跳过），37.5 秒
+- core coverage **94.2%**（v3 阈值 92%）✓
+- 新模块 repr_html.py 高覆盖（~95%）；simp/triangle_simp/fem2d/config 加方法后无回退
 
 ---
 

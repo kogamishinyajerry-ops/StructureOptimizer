@@ -169,6 +169,12 @@ class BenchmarkConfig:
         data.pop("source_path", None)
         return data
 
+    def _repr_html_(self) -> str:
+        """Jupyter / VS Code Notebook rich display."""
+        from structure_optimizer.core.repr_html import benchmark_config_repr_html
+
+        return benchmark_config_repr_html(self)
+
 
 def _deep_update(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     updated = copy.deepcopy(base)

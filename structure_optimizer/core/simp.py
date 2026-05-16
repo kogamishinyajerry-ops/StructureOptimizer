@@ -40,6 +40,34 @@ class OptimizationResult:
     stop_reason: str
     density_history: list[np.ndarray]
     load_case_names: list[str]
+    mesh_shape: tuple[int, int] = (0, 0)
+    """(nelx, nely) of the mesh that produced this result.
+
+    Wave Q only — used by ``_repr_png_`` to reshape ``densities``. Defaults
+    to (0, 0) for backwards compatibility with any caller that constructs
+    ``OptimizationResult`` directly without passing a mesh; PNG output is
+    suppressed in that case but the table-form ``_repr_html_`` still works.
+    """
+
+    def _repr_html_(self) -> str:
+        """Jupyter / VS Code Notebook rich display."""
+        from structure_optimizer.core.repr_html import optimization_result_repr_html
+
+        return optimization_result_repr_html(self)
+
+    def _repr_png_(self) -> bytes | None:
+        """Inline PNG of the final density field. Returns None if mesh_shape is unknown."""
+        nelx, nely = self.mesh_shape
+        if nelx <= 0 or nely <= 0:
+            return None
+        from structure_optimizer.core.repr_html import _grayscale_png_bytes
+
+        grid = np.asarray(self.densities, dtype=float).reshape((nely, nelx))
+        pixels = np.clip((1.0 - grid) * 255.0, 0, 255).astype(np.uint8)
+        scale = max(1, 320 // max(nelx, nely))
+        if scale > 1:
+            pixels = np.repeat(np.repeat(pixels, scale, axis=0), scale, axis=1)
+        return _grayscale_png_bytes(pixels)
 
 
 def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResult:
@@ -130,6 +158,7 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
         stop_reason=stop_reason,
         density_history=density_history,
         load_case_names=[load_case.name for load_case in load_cases],
+        mesh_shape=(mesh.nelx, mesh.nely),
     )
 
 

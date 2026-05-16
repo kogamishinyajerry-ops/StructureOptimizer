@@ -28,6 +28,12 @@ class FEMResult:
     mass: float
     element_strain_energy: np.ndarray
 
+    def _repr_html_(self) -> str:
+        """Jupyter / VS Code Notebook rich display."""
+        from structure_optimizer.core.repr_html import fem_result_repr_html
+
+        return fem_result_repr_html(self)
+
 
 def element_stiffness(young_modulus: float, poisson_ratio: float) -> np.ndarray:
     """Build the 8×8 plane-stress quad-element stiffness matrix for unit-sized elements."""
