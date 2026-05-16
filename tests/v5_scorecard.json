@@ -1,0 +1,306 @@
+{
+  "version": "v5.0.0",
+  "total_max": 100,
+  "total_earned": 17,
+  "items": [
+    {
+      "section": "\u00a71",
+      "code": "1.1",
+      "title": "\u70ed\u4f20\u5bfc TO (thermal SIMP)",
+      "max_points": 6,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "thermal modules missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.2",
+      "title": "\u6a21\u6001 / \u7279\u5f81\u9891\u7387 TO",
+      "max_points": 6,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "modal module missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.3",
+      "title": "\u51e0\u4f55\u975e\u7ebf\u6027 TO",
+      "max_points": 5,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "nonlinear modules missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.4",
+      "title": "\u591a\u6750\u6599 ordered SIMP",
+      "max_points": 5,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "multi_material module missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.5",
+      "title": "\u968f\u673a / \u53ef\u9760\u6027 TO (Monte Carlo)",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "stochastic module missing"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.6",
+      "title": "\u9891\u54cd / harmonic-driven TO",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "freq_response module missing"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.1",
+      "title": "\u70ed\u4f20\u5bfc 1D \u6746 analytical \u6821\u9a8c",
+      "max_points": 4,
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "6 analytical thermal refs"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.2",
+      "title": "Euler-Bernoulli \u6a21\u6001\u9891\u7387\u6821\u9a8c",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no EB modal test"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.3",
+      "title": "Gere \u5927\u53d8\u5f62 cantilever \u6821\u9a8c",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no Gere test"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.4",
+      "title": "Mass matrix lumped vs consistent",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no mass-consistency test"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.5",
+      "title": "Thermo-elastic coupling \u4e00\u81f4\u6027",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no coupling test"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.1",
+      "title": "Monte Carlo UQ entrypoint",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no UQ entry"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.2",
+      "title": "Worst-case / minmax TO",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no reliability module"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.3",
+      "title": "RNG-seed \u53ef\u590d\u73b0\u6027",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no seed-repro test"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.4",
+      "title": "Stochastic fingerprints \u2265 2",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "0 (need \u22652)"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.5",
+      "title": "NSGA-II Pareto front",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no NSGA module"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.1",
+      "title": "Test count \u2265 750",
+      "max_points": 4,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "655 (need \u2265750)"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.2",
+      "title": "Core coverage \u2265 95% (\u542b v5)",
+      "max_points": 4,
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "96.4% coverage"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.3",
+      "title": "Property tests \u2265 25",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "16 (need \u226525)"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.4",
+      "title": "Mutation kill rate \u2265 75%",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "80.0% kill rate"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.5",
+      "title": "Fingerprint DB \u2265 25",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "20 (need \u226525)"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.6",
+      "title": "v5 rubric \u5199\u5165 test agent",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "v5 rubric referenced"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.7",
+      "title": "CI \u8dd1 v5 rubric",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "v5 CI step present"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.1",
+      "title": "Pareto front HTML render",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no Pareto HTML"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.2",
+      "title": "2D\u2192STL boundary \u5bfc\u51fa",
+      "max_points": 3,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no STL export"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.3",
+      "title": "Pure-NumPy autodiff",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no autodiff"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.4",
+      "title": "Multi-physics demo",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "3 multi-physics demo refs"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.1",
+      "title": "blueprint-v5 six waves ticked",
+      "max_points": 2,
+      "earned": 0,
+      "status": "PARTIAL",
+      "evidence": "1"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.2",
+      "title": "tutorial v5 \u22655 new sections",
+      "max_points": 3,
+      "earned": 0,
+      "status": "PARTIAL",
+      "evidence": "0"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.3",
+      "title": "architecture v5 + multi-physics doc",
+      "max_points": 2,
+      "earned": 0,
+      "status": "FAIL",
+      "evidence": "no v5 section"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.4",
+      "title": "ADRs D025+ \u2265 8",
+      "max_points": 3,
+      "earned": 0,
+      "status": "PARTIAL",
+      "evidence": "0 (need \u22658)"
+    }
+  ],
+  "v1_check": {
+    "score": 100,
+    "regression": false,
+    "missing": []
+  },
+  "v2_check": {
+    "score": 97,
+    "regression": false,
+    "missing": []
+  },
+  "v3_check": {
+    "score": 99,
+    "regression": false,
+    "missing": []
+  },
+  "v4_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  }
+}

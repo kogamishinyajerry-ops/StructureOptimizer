@@ -79,11 +79,18 @@ jobs:
         if: matrix.os != 'ubuntu-latest' || matrix.python-version != '3.12' || matrix.install-variant != 'with-extras'
         run: pytest tests/test_fingerprints.py -q
 
-      - name: v4 test agent — rubric scorecard
+      - name: v4 test agent — rubric scorecard (no-regression gate)
         # Wave X §4.6: dedicated test agent must run in CI on the canonical
         # matrix cell. Non-zero exit indicates a v4 rubric regression.
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
-        run: python scripts/test_agent.py --strict
+        run: python scripts/test_agent.py --rubric v4 --strict
+
+      - name: v5 test agent — multi-physics rubric scorecard
+        # v5 §4.7: v5 rubric scored after v4 regression check passes. Strict
+        # gate is enabled once v5 reaches release-ready (≥99/100); during
+        # active development the score is informational.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --rubric v5
 
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
