@@ -9,13 +9,16 @@ on:
 
 jobs:
   test:
-    name: Test (Python ${{ matrix.python-version }} · ${{ matrix.install-variant }})
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }} · Python ${{ matrix.python-version }} · ${{ matrix.install-variant }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.11", "3.12", "3.13"]
         install-variant: ["vanilla", "with-extras"]
+        # Wave P (rubric §3.2): cross-OS macOS+Linux matrix; vanilla path runs
+        # without scipy/meshio so confirms NumPy-only red line cross-platform.
 
     steps:
       - name: Check out code
@@ -60,11 +63,21 @@ jobs:
         run: pytest --cov=structure_optimizer --cov-report=term --cov-report=xml -q
 
       - name: Upload coverage report
-        if: matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
+
+      - name: Cross-platform bit-exact fingerprint check (Linux + Python 3.12 with-extras only)
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        env:
+          REQUIRE_BIT_EXACT_FINGERPRINT: "1"
+        run: pytest tests/test_fingerprints.py -q
+
+      - name: Cross-platform tolerant fingerprint check (other matrix cells)
+        if: matrix.os != 'ubuntu-latest' || matrix.python-version != '3.12' || matrix.install-variant != 'with-extras'
+        run: pytest tests/test_fingerprints.py -q
 
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)

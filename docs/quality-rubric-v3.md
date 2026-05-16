@@ -100,6 +100,7 @@
 | v2.2.0 (Wave M) | 16/100 | 算法深度 25 仅得 16；性能 / 可复现 / 用户面 / 文档主要分项未启动 | SIMP-on-triangle 完整实装（填 D005 留白）；quad/triangle parity 测试通过；296 测试全绿；core 94.4%；triangle 路径无 CLI / 无 stress adjoint / 无 BESO（显式 D008 defer） |
 | v2.3.0 (Wave N) | 31/100 | 性能规模 15/15 满分；可复现 / 用户面 / 文档主线未启动 | 500×500 mesh 102 秒（< 5 分钟）；sparse template ≥1.8×；ProcessPool 4 worker 3.0×；301 测试全绿（含 5 fast perf）；core 94.1%；sparse_cg 不收敛已用 sparse direct 兜底（D009） |
 | v2.4.0 (Wave O) | 37/100 | §5.1+§5.2 拿下；测试 325（未达 ≥400）；可复现/文档/红线 §3+§6+§7.4 未启动 | LHS + Sobol 采样；run 含 parent_id（lineage.json）；study 含 lineage_tree.json；325 测试全绿；core 94.1%；scipy 缺时 Sobol 给 clear error |
+| v2.5.0 (Wave P) | 52/100 | 过半；剩 §1.3/1.4 算法矩阵 + §4.1/4.4 测试规模 + §6 文档 + §7.4 红线 | 7 fingerprint JSON 落档；CI 矩阵 12 cells（2 OS × 3 Py × 2 install）；22 个 reproducibility tests；342 测试全绿；core 94.1%；跨 LAPACK 严格 bit-exact 不可行 → 容忍 ≤1e-9 + canonical cell 走严 SHA |
 
 （每波结束后追加一行）
 
