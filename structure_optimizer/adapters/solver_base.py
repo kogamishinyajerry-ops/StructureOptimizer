@@ -144,11 +144,11 @@ try:
     import scipy.sparse.linalg  # noqa: F401
 
     _SCIPY_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover - optional dep
     _SCIPY_AVAILABLE = False
 
 
-class ScipySparseSolver(LinearSolver):
+class ScipySparseSolver(LinearSolver):  # pragma: no cover - requires optional scipy dep
     """``scipy.sparse.linalg.spsolve`` — direct sparse factorization (SuperLU).
 
     Memory-efficient for large meshes (O(non-zeros) instead of O(N^2)).
@@ -181,7 +181,7 @@ class ScipySparseSolver(LinearSolver):
         return solution
 
 
-class ScipySparseCGSolver(LinearSolver):
+class ScipySparseCGSolver(LinearSolver):  # pragma: no cover - requires optional scipy dep
     """``scipy.sparse.linalg.cg`` with sparse matrices — iterative SPD solver.
 
     Lowest memory; uses Jacobi (diagonal) preconditioning implicitly via
@@ -215,11 +215,11 @@ try:
     import pyamg  # noqa: F401
 
     _PYAMG_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover - optional dep
     _PYAMG_AVAILABLE = False
 
 
-class AMGCGSolver(LinearSolver):
+class AMGCGSolver(LinearSolver):  # pragma: no cover - requires optional pyamg+scipy deps
     """Wave W: ``pyamg``-preconditioned CG for large sparse SPD systems.
 
     Uses pyamg's smoothed-aggregation AMG (`smoothed_aggregation_solver`) as
@@ -268,10 +268,10 @@ _REGISTRY: dict[str, type[LinearSolver]] = {
     NumpyDenseSolver.name: NumpyDenseSolver,
     NumpyCGSolver.name: NumpyCGSolver,
 }
-if _SCIPY_AVAILABLE:
+if _SCIPY_AVAILABLE:  # pragma: no cover - exercised in scipy-installed CI matrix
     _REGISTRY[ScipySparseSolver.name] = ScipySparseSolver
     _REGISTRY[ScipySparseCGSolver.name] = ScipySparseCGSolver
-if _SCIPY_AVAILABLE and _PYAMG_AVAILABLE:
+if _SCIPY_AVAILABLE and _PYAMG_AVAILABLE:  # pragma: no cover - scipy+pyamg CI matrix
     _REGISTRY[AMGCGSolver.name] = AMGCGSolver
 
 

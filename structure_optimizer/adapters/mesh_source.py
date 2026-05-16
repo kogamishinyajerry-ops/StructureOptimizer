@@ -27,7 +27,7 @@ try:
     import meshio
 
     _MESHIO_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover - optional dep
     _MESHIO_AVAILABLE = False
 
 

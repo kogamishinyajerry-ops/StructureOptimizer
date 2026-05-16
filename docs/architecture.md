@@ -342,3 +342,87 @@ Wave Q。`OptimizationResult` / `TriangleOptimizationResult` / `FEMResult` / `Be
 - LLM / AI 顾问能力 not in scope（永久红线）
 
 详 ADR D001-D016 各自的 "Reopening criteria" 节。
+
+---
+
+## 12. v4.x 抽象与扩展点（Waves S → X · D017-D024）
+
+### 12.1 MMA + Augmented Lagrangian (`core/mma.py`, `core/augmented_lagrangian.py`)
+
+Wave S。`mma_step(x, df, fval, dfdx, xmin, xmax, state)` 一步 Method of Moving Asymptotes 更新；
+内部以渐进可移动凸子问题 + 对偶分解（block-coordinate bisection on λ）解 m 个对偶变量。
+`augmented_objective(f, df, g, dg, state)` 把 m 个不等式约束并入目标，`update_multipliers`
+按 Powell-Hestenes 更新 μ 与 ρ。`run_simp_with_mma(config, mesh)` 整合两者作为 SIMP 主循环
+的可选 driver；与 OC 对照通过 `tests/test_mma_vs_oc.py`。详 D017。
+
+### 12.2 Triangle BESO + 三角制造投影 (`core/triangle_beso.py`, `core/triangle_manufacturing.py`)
+
+Wave T 填补 D013 defer。BESO 的元素增删按 area-weighted 排序（不是 unit-count），
+保证非均匀三角网格的体积分数正确；制造投影改为 centroid-based pairing。3 个
+triangle benchmark 已 fingerprint 化。详 D018。
+
+### 12.3 屈曲特征值 + Heaviside 三场 (`core/buckling.py`, `core/robust.py`)
+
+Wave U。`linearized_buckling(config, mesh, densities)` 解 K φ = λ K_G φ 的最小本征值
+（power iteration on K⁻¹ K_G）；`project_robust_fields(rho, eta_eroded, eta_dilated, beta)`
+返回 eroded/nominal/dilated 三场。`heaviside_project(rho, params)` + `heaviside_project_grad`
+是基础投影 + 链式导数。详 D019。
+
+### 12.4 Bayesian opt + 自动加密 + 对比 + CLI 增强 (`core/bayesian_opt.py`, `core/refinement.py`, `core/compare.py`, `cli.py`)
+
+Wave V。`bayes_optimize(objective, bounds, n_init, n_iter, rng)` 是纯 NumPy
+GP + EI 采集函数（无 scikit-learn 依赖）。`refine_loop` 在感兴趣 region 自动局部加密
+（闭合 D010 留白）。`render_side_by_side(result_a, result_b, html_path)` 写并排对比报告。
+CLI 加 `cli_red/green/yellow` ANSI helpers + `diagnose_error`（单行 stderr 不破红线，
+`NO_COLOR=1` 关闭）。详 D020。
+
+### 12.5 AMG + 矩阵自由 CG + 1000×1000 + 突变测试 (`adapters/solver_base.AMGCGSolver`, `core/matrix_free_cg.py`)
+
+Wave W。`AMGCGSolver` (`backend="amg"`) 把 pyamg `smoothed_aggregation_solver`
+作 CG preconditioner（O(n) setup，迭代次数从 1000+ 降到 ~50）；`matrix_free_apply` /
+`matrix_free_diagonal` / `matrix_free_cg` 按 element-by-element 计算 K·v，
+内存 O(n_elem) 而非 O(n_elem²)。`benchmarks/configs/xlarge_cantilever.json` 是
+1000×1000 = 2M-DOF 标杆。`scripts/run_mutation_test.py` 是 4-mutator
+in-house 变异测试（70%+ 杀伤率门槛）；`scripts/drift_check.py` 比对当前
+benchmark 输出哈希 vs 历史指纹。详 D021。
+
+### 12.6 测试 agent + v4 评分体系 (`scripts/test_agent.py`)
+
+Wave W/X。`test_agent.py` 是 v4 阶段引入的**独立机械验证器**，按
+`docs/quality-rubric-v4.md` 100 分制 23 个条目扫描整个代码库，
+逐项输出 PASS/PARTIAL/FAIL + 文件级证据，并把分数写入 `tests/v4_scorecard.json`。
+
+设计原则：
+1. **机械可验**：每个条目用 grep/coverage/pytest 计数，不靠人工判断
+2. **诚实优先**：阈值故意定高（核心覆盖率 ≥ 95% 而非 ≥ 80%），不达就 fail
+3. **零回归**：同时检查 v1/v2/v3 rubric 不能回归，保证向前没有性能/算法/复现退化
+4. **CI 集成**：`.github/workflows/test.yml` 把 test_agent 作为独立 step，rubric ≥ 99 才放行 release
+
+调用：
+
+```bash
+python scripts/test_agent.py                    # 跑完整 rubric
+cat tests/v4_scorecard.json | jq '.total_earned'  # 当前分数
+```
+
+详 D022 / D023 / D024。
+
+### 12.7 v4 永久红线（重申 + 增量）
+
+- 运行时仅依赖 NumPy（pyamg / scipy / meshio / matplotlib 全部 optional）
+- 无 GUI / 无 cloud / 无 full-3D / 无 commercial CAE 求解器
+- 失败仍单行 stderr + 状态码字符串（v1 红线，v4 不破）
+- 测试 agent 的评分必须诚实——v3 不能因为 v4 蓝图变化就回归
+
+---
+
+## 13. v4.0 已知限制
+
+- 仍 2D（3D 永久红线）
+- 矩阵自由 CG 暂无前置条件（朴素 Jacobi），AMG 路径走 sparse 装配
+- BESO-on-triangle 不带 stress adjoint（与 D008 一致 defer）
+- 1000×1000 网格 dense 路径需要 ≥ 30 GB 内存，必须走 `sparse` / `amg` 后端
+- pyamg 与 scipy 是 optional dep；不装时 `solver.backend="amg"` 报错列出可用后端
+- LLM / AI 顾问能力 not in scope（永久红线）
+
+详 ADR D017-D024 各自的 "Reopening criteria" 节。

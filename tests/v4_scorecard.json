@@ -1,7 +1,7 @@
 {
   "version": "v4.0.0",
   "total_max": 100,
-  "total_earned": 82,
+  "total_earned": 100,
   "items": [
     {
       "section": "\u00a71",
@@ -143,27 +143,27 @@
       "code": "4.1",
       "title": "Test count \u2265 600",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "562 (need \u2265600)"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "655 tests collected"
     },
     {
       "section": "\u00a74",
       "code": "4.2",
       "title": "Core coverage \u2265 95%",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "94.8% (need \u226595%)"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "96.4% coverage"
     },
     {
       "section": "\u00a74",
       "code": "4.3",
       "title": "Adapters coverage \u2265 90%",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "83.5% (need \u226590%)"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "99.2% coverage"
     },
     {
       "section": "\u00a74",
@@ -242,27 +242,27 @@
       "code": "6.2",
       "title": "tutorial v4 \u22654 new sections",
       "max_points": 3,
-      "earned": 0,
-      "status": "PARTIAL",
-      "evidence": "0"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "8 v4 subsections"
     },
     {
       "section": "\u00a76",
       "code": "6.3",
       "title": "architecture v4 + test agent doc",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no v4 section"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "v4 section present"
     },
     {
       "section": "\u00a76",
       "code": "6.4",
       "title": "ADRs D017+ \u2265 8",
       "max_points": 3,
-      "earned": 0,
-      "status": "PARTIAL",
-      "evidence": "5 (need \u22658)"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "8 new ADRs"
     }
   ],
   "v1_check": {

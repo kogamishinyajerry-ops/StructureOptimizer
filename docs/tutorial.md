@@ -410,12 +410,130 @@ python scripts/generate_fingerprints.py
 
 ---
 
-## 10. 下一步
+## 10. v4.x 新能力（v3.1 → v4.0）
 
-- `docs/architecture.md` — 模块边界、永久红线、扩展点（含 v3.x 抽象）
-- `docs/quality-rubric.md` / `quality-rubric-v2.md` / `quality-rubric-v3.md` — 质量评分体系三代
-- `CHANGELOG.md` — v0.1 → v3.0 完整版本历史
+> v4 阶段完整蓝图见 `docs/blueprint-v4.md` 与 `docs/quality-rubric-v4.md`（100 分制，目标 ≥ 99）。
+> 实施记录见 ADR `D017-D024`。
+
+### 10.1 MMA 优化器 + Augmented Lagrangian（Wave S，D017）
+
+OC update（之前 v0.x..v3.x 默认）在多约束、应力约束、非凸问题上收敛差。
+**Method of Moving Asymptotes (Svanberg 1987)** 用渐进可移动的凸近似在每个迭代构造子问题，
+通过对偶分解高效解 m 个对偶变量；**Augmented Lagrangian (Powell-Hestenes)** 把应力约束作为乘子项
+加入目标函数，避免内罚法的病态条件数。
+
+最小用法（API）：
+
+```python
+from structure_optimizer.core.simp_mma import run_simp_with_mma
+from structure_optimizer.benchmarks.registry import load_benchmark
+from structure_optimizer.core.mesh import create_structured_mesh
+
+config = load_benchmark("stress_multi_load_bracket", preset="smoke")
+mesh = create_structured_mesh(config)
+result = run_simp_with_mma(config, mesh)  # MMA + AL stress
+print(result.metrics[-1].compliance, result.metrics[-1].stress_max)
+```
+
+对照：`run_simp(...)` 是 OC + KS/p-norm。MMA 路径在 5-50 倍约束规模下更稳。
+
+### 10.2 三角网格 BESO + 制造投影（Wave T，D018）
+
+BESO（Bidirectional Evolutionary Structural Optimization）原本只支持结构 quad；
+Wave T 把 element-removal 改成基于三角形面积加权的排序，并在三角网格上
+落地 symmetry / extrusion 投影（centroid-based 比较，nearest-neighbour 配对）。
+
+```python
+from structure_optimizer.core.triangle_beso import run_beso_on_triangle_mesh
+from structure_optimizer.adapters.mesh_source import MeshioReader
+
+mesh = MeshioReader().load("my_part.msh")  # 需 pip install structure-optimizer[mesh]
+result = run_beso_on_triangle_mesh(config, mesh)
+```
+
+3 个 triangle benchmark 已 fingerprint 化（`tests/fingerprints/triangle_*.json`）。
+
+### 10.3 屈曲特征值 + Heaviside 三场鲁棒（Wave U，D019）
+
+**屈曲（linear buckling）**: 解 KKₓ φ = λ KG φ 的最小 λ；λ < 1 表示在
+当前载荷下结构会失稳。集成到 SIMP 后可做"屈曲约束 SIMP"。
+
+**Heaviside 三场公式 (Wang/Lazarov/Sigmund 2011)**: ρ → ρ̃ (filter) → η-eroded /
+nominal / dilated 三个投影场；优化目标是 max(C_e, C_n, C_d)，得到的
+拓扑对几何摄动、3D 打印线宽误差鲁棒。
+
+```python
+from structure_optimizer.core.robust import project_robust_fields, HeavisideParams
+from structure_optimizer.core.buckling import linearized_buckling
+
+fields = project_robust_fields(rho, eta_eroded=0.75, eta_dilated=0.25, beta=10.0)
+lam_min = linearized_buckling(config, mesh, rho).min_eigenvalue
+```
+
+### 10.4 Bayesian 优化 + 自动加密 + 对比报告 + CLI 增强（Wave V，D020）
+
+- `core.bayesian_opt.bayes_optimize`: EI 采集函数 + GP（NumPy 实现，零依赖）
+  用于搜索 `volume_fraction` / `filter_radius` 等超参数
+- `core.refinement.refine_loop`: 在感兴趣区域自动局部加密网格，闭合 D010
+- `core.compare.render_side_by_side`: 两个 OptimizationResult 并排 HTML 对比
+- `cli.cli_red/green/yellow` + `diagnose_error`: ANSI 彩色错误诊断（仍保
+  单行 stderr，符合永久红线；`NO_COLOR=1` 关闭）
+
+### 10.5 AMG 预条件 + 矩阵自由 CG + 1000×1000 网格（Wave W，D021）
+
+**AMG（Algebraic MultiGrid）**: `pip install structure-optimizer[amg]` 启用
+pyamg-preconditioned CG，对刚度矩阵的迭代次数从 1000+ 降到 ~50。
+
+**矩阵自由 CG**: `core.matrix_free_cg.matrix_free_cg(...)` 不组装 K，
+按 element-by-element 计算 K·v；内存 O(n_elem) 而非 O(n_elem²)。
+配合 `xlarge_cantilever` benchmark 可在本地跑 1000×1000 ≈ 2M DOFs 网格。
+
+```python
+from structure_optimizer.core.matrix_free_cg import matrix_free_cg
+u_free = matrix_free_cg(config, mesh, densities, rhs_free, tolerance=1e-8)
+```
+
+### 10.6 突变测试 + 漂移检测 + 指纹库扩充（Wave W 续，D021）
+
+- `scripts/run_mutation_test.py`: 4 个标准变异算子 × 3 个核心模块；
+  当前杀伤率 ≥ 70%（rubric §3.3）
+- `scripts/drift_check.py`: 把当前代码的 benchmark 输出哈希 vs `tests/fingerprints/`
+  里的历史指纹比对；CI 早期预警意外的算法漂移
+- `tests/fingerprints/` 已扩充到 ≥ 20 quad + ≥ 3 triangle 指纹
+
+### 10.7 测试 agent + v4 评分体系（D022-D024）
+
+`scripts/test_agent.py` 是 v4 阶段引入的**独立机械验证器**：扫 100 分制
+rubric 的 23 个条目（算法 30 + 性能 15 + 复现 15 + 工程质量 20 + 用户面 10 + 文档 10），
+逐项输出 PASS/PARTIAL/FAIL + 证据，并把分数写入 `tests/v4_scorecard.json`。
+评分故意"客观高于乐观"：若 `core` 覆盖率 < 95% 就 fail，不放水。
+
+```bash
+python scripts/test_agent.py        # 跑完整 rubric
+cat tests/v4_scorecard.json | jq .   # 机器可读评分
+```
+
+测试 agent 同时检查 v1/v2/v3 旧 rubric **不能回归**，保证向前没有
+性能/算法/复现退化。
+
+---
+
+## 11. 下一步
+
+- `docs/architecture.md` — 模块边界、永久红线、扩展点（含 v3.x/v4.x 抽象）
+- `docs/quality-rubric.md` / `quality-rubric-v2.md` / `quality-rubric-v3.md` / `quality-rubric-v4.md` — 质量评分体系四代
+- `CHANGELOG.md` — v0.1 → v4.0 完整版本历史
 - `README.md` — CLI 完整表 + 已知限制
+- `scripts/test_agent.py` — 自动跑 100 分制 rubric
+
+### 11.1 v4 阶段的永久红线（不变）
+
+v4 没有放松任何 v1-v3 已建立的红线：
+- 无 CAD / GUI / cloud / full-3D / commercial 求解器
+- 运行时 mandatory deps 仍仅 `numpy`（scipy / pyamg / meshio / matplotlib 全部 optional）
+- 本地可跑 — `pytest -q` 不依赖网络
+- 失败仍单行 stderr + 状态码字符串（不抛 traceback）
+- 自我贬低优先于自我吹嘘（rubric 评分诚实优先）
 
 如果 `verification.json` 出现 `volume_constraint_failed` / `connectivity_failed` 之类的失败状态，先看 `report.md` 的诊断段落。
 
