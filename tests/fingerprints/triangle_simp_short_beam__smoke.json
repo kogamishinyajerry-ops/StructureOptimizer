@@ -1,0 +1,22 @@
+{
+  "benchmark": "triangle_simp_short_beam",
+  "densities_first_8": [
+    "1.0",
+    "1.0",
+    "0.4029328455163068",
+    "0.26060076224947165",
+    "0.00865237413813027",
+    "0.001",
+    "0.001",
+    "0.001"
+  ],
+  "density_sha256": "sha256:7e8804d23628153cfe42a145dcb174f7b479f50b538c0e2e028d4407b825a7d2",
+  "n_elements": 128,
+  "preset": "smoke",
+  "scalar_sha256": "sha256:56f28ab3259df2be5a1facf97332ef2f2c5f28f8f5b013c4f86141dd10afec01",
+  "scalars": {
+    "baseline_compliance": "3.2861170102352943",
+    "final_compliance": "4.285504488706135",
+    "final_max_disp": "4.2890692935811785"
+  }
+}

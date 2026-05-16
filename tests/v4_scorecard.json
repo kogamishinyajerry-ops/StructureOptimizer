@@ -1,7 +1,7 @@
 {
   "version": "v4.0.0",
   "total_max": 100,
-  "total_earned": 27,
+  "total_earned": 37,
   "items": [
     {
       "section": "\u00a71",
@@ -26,18 +26,18 @@
       "code": "1.3",
       "title": "BESO-on-triangle",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/triangle_beso.py missing"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "core/triangle_beso.py present"
     },
     {
       "section": "\u00a71",
       "code": "1.4",
       "title": "Triangle manufacturing",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/triangle_manufacturing.py missing"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "core/triangle_manufacturing.py present"
     },
     {
       "section": "\u00a71",
@@ -100,16 +100,16 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "8 fingerprints (need \u226520)"
+      "evidence": "11 fingerprints (need \u226520)"
     },
     {
       "section": "\u00a73",
       "code": "3.2",
       "title": "Triangle fingerprints \u2265 3",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "0 (need \u22653)"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "6 triangle fingerprints"
     },
     {
       "section": "\u00a73",
@@ -145,7 +145,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "438 (need \u2265600)"
+      "evidence": "457 (need \u2265600)"
     },
     {
       "section": "\u00a74",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "94.6% (need \u226595%)"
+      "evidence": "94.5% (need \u226595%)"
     },
     {
       "section": "\u00a74",
@@ -262,7 +262,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "1 (need \u22658)"
+      "evidence": "2 (need \u22658)"
     }
   ],
   "v1_check": {

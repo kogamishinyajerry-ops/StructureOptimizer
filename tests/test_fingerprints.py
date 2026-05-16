@@ -37,7 +37,8 @@ TOLERANCE = 1e-9
 
 
 def _all_fingerprints() -> list[Path]:
-    return sorted(FINGERPRINT_DIR.glob("*.json"))
+    """Only quad-path fingerprints — triangle ones live in test_triangle_fingerprints.py."""
+    return sorted(p for p in FINGERPRINT_DIR.glob("*.json") if not p.name.startswith("triangle_"))
 
 
 def _density_sha256(densities: np.ndarray) -> str:

@@ -1,0 +1,22 @@
+{
+  "benchmark": "triangle_simp_cantilever",
+  "densities_first_8": [
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "0.7421385083284775",
+    "0.9556621042206818",
+    "0.7406310283734835"
+  ],
+  "density_sha256": "sha256:5cccf9e6a49e1c1dc37cfcdd52648b663143c26888da3178af8f48b6791e64ec",
+  "n_elements": 144,
+  "preset": "smoke",
+  "scalar_sha256": "sha256:2766da1a45650089a175c63cc0b330da69408fa65c7e4c24cf748c4cbe75baa9",
+  "scalars": {
+    "baseline_compliance": "35.09197985742824",
+    "final_compliance": "138.18284250990945",
+    "final_max_disp": "140.68904985976735"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "benchmark": "triangle_beso_cantilever",
+  "densities_first_8": [
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0",
+    "1.0"
+  ],
+  "density_sha256": "sha256:b7f73653af68fd87a99225f3a210552230f0b11edfb4963aa027fb18d9cffc9e",
+  "n_elements": 144,
+  "preset": "smoke",
+  "scalar_sha256": "sha256:74884917d46e5b4a709585d2cad174a4a7db8d67c20eaf46817df3c8e76bbe6e",
+  "scalars": {
+    "baseline_compliance": "35.09197985742824",
+    "final_compliance": "4643.883768988577",
+    "final_volume_frac": "0.40337499999999993"
+  }
+}
