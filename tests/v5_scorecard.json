@@ -1,16 +1,16 @@
 {
   "version": "v5.0.0",
   "total_max": 100,
-  "total_earned": 17,
+  "total_earned": 23,
   "items": [
     {
       "section": "\u00a71",
       "code": "1.1",
       "title": "\u70ed\u4f20\u5bfc TO (thermal SIMP)",
       "max_points": 6,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "thermal modules missing"
+      "earned": 6,
+      "status": "PASS",
+      "evidence": "thermal_simp + thermal modules present + test"
     },
     {
       "section": "\u00a71",
@@ -64,7 +64,7 @@
       "max_points": 4,
       "earned": 4,
       "status": "PASS",
-      "evidence": "6 analytical thermal refs"
+      "evidence": "12 analytical thermal refs"
     },
     {
       "section": "\u00a72",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "655 (need \u2265750)"
+      "evidence": "684 (need \u2265750)"
     },
     {
       "section": "\u00a74",
@@ -172,7 +172,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "16 (need \u226525)"
+      "evidence": "21 (need \u226525)"
     },
     {
       "section": "\u00a74",
@@ -190,7 +190,7 @@
       "max_points": 2,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "20 (need \u226525)"
+      "evidence": "21 (need \u226525)"
     },
     {
       "section": "\u00a74",
@@ -280,7 +280,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "0 (need \u22658)"
+      "evidence": "1 (need \u22658)"
     }
   ],
   "v1_check": {

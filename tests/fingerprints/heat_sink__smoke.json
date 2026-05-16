@@ -1,0 +1,21 @@
+{
+  "benchmark": "heat_sink",
+  "preset": "smoke",
+  "rubric_version": "v5.0-wave-Y",
+  "density_sha256": "sha256:44fe881260fff0d309572bf4168e8f10ec6679322459b4de363becb86d065afb",
+  "n_elements": 256,
+  "densities_first_8": [
+    "0.00100000000000000002",
+    "0.00100000000000000002",
+    "0.00111512334673914996",
+    "0.0485279668558400365",
+    "0.43361789179669058",
+    "1",
+    "1",
+    "1"
+  ],
+  "final_thermal_compliance": 5052.935371495912,
+  "final_max_temperature": 5.052935371495913,
+  "final_volume_fraction": 0.3999977388023306,
+  "iteration_count": 6
+}

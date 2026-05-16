@@ -70,6 +70,7 @@ class StructuredMesh:
             "bottom_right": [self.node_id(self.nelx, 0)],
             "top_left": [self.node_id(0, self.nely)],
             "top_right": [self.node_id(self.nelx, self.nely)],
+            "center": [self.node_id(mid_x, mid_y)],
         }
         if selector not in selectors:
             raise ConfigError(f"unknown mesh selector '{selector}'")
