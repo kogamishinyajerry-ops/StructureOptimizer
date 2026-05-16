@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -11,6 +12,63 @@ from structure_optimizer.core.reporting import generate_report
 from structure_optimizer.core.study import run_study
 from structure_optimizer.core.verification import FAILURE_STATUSES, PASS_STATUS, verify_run
 from structure_optimizer.core.workflow import run_benchmark
+
+
+# Wave V: ANSI color hooks for CLI output.
+# Auto-disabled when stdout is not a TTY (so piping / capture remain plain
+# text) and when the standard NO_COLOR env var is set
+# (https://no-color.org/). Set FORCE_COLOR=1 to override.
+def _color_supported() -> bool:
+    if os.environ.get("NO_COLOR"):
+        return False
+    if os.environ.get("FORCE_COLOR"):
+        return True
+    return sys.stdout.isatty()
+
+
+_COLOR_ENABLED = _color_supported()
+
+
+def _color(text: str, code: str) -> str:
+    """Wrap ``text`` in ANSI escape if color is enabled."""
+    if not _COLOR_ENABLED:
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+
+def cli_red(text: str) -> str:
+    """Wave V: ANSI red for errors / failure markers."""
+    return _color(text, "31")
+
+
+def cli_green(text: str) -> str:
+    """Wave V: ANSI green for success / pass markers."""
+    return _color(text, "32")
+
+
+def cli_yellow(text: str) -> str:
+    """Wave V: ANSI yellow for warnings / caveats."""
+    return _color(text, "33")
+
+
+def diagnose_error(exc: Exception) -> str:
+    """Wave V: turn a caught exception into a more actionable hint.
+
+    Returns the original error text plus, when the exception type is
+    one we recognize, a one-line suggestion.
+    """
+    msg = str(exc)
+    hint = ""
+    name = type(exc).__name__
+    if name == "ConfigError":
+        hint = "  hint: check `docs/blueprint-v4.md` or run `structopt help` for valid config schema."
+    elif "No module named" in msg:
+        hint = "  hint: install optional dep with `pip install scipy` (or the missing package)."
+    elif "all degrees of freedom are fixed" in msg:
+        hint = "  hint: at least one DOF must be free; reduce the `boundary_conditions` extent."
+    elif "stress_constraint" in msg.lower():
+        hint = "  hint: set `stress_constraint.enabled = true` in your benchmark config."
+    return f"{cli_red('error:')} {msg}" + (f"\n{cli_yellow(hint)}" if hint else "")
 
 
 def _package_version() -> str:
@@ -192,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
             print(out_path)
             return 0
     except Exception as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(diagnose_error(exc), file=sys.stderr)
         return 1
     parser.error("unknown command")
     return 2

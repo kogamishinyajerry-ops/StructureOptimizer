@@ -1,7 +1,7 @@
 {
   "version": "v4.0.0",
   "total_max": 100,
-  "total_earned": 44,
+  "total_earned": 54,
   "items": [
     {
       "section": "\u00a71",
@@ -145,7 +145,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "476 (need \u2265600)"
+      "evidence": "512 (need \u2265600)"
     },
     {
       "section": "\u00a74",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "94.6% (need \u226595%)"
+      "evidence": "94.8% (need \u226595%)"
     },
     {
       "section": "\u00a74",
@@ -197,36 +197,36 @@
       "code": "5.1",
       "title": "Bayesian opt driver",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/bayesian_opt.py missing"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "core/bayesian_opt.py present"
     },
     {
       "section": "\u00a75",
       "code": "5.2",
       "title": "Auto-refinement loop",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/refinement.py missing"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "core/refinement.py present"
     },
     {
       "section": "\u00a75",
       "code": "5.3",
       "title": "Comparative HTML report",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "core/compare.py missing"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "core/compare.py present"
     },
     {
       "section": "\u00a75",
       "code": "5.4",
       "title": "CLI color + diagnostics",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no color hooks in cli.py"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "CLI color codes present"
     },
     {
       "section": "\u00a76",
@@ -262,7 +262,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "3 (need \u22658)"
+      "evidence": "4 (need \u22658)"
     }
   ],
   "v1_check": {
