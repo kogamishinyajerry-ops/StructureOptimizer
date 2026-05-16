@@ -1,0 +1,43 @@
+{
+  "name": "vibrating_beam",
+  "dimension": "2d",
+  "units": "mm_N_MPa",
+  "thickness": 1.0,
+  "mesh": {
+    "type": "structured_quad",
+    "nelx": 50,
+    "nely": 10,
+    "width": 50.0,
+    "height": 10.0
+  },
+  "material": {
+    "young_modulus": 210000.0,
+    "poisson_ratio": 0.3,
+    "density": 7.85e-9
+  },
+  "boundary_conditions": [
+    {"selector": "left_edge", "components": ["ux", "uy"]}
+  ],
+  "loads": [
+    {"selector": "right_mid", "fx": 0.0, "fy": -1.0}
+  ],
+  "optimization": {
+    "objective": "min_compliance",
+    "volume_fraction": 0.5,
+    "penalty": 3.0,
+    "filter_radius": 1.5,
+    "max_iterations": 20,
+    "min_iterations": 4,
+    "change_tolerance": 0.01,
+    "min_density": 0.001
+  },
+  "solver": {
+    "backend": "dense"
+  },
+  "presets": {
+    "smoke": {
+      "mesh": {"nelx": 20, "nely": 4, "width": 20.0, "height": 4.0},
+      "optimization": {"max_iterations": 6, "min_iterations": 6}
+    }
+  }
+}

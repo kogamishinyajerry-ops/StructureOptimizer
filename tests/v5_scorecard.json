@@ -1,7 +1,7 @@
 {
   "version": "v5.0.0",
   "total_max": 100,
-  "total_earned": 23,
+  "total_earned": 42,
   "items": [
     {
       "section": "\u00a71",
@@ -17,9 +17,9 @@
       "code": "1.2",
       "title": "\u6a21\u6001 / \u7279\u5f81\u9891\u7387 TO",
       "max_points": 6,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "modal module missing"
+      "earned": 6,
+      "status": "PASS",
+      "evidence": "core/modal.py + eigenvalue test"
     },
     {
       "section": "\u00a71",
@@ -53,9 +53,9 @@
       "code": "1.6",
       "title": "\u9891\u54cd / harmonic-driven TO",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "freq_response module missing"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "freq_response module + test"
     },
     {
       "section": "\u00a72",
@@ -64,16 +64,16 @@
       "max_points": 4,
       "earned": 4,
       "status": "PASS",
-      "evidence": "12 analytical thermal refs"
+      "evidence": "13 analytical thermal refs"
     },
     {
       "section": "\u00a72",
       "code": "2.2",
       "title": "Euler-Bernoulli \u6a21\u6001\u9891\u7387\u6821\u9a8c",
       "max_points": 4,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no EB modal test"
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "1 EB modal refs"
     },
     {
       "section": "\u00a72",
@@ -89,9 +89,9 @@
       "code": "2.4",
       "title": "Mass matrix lumped vs consistent",
       "max_points": 2,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "no mass-consistency test"
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "2 mass-consistency refs"
     },
     {
       "section": "\u00a72",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 0,
       "status": "FAIL",
-      "evidence": "684 (need \u2265750)"
+      "evidence": "713 (need \u2265750)"
     },
     {
       "section": "\u00a74",
@@ -163,16 +163,16 @@
       "max_points": 4,
       "earned": 4,
       "status": "PASS",
-      "evidence": "96.4% coverage"
+      "evidence": "96.2% coverage"
     },
     {
       "section": "\u00a74",
       "code": "4.3",
       "title": "Property tests \u2265 25",
       "max_points": 3,
-      "earned": 0,
-      "status": "FAIL",
-      "evidence": "21 (need \u226525)"
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "25 property tests"
     },
     {
       "section": "\u00a74",
@@ -280,7 +280,7 @@
       "max_points": 3,
       "earned": 0,
       "status": "PARTIAL",
-      "evidence": "1 (need \u22658)"
+      "evidence": "2 (need \u22658)"
     }
   ],
   "v1_check": {
