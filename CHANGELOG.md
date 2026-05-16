@@ -8,13 +8,67 @@
 
 ## [Unreleased]
 
-### Planned (post v2.1.0 · v3 roadmap waves M–R)
-- M 波：SIMP-on-triangle 完整实装（填 D005 留白） → v2.2.0
+### Planned (post v2.2.0 · v3 roadmap waves N–R)
 - N 波：500×500 网格 + incremental sparse assembly + 多进程 study → v2.3.0
 - O 波：DOE study runner（LHS + Sobol）+ design lineage tree → v2.4.0
 - P 波：跨平台 bit-reproducibility + fingerprint DB → v2.5.0
 - Q 波：Jupyter rich display + interactive review HTML 升级 → v2.6.0
-- R 波：v3.0 final 收口（tutorial v3 + architecture v3 + ADR D008-D016+ + rubric ≥95） → v3.0.0
+- R 波：v3.0 final 收口（tutorial v3 + architecture v3 + ADR D009-D016+ + rubric ≥95） → v3.0.0
+
+---
+
+## [2.2.0] — 2026-05-16
+
+### M 波：SIMP-on-triangle（填 D005 留白）
+
+v3 大阶段第二波。v1.9 时 triangle mesh + CST + linear-elastic 已存在，但 SIMP 主循环还是 quad-only；本波让 SIMP 真正跑在三角网格上。
+
+### Added
+- **`structure_optimizer/core/triangle_filter.py`** (NEW) — centroid 距离 Sigmund 灵敏度过滤器（mesh-agnostic）
+- **`structure_optimizer/core/triangle_simp.py`** (NEW, 268 LOC)
+  - `run_simp_triangle(...)` — 三角网格 SIMP 主循环
+  - `TriangleIterationMetric` / `TriangleOptimizationResult` 数据类
+  - `split_quad_to_triangles(nelx, nely, width, height)` — 把结构化 quad 网格按对角线劈成 2 个 CCW 三角形（用于 quad vs triangle 对比 + 用户简易三角化矩形域）
+- **`docs/decisions/D008-simp-on-triangle-implementation.md`** — 设计 rationale + D005 留白闭合说明 + Wave-L 适配 / manufacturing projection / BESO-on-triangle 等显式 deferred 项的边界
+- **`tests/test_triangle_simp.py`** (NEW, 17 测试)
+  - `TriangleMesh` 默认 masks (all-design / none-frozen / none-void)
+  - centroid 过滤器：constant input / self-only / pairwise sanity
+  - `split_quad_to_triangles`: 计数 + CCW 朝向
+  - SIMP loop：compliance 下降 / 体积约束 ±5% / frozen_solid 保 1.0 / void 保 min_density / sparse vs dense 数值一致 / stop reason / 全 DOF 固定 raise
+  - **`test_triangle_simp_qualitatively_matches_quad_simp_cantilever`** — quad/triangle SIMP 在同一 cantilever 域上，最终体积分数都在目标 ±10% 以内
+
+### Changed
+- `structure_optimizer/core/triangle.py` — `TriangleMesh` 加 `design_mask` / `frozen_solid_mask` / `void_mask` (可选字段，`__post_init__` 自动填默认)；新增 `element_centroid` / `element_centroids`。**向后兼容**：v1.9 的 `TriangleMesh(nodes=..., elements=...)` 调用不变
+- `pyproject.toml` version: 2.1.0 → 2.2.0
+
+### v3.x rubric 评分（M 波贡献）
+- **1.2 SIMP-on-triangle 完整实装 + benchmark**: +8
+  - `core/triangle_simp.py` 含 SIMP 主循环 ✓
+  - triangle 上跑通的 benchmark（split_quad_to_triangles + cantilever-like setup）✓
+  - quad vs triangle parity 测试：两种网格在同一 cantilever 域上都收敛到 vf=0.45 ±10% ✓
+- **4.2 core 覆盖率 ≥92%**（当前 **94.4%**）：✅（triangle_simp.py 100%，triangle_filter.py 100%）
+- **7.3 v2.x rubric 不回退（≥95）**：v2.0.0-final 仍 97/100 ✅
+- **7.4 v1.x rubric 不回退（100）**：v1.4.0 134 测试全绿 ✅
+
+**v3.x 累计：8 → 16/100**（L+M 两波拿下算法深度 25 分中的 16）
+
+### 不拿分项（诚实记录）
+- **1.4 algorithm × mesh × backend 矩阵全跑通**（4 分）：仍差 BESO-on-triangle；只有 SIMP-on-triangle 完成。会在后续波次或 R 波 final 补
+- **stress adjoint × triangle 组合**：Wave-L adjoint 仍 quad-only（`_strain_displacement_matrix` 用 grid 宽高）。Triangle 版本数学可推但 ~150 LOC，超出 M 波 scope，已在 D008 显式 defer 到 v3.x+
+- triangle 路径无 manufacturing projections（overhang 等本质 grid-aligned）—— D005 既有限定保持，D008 重申
+- triangle 路径无 CLI `--algorithm triangle_simp` 集成 —— 当前 Python API only
+
+### 工程卫生
+- ruff check ✓
+- ruff format ✓
+- mypy ✓（triangle_simp.py 无 type:ignore；stiffness 用 Any 类型避开 dense/sparse 二分类型问题）
+- pytest 296 全绿（v1: 134 + v2: 130 + L: 15 + M: 17 = 296），17.7 秒
+- core coverage **94.4%**（v3 rubric 阈值 92%）✓
+- 新模块覆盖：triangle_simp.py 100% / triangle_filter.py 100% / triangle.py 99.2%
+
+### Wave M 自我反省（test-failure-driven 发现）
+1. **`test_centroid_filter_large_radius_averages_all`** 第一版断言"大 radius 下所有 element 应输出相同常数"——错。Sigmund 公式只在 sensitivity 也是常数时才输出常数；不同位置的元素 weight sum 不同，输出本就不必相同。改成 "constant sensitivity input → constant output" 测试公式自一致性。
+2. **`test_triangle_simp_qualitatively_matches_quad_simp_cantilever`** 第一版用 force=-1.0 → 三角网格 vf 漂到 0.28（远低于 0.45 目标）。原因：极小 force → strain energy ~1e-20 → sensitivity ~1e-20 → OC bisection 初始区间 [0, 1e9] 无法 navigate（`-sens/midpoint` 全部下溢到无穷小）。**Fix**：用 cantilever config 实际载荷 `-800.0 N`。已在 D008 文档化此约束（不是 triangle 特有，quad SIMP 同样如此，只是 benchmark 默认使用物理量纲所以没碰到）。
 
 ---
 

@@ -83,18 +83,29 @@ def triangle_stiffness(
 
 @dataclass(frozen=True)
 class TriangleMesh:
-    """Unstructured 2D triangle mesh — minimal geometry-only container.
+    """Unstructured 2D triangle mesh container.
 
-    ``nodes``: (n_nodes, 2) float array of (x, y) per node.
-    ``elements``: (n_elem, 3) int array of node-id triplets per triangle.
-
-    No design_mask / void_mask / frozen_solid yet — those plug in only when
-    SIMP-on-triangles is added in a future wave. For v1.9 the use case is
-    "import external mesh, solve linear elastic, get compliance for analysis".
+    Required: ``nodes`` (n_nodes, 2) + ``elements`` (n_elem, 3).
+    Optional design-space masks (default: all-design, none frozen, none void)
+    are populated in ``__post_init__`` so existing v1.9 callers
+    (``TriangleMesh(nodes=..., elements=...)``) keep working unchanged while
+    Wave M's SIMP-on-triangle path can pin elements as solid/void.
     """
 
     nodes: np.ndarray
     elements: np.ndarray
+    design_mask: np.ndarray | None = None
+    frozen_solid_mask: np.ndarray | None = None
+    void_mask: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        n_elem = int(self.elements.shape[0])
+        if self.design_mask is None:
+            object.__setattr__(self, "design_mask", np.ones(n_elem, dtype=bool))
+        if self.frozen_solid_mask is None:
+            object.__setattr__(self, "frozen_solid_mask", np.zeros(n_elem, dtype=bool))
+        if self.void_mask is None:
+            object.__setattr__(self, "void_mask", np.zeros(n_elem, dtype=bool))
 
     @property
     def n_nodes(self) -> int:
@@ -122,6 +133,15 @@ class TriangleMesh:
         x = coords[:, 0]
         y = coords[:, 1]
         return float(abs(x[0] * (y[1] - y[2]) + x[1] * (y[2] - y[0]) + x[2] * (y[0] - y[1])) * 0.5)
+
+    def element_centroid(self, element_id: int) -> np.ndarray:
+        """Centroid (x, y) of one triangle."""
+        return self.nodes[self.elements[element_id]].mean(axis=0)
+
+    @property
+    def element_centroids(self) -> np.ndarray:
+        """(n_elem, 2) array of triangle centroids."""
+        return self.nodes[self.elements].mean(axis=1)
 
     def select_nodes_in_box(
         self,

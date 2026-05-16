@@ -97,6 +97,7 @@
 |---|---:|---|---|
 | v2.0.0-final (baseline) | 0/100 | v3 维度全空（无 adjoint / SIMP-tri / 大网格 / DOE / lineage / 跨平台 / Jupyter） | v3 roadmap 已签发；v2.x rubric 97/100；v1.x rubric 100/100 |
 | v2.1.0 (Wave L) | 8/100 | 仅 1.1 + 4.2 + 7.3/7.4 — M/N/O/P/Q/R 全未启动 | adjoint method 集成 SIMP；FD ratio = 1.000；σ_PN 真实下降；279 测试全绿；core 93.9%；v1/v2 rubric 无回退 |
+| v2.2.0 (Wave M) | 16/100 | 算法深度 25 仅得 16；性能 / 可复现 / 用户面 / 文档主要分项未启动 | SIMP-on-triangle 完整实装（填 D005 留白）；quad/triangle parity 测试通过；296 测试全绿；core 94.4%；triangle 路径无 CLI / 无 stress adjoint / 无 BESO（显式 D008 defer） |
 
 （每波结束后追加一行）
 
