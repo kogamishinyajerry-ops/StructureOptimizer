@@ -751,6 +751,30 @@ front = nsga3(eval_fn, n_vars=6, bounds_lower=np.zeros(6), bounds_upper=np.ones(
 **定量校验**：在 DTLZ2 基准上（真前沿 = 单位球卦限 Σf²=1）演化前沿收敛到该球面，
 且按目标维均匀展开（非塌缩）。SBX 交叉 / 多项式变异 / 非支配排序与 NSGA-II 共享。
 
+### 16.5 FORM/SORM + 重要性采样可靠度（Wave II，D038）
+
+v5 的 `monte_carlo_uq` 是粗 Monte Carlo：估计失效概率 P_f 需要 O(1/P_f) 样本才能
+看到一个尾部事件——P_f≈1e-4 时几乎不可行。v6 加结构可靠度方法（标准正态 U 空间，
+失效 = `{g(u) ≤ 0}`，原点假定安全）：
+
+```python
+import numpy as np
+from structure_optimizer.core.reliability import (
+    form_hlrf, sorm_breitung, importance_sampling, standardize_gaussian)
+
+# 物理高斯变量 → 标准正态：u = (x − μ)/σ
+a = np.array([3.0, 4.0])                       # 线性极限态 g(u) = 10 − aᵀu
+g = lambda u: float(10.0 - a @ u)
+form = form_hlrf(g, n_vars=2)                  # β = 10/‖a‖ = 2.0，P_f = Φ(−2)
+sorm = sorm_breitung(g, form)                  # 线性 → 退化为 FORM
+imp  = importance_sampling(g, 2, form.mpp, n_samples=4000)  # 低方差 P_f + cov
+```
+
+**关键升级**：FORM 对线性极限态**解析精确**（β=β₀/‖a‖，一步收敛，机器精度）；
+SORM 用 Breitung 曲率修正 `P_f ≈ Φ(−β)∏(1+βκᵢ)^(−1/2)`，零曲率时退化为 FORM；
+重要性采样把采样密度移到设计点（MPP），尾事件（β=3，P_f≈1.35e-3）下变异系数
+比同样本量的粗 MC 小一个量级以上。Φ 用 `math.erf`，不引入 scipy。
+
 ---
 
 ## 常见错误
