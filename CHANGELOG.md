@@ -8,8 +8,154 @@
 
 ## [Unreleased]
 
-### Planned (post v3.0.0)
-- v4.x roadmap **未签发** — v3.0 是 v3 大阶段的发布点，v4 概念见 `docs/decisions/D016` § "Handoff state to v4.x" 列出的 7 项可选 defer。
+当前发布点 = **v5.0.0**（multi-physics 大阶段收口）。下一个大阶段蓝图未签发；v5+ 可选 defer 项见 `docs/decisions/D032` § "Reopening criteria"（全 Total-Lagrangian Newton / NSGA-III / Rayleigh damping / marching-cubes STL / 各向异性热传导 / FORM 可靠性 / reverse-mode AD）。
+
+---
+
+> **版本 tag 说明（重要，避免误读时序）**：v4 / v5 两个大阶段的**中间 wave 复用了 `3.x` 小版本号**作 checkpoint tag，发布点才跳到 `4.0.0` / `5.0.0`。真实开发时序（新→旧）是：
+> `5.0.0 → 3.10.0 → 3.9.0 → 3.8.0 → 3.7.0 → 3.6.0`（v5 阶段 Wave Y-DD）`→ 4.0.0 → 3.5.0 → 3.4.0 → 3.3.0 → 3.2.0 → 3.1.0`（v4 阶段 Wave S-X）`→ 3.0.0`。
+> 下面条目按此真实时序排列，不按 SemVer 数值大小。每个 wave 配一个 ADR（`docs/decisions/DNNN`）+ test_agent 累计分（绝对诚实自评，机制见 D023）。
+
+---
+
+## [5.0.0] — 2026-05-16
+
+### Wave DD：v5 multi-physics 大阶段收口（test_agent v5 rubric 100/100）
+
+v5 charter：「规划下一个大阶段蓝图，全权开发瞄准蓝图，专门测试 agent + 绝对诚实评分机制，迭代到 ≥99 分」。本波收口同时交付 NSGA-II / STL / autodiff / 热-弹耦合，并把 v5 rubric 从 76 拉到 100。
+
+### Added
+- **`structure_optimizer/core/pareto_nsga.py`** — NSGA-II 双目标 Pareto（SBX crossover + polynomial mutation + 非支配排序 + 拥挤度）+ HTML 渲染
+- **`structure_optimizer/core/stl_export.py`** — 2D voxel → 12-triangle-per-cell ASCII STL 边界导出（3D 打印工程链 ready，voxelized；marching-cubes 留 v6）
+- **`structure_optimizer/core/autodiff.py`** — 纯 NumPy forward-mode AD（`Var` 类）+ central-FD 梯度校验
+- thermo-elastic coupling 测试（`tests/test_thermo_elastic_coupling.py`）
+- benchmark coverage 收口；测试总数提升到 ≥770（实测当前 802 collected）
+- **ADR D030（NSGA-II）/ D031（STL 2D 挤出）/ D032（v5 final scoring + handoff）**
+- 架构 §14.6 + §14.7 + §15 "v5 known limits"
+
+### Honest scope notes
+- v5 是 plateau 不是 peak；保留的 1 分是故意 headroom（防自评 rubric 过拟合，见 D032）
+- geometric-nonlinear / NSGA-II / autodiff 均为**有意简化版**，各自 ADR 的 "Honest scope notes" 列出未实装项
+
+---
+
+## [3.10.0] — 2026-05-16  （v5 阶段 · Wave CC）
+
+### Added — 随机 / 可靠性 SIMP（v5 rubric 59 → 76）
+- **`structure_optimizer/core/stochastic.py`** + **`core/reliability.py`** — 载荷/材料不确定性的 Monte Carlo UQ + 预采样 K 场 worst-case (minimax) SIMP
+- benchmark `uncertain_load_bracket.json`；RNG 走 `default_rng(seed)`，给定 seed + 平台 bit-exact，跨平台不强求
+- ADR D029。仅 Gaussian uncertainty（FORM / SORM / importance sampling 留 v5+）
+
+---
+
+## [3.9.0] — 2026-05-16  （v5 阶段 · Wave BB）
+
+### Added — 多材料 SIMP（v5 rubric 50 → 59）
+- **`structure_optimizer/core/multi_material.py`** — Sigmund-Tortorelli 形式：M 个独立 density field，`E_eff = E_min + Σᵢ ρ_{i,e}^p·(Eᵢ - E_min)`；per-material 体积约束 + per-material OC update
+- benchmark `bimaterial_beam.json`
+- ADR D028。Poisson 比共享（只用 material[0] 的 ν）
+
+---
+
+## [3.8.0] — 2026-05-16  （v5 阶段 · Wave AA）
+
+### Added — 几何非线性 FEM + SIMP（v5 rubric 42 → 50）
+- **`structure_optimizer/core/nonlinear_fem.py`** + **`core/nonlinear_simp.py`** — 简化 Total-Lagrangian Newton-Raphson + 增量加载，复用 v4 `buckling.assemble_geometric_stiffness`
+- benchmark `nonlinear_cantilever.json`；Gere elastica 趋势校验（qualitative，非 bit-exact）
+- ADR D027
+
+---
+
+## [3.7.0] — 2026-05-16  （v5 阶段 · Wave Z）
+
+### Added — 模态 + 频响（v5 rubric 23 → 42）
+- **`structure_optimizer/core/modal.py`** — 广义本征值 K φ = ω² M φ，纯 NumPy Cholesky 变换 + eigh（避 scipy）；consistent + lumped 两种质量阵
+- **`structure_optimizer/core/freq_response.py`** — 频域谐响应 (K - ω²M)u = f，无阻尼（Rayleigh damping 留 v5+）
+- benchmark `vibrating_beam.json`
+- ADR D026。dense eigh，~2000 DOF 上限
+
+---
+
+## [3.6.0] — 2026-05-16  （v5 阶段 · Wave Y）
+
+### Added — 热传导 SIMP（v5 rubric 17 → 23）
+- **`structure_optimizer/core/thermal.py`** + **`core/thermal_simp.py`** — 2D Poisson 热传导，element matrix `Ke = k·t/6·[[4,-1,-2,-1],...]`（Cook 1989 §10.2），DOF/node = 1
+- benchmark `heat_sink.json` + 1D-rod 解析校验
+- ADR D025。仅 scalar conductivity（无各向异性）
+
+### Roadmap commit
+- `v5 roadmap`：blueprint-v5 + multi-physics rubric-v5 + test_agent v5 模式（baseline 17/100）
+
+---
+
+## [4.0.0] — 2026-05-16
+
+### Wave X：v4 大阶段收口（test_agent v4 rubric 99-100/100）
+
+聚焦覆盖率冲刺 + 文档/ADR 收口（前序 S-W 已交付算法/求解器/基础设施）。
+
+### Added
+- 覆盖率测试 `test_adapters_coverage` / `test_config_validation_coverage` / `test_manufacturing_coverage`（+93 测试，总数到 655）；core coverage 94.3% → 95.9%，adapters 83.5% → 99.2%
+- tutorial §10-11（含 7 个 v4 子节）+ 架构 §12-13
+- **ADR D024（v4 final scoring + handoff）**
+- CI 把 `scripts/test_agent.py` 作独立 gate，rubric ≥99 才放行 release
+
+### Honest scope notes
+- 3D / GUI / LLM / 商业 CAE / GPU 全部仍 out of scope（永久红线）
+- optional-dep 路径用 `# pragma: no cover`：装了 scipy+pyamg+meshio 时功能可用且本地测过，但 headline 覆盖率故意按 numpy-only 路径算（诚实低报）
+
+---
+
+## [3.5.0] — 2026-05-16  （v4 阶段 · Wave W）
+
+### Added — AMG + 矩阵自由 CG + 1000×1000 + 突变测试（v4 rubric 54 → 82）
+- **`adapters/solver_base.AMGCGSolver`**（`backend="amg"`，pyamg optional）— O(n) setup，CG 迭代从 1000+ 降到 ~50
+- **`structure_optimizer/core/matrix_free_cg.py`** — element-by-element K·v，内存 O(n_elem)
+- benchmark `xlarge_cantilever.json`（1000×1000 = 2M DOF）
+- **`scripts/run_mutation_test.py`**（4-mutator in-house 突变测试，≥75% kill）+ **`scripts/drift_check.py`** + **`scripts/test_agent.py`**（首次落地）
+- ADR D021 / D022（突变测试哲学）/ D023（test agent + rubric 机制）
+
+---
+
+## [3.4.0] — 2026-05-16  （v4 阶段 · Wave V）
+
+### Added — Bayesian opt + 自动加密 + 对比 + CLI（v4 rubric 44 → 54，§5 = 10/10）
+- **`structure_optimizer/core/bayesian_opt.py`** — 纯 NumPy GP + EI 采集（无 scikit-learn）
+- **`structure_optimizer/core/refinement.py`** — 感兴趣 region 自动局部加密（闭合 D010 留白）
+- **`structure_optimizer/core/compare.py`** — `render_side_by_side` 并排对比 HTML
+- `cli.py` ANSI color helpers + `diagnose_error`（单行 stderr 不破红线，`NO_COLOR=1` 关闭）
+- ADR D020
+
+---
+
+## [3.3.0] — 2026-05-16  （v4 阶段 · Wave U）
+
+### Added — 屈曲 + Heaviside robust（v4 rubric 37 → 44，§1 = 30/30）
+- **`structure_optimizer/core/buckling.py`** — 线性化屈曲 K φ = λ K_G φ 最小本征值（power iteration on K⁻¹K_G）
+- **`structure_optimizer/core/robust.py`** — eroded/nominal/dilated 三场投影 + `heaviside_project` / `_grad`
+- ADR D019
+
+---
+
+## [3.2.0] — 2026-05-16  （v4 阶段 · Wave T）
+
+### Added — Triangle BESO + 三角制造投影（v4 rubric 27 → 37）
+- **`structure_optimizer/core/triangle_beso.py`** — BESO 元素增删按 area-weighted 排序（保证非均匀三角网格体积分数正确）
+- **`structure_optimizer/core/triangle_manufacturing.py`** — centroid-based pairing 制造投影
+- 3 个 triangle benchmark fingerprint 化；ADR D018（填补 D013 defer）
+
+---
+
+## [3.1.0] — 2026-05-16  （v4 阶段 · Wave S）
+
+### Added — MMA + Augmented Lagrangian 应力（v4 rubric 11 → 27）
+- **`structure_optimizer/core/mma.py`** — Method of Moving Asymptotes 一步更新（渐进可移动凸子问题 + 对偶分解）
+- **`structure_optimizer/core/augmented_lagrangian.py`** — Powell-Hestenes 乘子更新，把 m 个不等式约束并入目标
+- **`core/simp_mma.py`**（`run_simp_with_mma`）整合两者作 SIMP 可选 driver；`tests/test_mma_vs_oc.py` 与 OC 对照
+- ADR D017
+
+### Roadmap commit
+- `v4 roadmap`：blueprint-v4 + rubric-v4 + 专门 test agent（baseline 11/100）
 
 ---
 
