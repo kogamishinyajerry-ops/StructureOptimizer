@@ -71,5 +71,13 @@
 - v3 rubric must still be 99/100
 - v2 rubric must still be 97/100
 - v1 rubric must still be 100/100
+- **`pytest -q` must be green** — zero failures, zero errors (skips ok).
+  Recorded as `pytest_check` in the scorecard. Added because the rubric
+  items are static probes (file / grep / collect-count / coverage) that
+  don't run the suite, so a 100/100 rubric could coexist with red pytest
+  (it did — see D033). The gate runs the full suite by default;
+  `--section` / `--no-pytest-gate` skip it for partial / iterative scoring.
 
-Any regression in v1-v4 blocks release, even if v5 = 100.
+Any regression in v1-v4 **or a red pytest suite** blocks release, even if
+v5 = 100. The rubric score and the suite-green signal are independent and
+both required.

@@ -127,7 +127,7 @@
       "max_points": 3,
       "earned": 3,
       "status": "PASS",
-      "evidence": "2 seed-repro refs"
+      "evidence": "3 seed-repro refs"
     },
     {
       "section": "\u00a73",
@@ -154,7 +154,7 @@
       "max_points": 4,
       "earned": 4,
       "status": "PASS",
-      "evidence": "802 tests collected"
+      "evidence": "803 tests collected"
     },
     {
       "section": "\u00a74",
@@ -280,7 +280,7 @@
       "max_points": 3,
       "earned": 3,
       "status": "PASS",
-      "evidence": "8 v5 ADRs"
+      "evidence": "9 v5 ADRs"
     }
   ],
   "v1_check": {
@@ -301,6 +301,15 @@
   "v4_check": {
     "score": 100,
     "max": 100,
+    "regression": false
+  },
+  "pytest_check": {
+    "passed": 799,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 4,
+    "returncode": 0,
+    "green": true,
     "regression": false
   }
 }

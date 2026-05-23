@@ -66,6 +66,7 @@ class Scorecard:
     v2_check: dict = field(default_factory=dict)
     v3_check: dict = field(default_factory=dict)
     v4_check: dict = field(default_factory=dict)
+    pytest_check: dict = field(default_factory=dict)
 
     @property
     def total_max(self) -> int:
@@ -698,6 +699,44 @@ def check_v4_no_regression() -> dict:
     }
 
 
+def check_pytest_green() -> dict:
+    """No-regression gate: the full pytest suite must be green (D033).
+
+    The rubric items are file-presence / coverage / ``--collect-only`` counts —
+    none of them *runs* the suite, so a 100/100 rubric historically coexisted
+    with red pytest (5 v5 multi-physics fingerprint tests crashed undetected,
+    because the rubric only counted the fixture files). This gate executes
+    ``pytest -q`` for real and blocks "release ready" on any failure/error,
+    independent of the 100-point score. It is *not* part of the 100 points.
+
+    Skips are allowed (the slow perf tests are ``--run-slow``-gated). The
+    authoritative signal is the return code; counts are parsed for reporting.
+    """
+    rc, out, err = _run([str(VENV_PYTEST), "-q", "--no-header"])
+    text = out + err
+
+    def _count(pattern: str) -> int:
+        m = re.search(pattern, text)
+        return int(m.group(1)) if m else 0
+
+    failed = _count(r"(\d+) failed")
+    errors = _count(r"(\d+) error")
+    passed = _count(r"(\d+) passed")
+    skipped = _count(r"(\d+) skipped")
+    # pytest return codes: 0 = all passed (skips ok), 1 = failures, 2 = interrupted,
+    # 5 = no tests collected. Anything non-zero is a regression.
+    green = rc == 0 and failed == 0 and errors == 0
+    return {
+        "passed": passed,
+        "failed": failed,
+        "errors": errors,
+        "skipped": skipped,
+        "returncode": rc,
+        "green": green,
+        "regression": not green,
+    }
+
+
 # --- main orchestration -----------------------------------------------
 
 
@@ -805,8 +844,13 @@ def run_v4(section_filter: str | None = None) -> Scorecard:
     return sc
 
 
-def run_all(section_filter: str | None = None, rubric: str = "v5") -> Scorecard:
-    """Score the currently-active rubric. Default = v5 (the latest)."""
+def run_all(section_filter: str | None = None, rubric: str = "v5", run_pytest_gate: bool = True) -> Scorecard:
+    """Score the currently-active rubric. Default = v5 (the latest).
+
+    ``run_pytest_gate`` runs the full suite as a hard-fail no-regression gate
+    (D033). It is skipped for ``--section`` (partial) runs and via
+    ``--no-pytest-gate`` — a partial score shouldn't gate on the whole suite.
+    """
     if rubric == "v4":
         sc = run_v4(section_filter)
     else:
@@ -817,6 +861,8 @@ def run_all(section_filter: str | None = None, rubric: str = "v5") -> Scorecard:
     sc.v3_check = check_v3_no_regression()
     if rubric == "v5":
         sc.v4_check = check_v4_no_regression()
+    if run_pytest_gate:
+        sc.pytest_check = check_pytest_green()
     return sc
 
 
@@ -846,15 +892,25 @@ def print_summary(sc: Scorecard) -> None:
     print(f"  v3 rubric  : {sc.v3_check.get('score')}/100  regression={sc.v3_check.get('regression')}")
     if sc.v4_check:
         print(f"  v4 rubric  : {sc.v4_check.get('score')}/{sc.v4_check.get('max', 100)}  regression={sc.v4_check.get('regression')}")
+    if sc.pytest_check:
+        pc = sc.pytest_check
+        marker = "✓" if pc.get("green") else "✗"
+        print(
+            f"  pytest gate: [{marker}] {pc.get('passed')} passed / {pc.get('failed')} failed / "
+            f"{pc.get('errors')} errors / {pc.get('skipped')} skipped (rc={pc.get('returncode')})"
+        )
 
     regressions = [
         sc.v1_check.get("regression"),
         sc.v2_check.get("regression"),
         sc.v3_check.get("regression"),
         sc.v4_check.get("regression") if sc.v4_check else False,
+        sc.pytest_check.get("regression") if sc.pytest_check else False,
     ]
     if sc.total_earned >= 99 and not any(regressions):
-        print(f"\n✅  {label} rubric ≥ 99/100 AND no regression — release ready.")
+        print(f"\n✅  {label} rubric ≥ 99/100 AND no regression (incl. pytest green) — release ready.")
+    elif sc.total_earned >= 99 and sc.pytest_check.get("regression"):
+        print(f"\n❌  {label} rubric ≥ 99 but pytest is RED — release blocked (D033 gate).")
     elif sc.total_earned >= 80:
         print(f"\n⚠️  {label} progress: not yet 99 (release blocked).")
     else:
@@ -877,9 +933,16 @@ def main() -> int:
     )
     parser.add_argument("--section", default=None, help="only score one section (e.g. §4)")
     parser.add_argument("--quiet", action="store_true", help="suppress human-readable summary")
+    parser.add_argument(
+        "--no-pytest-gate",
+        action="store_true",
+        help="skip the D033 full-suite pytest gate (faster; for iterative scoring only)",
+    )
     args = parser.parse_args()
 
-    sc = run_all(section_filter=args.section, rubric=args.rubric)
+    # The pytest gate runs the whole suite; skip it for partial (--section) scoring.
+    run_pytest_gate = not args.no_pytest_gate and args.section is None
+    sc = run_all(section_filter=args.section, rubric=args.rubric, run_pytest_gate=run_pytest_gate)
     out_default = f"tests/{args.rubric}_scorecard.json"
     out_path = REPO_ROOT / (args.output or out_default)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -894,6 +957,8 @@ def main() -> int:
     }
     if sc.v4_check:
         payload["v4_check"] = sc.v4_check
+    if sc.pytest_check:
+        payload["pytest_check"] = sc.pytest_check
     out_path.write_text(json.dumps(payload, indent=2) + "\n")
 
     if not args.quiet:
@@ -905,6 +970,7 @@ def main() -> int:
                 sc.v2_check.get("regression"),
                 sc.v3_check.get("regression"),
                 sc.v4_check.get("regression") if sc.v4_check else False,
+                sc.pytest_check.get("regression") if sc.pytest_check else False,
             ]
         )
         if sc.total_earned < 99 or regression:
