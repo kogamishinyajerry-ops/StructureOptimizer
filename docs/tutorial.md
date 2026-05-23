@@ -775,6 +775,29 @@ SORM 用 Breitung 曲率修正 `P_f ≈ Φ(−β)∏(1+βκᵢ)^(−1/2)`，零�
 重要性采样把采样密度移到设计点（MPP），尾事件（β=3，P_f≈1.35e-3）下变异系数
 比同样本量的粗 MC 小一个量级以上。Φ 用 `math.erf`，不引入 scipy。
 
+### 16.6 Marching-squares 平滑边界 STL（Wave JJ，D039）
+
+v5 的 `write_stl` 把每个实体格变成轴对齐方盒——边界是阶梯状，面积误差 O(h)。
+v6 加 `write_stl_marching_squares`：用 marching squares 提取密度场的等值线（边上线性
+插值），把拐角削平，光滑场下面积误差降到 O(h²)；闭合轮廓再挤出成棱柱：
+
+```python
+import numpy as np
+from structure_optimizer.core.stl_export import (
+    marching_squares_contours, polygon_area, write_stl_marching_squares)
+
+# 直接对标量场提取等值线（inside = field > level）
+loops = marching_squares_contours(field, x_coords, y_coords, level=0.0)
+area = sum(polygon_area(lp) for lp in loops)          # 各闭合环面积之和
+# 或对优化后的密度场直接写平滑 STL
+info = write_stl_marching_squares(mesh, densities, "out.stl", rho_threshold=0.5)
+```
+
+**关键升级**：对光滑圆盘场，面积误差随 h 减半而**四分之一化**（实测 n=33→257
+误差 1.08e-3→1.6e-5，比率≈0.25 = O(h²)），且各分辨率下都比 voxel 阶梯面积误差小
+约 5 倍；轮廓保证闭合（首点≈末点）。鞍点（case 5/10）用格心值消歧。仍是 2.5D 挤出，
+不引入 3D 求解。
+
 ---
 
 ## 常见错误

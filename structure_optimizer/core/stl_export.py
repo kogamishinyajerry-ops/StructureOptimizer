@@ -13,18 +13,21 @@ tool). Binary STL is more compact but adds a dep on struct-packing
 fixed widths; v5+ option.
 
 Limitations:
-- Output is voxelized — each density cell becomes an axis-aligned box.
-  Marching-cubes-style isocontour extraction would give smoother
-  surfaces but adds significant complexity. v5+ if needed.
+- ``write_stl`` output is voxelized — each density cell becomes an axis-aligned
+  box (boundary area error O(h)). Wave JJ adds ``write_stl_marching_squares``,
+  a marching-squares iso-contour extruder with linearly-interpolated smooth
+  boundaries (area error O(h²)); see D039.
 - Thickness is uniform — variable thickness needs per-element
   metadata.
 """
 
 from __future__ import annotations
 
+from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+
 from structure_optimizer.core.fem2d import SolverError
 from structure_optimizer.core.mesh import StructuredMesh
 
@@ -137,5 +140,221 @@ def write_stl(
     return {
         "n_triangles": len(triangles),
         "n_solid_cells": n_solid,
+        "out_path": str(out_path),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Wave JJ (v6): marching-squares smooth-boundary STL.
+#
+# The voxel ``write_stl`` above turns every solid cell into an axis-aligned box,
+# so the boundary is staircased — its area error vs the true shape is O(h)
+# (proportional to cell size). Marching squares extracts the iso-contour of the
+# density field with *linear edge interpolation*, cutting the corners; for a
+# smooth field its enclosed-area error drops to O(h²). The closed contour loops
+# are then extruded to a prism (smooth side walls + fan-triangulated caps).
+#
+# Edge indexing within a cell (corners CCW from bottom-left):
+#   c0=(x_i, y_j)  c1=(x_{i+1}, y_j)  c2=(x_{i+1}, y_{j+1})  c3=(x_i, y_{j+1})
+#   e0 = c0-c1 (bottom)  e1 = c1-c2 (right)  e2 = c2-c3 (top)  e3 = c3-c0 (left)
+# ---------------------------------------------------------------------------
+
+# Undirected edge-pairs the contour crosses, per 4-bit corner-inside case.
+# Saddle cases 5 and 10 are resolved at run time by the cell-centre value.
+_MS_CASES: dict[int, list[tuple[int, int]]] = {
+    0: [], 15: [],
+    1: [(3, 0)], 14: [(3, 0)],
+    2: [(0, 1)], 13: [(0, 1)],
+    3: [(1, 3)], 12: [(1, 3)],
+    4: [(1, 2)], 11: [(1, 2)],
+    6: [(0, 2)], 9: [(0, 2)],
+    7: [(2, 3)], 8: [(2, 3)],
+    5: [(3, 0), (1, 2)],   # saddle — resolved below
+    10: [(0, 1), (2, 3)],  # saddle — resolved below
+}
+
+
+def _edge_point(edge: int, corners: list, vals: list, level: float) -> np.ndarray:
+    """Linearly-interpolated crossing point on one cell edge at ``level``."""
+    a, b = ((0, 1), (1, 2), (2, 3), (3, 0))[edge]
+    va, vb = vals[a], vals[b]
+    denom = vb - va
+    t = 0.5 if abs(denom) < 1e-300 else (level - va) / denom
+    return corners[a] + t * (corners[b] - corners[a])
+
+
+def _key(p: np.ndarray) -> tuple[float, float]:
+    """Quantized endpoint key so a crossing shared by two cells matches exactly."""
+    return (round(float(p[0]), 12), round(float(p[1]), 12))
+
+
+def _stitch_loops(segments: list[tuple[np.ndarray, np.ndarray]]) -> list[list[np.ndarray]]:
+    """Stitch unordered segments into closed loops by endpoint matching."""
+    used = [False] * len(segments)
+    endpoint: dict[tuple, list[int]] = defaultdict(list)
+    for idx, (p, q) in enumerate(segments):
+        endpoint[_key(p)].append(idx)
+        endpoint[_key(q)].append(idx)
+
+    loops: list[list[np.ndarray]] = []
+    for start_idx in range(len(segments)):
+        if used[start_idx]:
+            continue
+        used[start_idx] = True
+        p, q = segments[start_idx]
+        loop = [p, q]
+        start_key, cur_key = _key(p), _key(q)
+        while cur_key != start_key:
+            nxt = next((c for c in endpoint[cur_key] if not used[c]), None)
+            if nxt is None:
+                break  # open contour (solid touches the sampling boundary)
+            used[nxt] = True
+            a, b = segments[nxt]
+            nextpt = b if _key(a) == cur_key else a
+            loop.append(nextpt)
+            cur_key = _key(nextpt)
+        loops.append(loop)
+    return loops
+
+
+def marching_squares_contours(
+    field: np.ndarray,
+    x_coords: np.ndarray,
+    y_coords: np.ndarray,
+    level: float = 0.5,
+) -> list[list[np.ndarray]]:
+    """Extract iso-contour loops at ``level`` from a scalar grid.
+
+    Args:
+        field:    shape (ny, nx) — scalar samples; ``field[j, i]`` at
+                  (x_coords[i], y_coords[j]).
+        x_coords: shape (nx,) ascending sample x positions.
+        y_coords: shape (ny,) ascending sample y positions.
+        level:    iso-value (inside = field > level).
+
+    Returns:
+        list of loops; each loop is a list of (x, y) points. Interior loops are
+        closed (first point ≈ last point) with linearly-interpolated vertices.
+    """
+    field = np.asarray(field, dtype=float)
+    ny, nx = field.shape
+    if nx < 2 or ny < 2:
+        raise SolverError("marching_squares_grid_too_small")
+    if x_coords.shape[0] != nx or y_coords.shape[0] != ny:
+        raise SolverError("marching_squares_coord_mismatch")
+
+    segments: list[tuple[np.ndarray, np.ndarray]] = []
+    for j in range(ny - 1):
+        for i in range(nx - 1):
+            corners = [
+                np.array([x_coords[i], y_coords[j]]),
+                np.array([x_coords[i + 1], y_coords[j]]),
+                np.array([x_coords[i + 1], y_coords[j + 1]]),
+                np.array([x_coords[i], y_coords[j + 1]]),
+            ]
+            vals = [field[j, i], field[j, i + 1], field[j + 1, i + 1], field[j + 1, i]]
+            case = sum((1 << k) for k, v in enumerate(vals) if v > level)
+            pairs = _MS_CASES[case]
+            if case in (5, 10):
+                center_inside = (sum(vals) / 4.0) > level
+                if case == 5:
+                    pairs = [(0, 1), (2, 3)] if center_inside else [(3, 0), (1, 2)]
+                else:
+                    pairs = [(3, 0), (1, 2)] if center_inside else [(0, 1), (2, 3)]
+            for ea, eb in pairs:
+                segments.append(
+                    (_edge_point(ea, corners, vals, level), _edge_point(eb, corners, vals, level))
+                )
+    return _stitch_loops(segments)
+
+
+def polygon_area(loop: list[np.ndarray]) -> float:
+    """Absolute area enclosed by a polygon loop (shoelace)."""
+    pts = np.asarray(loop, dtype=float)
+    if pts.shape[0] >= 2 and np.allclose(pts[0], pts[-1]):
+        pts = pts[:-1]
+    if pts.shape[0] < 3:
+        return 0.0
+    x, y = pts[:, 0], pts[:, 1]
+    return 0.5 * abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))))
+
+
+def write_stl_marching_squares(
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    out_path: str | Path,
+    rho_threshold: float = 0.5,
+    z_thickness: float = 1.0,
+    solid_name: str = "topology_smooth",
+) -> dict:
+    """Write a 2D density field as a smooth-boundary extruded STL.
+
+    Samples the density field at cell centres, extracts the ``rho_threshold``
+    iso-contour by marching squares, and extrudes each closed loop to a prism
+    (linearly-interpolated side walls + centroid-fan top/bottom caps).
+
+    Returns a dict with ``n_triangles``, ``n_loops``, ``cross_section_area``,
+    ``out_path``.
+    """
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    if densities.shape[0] != mesh.elements.shape[0]:
+        raise SolverError("density_count_mismatch")
+    if z_thickness <= 0:
+        raise SolverError("stl_export_nonpositive_thickness")
+
+    cell_w = mesh.width / mesh.nelx
+    cell_h = mesh.height / mesh.nely
+    field = np.zeros((mesh.nely, mesh.nelx))
+    for ey in range(mesh.nely):
+        for ex in range(mesh.nelx):
+            field[ey, ex] = densities[mesh.element_index(ex, ey)]
+    x_coords = (np.arange(mesh.nelx) + 0.5) * cell_w
+    y_coords = (np.arange(mesh.nely) + 0.5) * cell_h
+
+    loops = marching_squares_contours(field, x_coords, y_coords, rho_threshold)
+    loops = [lp for lp in loops if polygon_area(lp) > 1e-12]
+
+    triangles: list[str] = []
+    total_area = 0.0
+    for lp in loops:
+        pts = np.asarray(lp, dtype=float)
+        if pts.shape[0] >= 2 and np.allclose(pts[0], pts[-1]):
+            pts = pts[:-1]
+        if pts.shape[0] < 3:
+            continue
+        total_area += polygon_area(lp)
+        centroid = pts.mean(axis=0)
+        c_lo = np.array([centroid[0], centroid[1], 0.0])
+        c_hi = np.array([centroid[0], centroid[1], z_thickness])
+        n_pts = pts.shape[0]
+        for k in range(n_pts):
+            a = pts[k]
+            b = pts[(k + 1) % n_pts]
+            a_lo = np.array([a[0], a[1], 0.0])
+            b_lo = np.array([b[0], b[1], 0.0])
+            a_hi = np.array([a[0], a[1], z_thickness])
+            b_hi = np.array([b[0], b[1], z_thickness])
+            # Side wall (two triangles); normal from the edge direction × z.
+            edge = b - a
+            wall_n = np.array([edge[1], -edge[0], 0.0])
+            nrm = np.linalg.norm(wall_n)
+            wall_n = wall_n / nrm if nrm > 1e-300 else np.array([1.0, 0.0, 0.0])
+            triangles.append(_format_triangle(a_lo, b_lo, b_hi, wall_n))
+            triangles.append(_format_triangle(a_lo, b_hi, a_hi, wall_n))
+            # Bottom cap fan (normal -z) and top cap fan (normal +z).
+            triangles.append(_format_triangle(c_lo, b_lo, a_lo, np.array([0.0, 0.0, -1.0])))
+            triangles.append(_format_triangle(c_hi, a_hi, b_hi, np.array([0.0, 0.0, 1.0])))
+
+    out_path = Path(out_path)
+    with open(out_path, "w") as f:
+        f.write(f"solid {solid_name[:80]}\n")
+        for tri in triangles:
+            f.write(tri)
+        f.write(f"endsolid {solid_name[:80]}\n")
+
+    return {
+        "n_triangles": len(triangles),
+        "n_loops": len(loops),
+        "cross_section_area": float(total_area),
         "out_path": str(out_path),
     }

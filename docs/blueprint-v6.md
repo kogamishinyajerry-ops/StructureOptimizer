@@ -65,7 +65,7 @@ v6 完成 = `python scripts/test_agent.py --rubric v6` 报告：
 - [x] GG — 各向异性张量热传导（D036 · 8 tests green · 解析 patch test + 旋转不变）
 - [x] HH — NSGA-III ≥3 目标（D037 · 7 tests green · Das-Dennis 精确计数 + DTLZ2 单位球收敛）
 - [x] II — FORM/SORM + importance sampling（D038 · 10 tests green · 线性极限态 β 解析 + Breitung 抛物面 + IS 方差缩减）
-- [ ] JJ — Marching-squares 平滑边界 STL
+- [x] JJ — Marching-squares 平滑边界 STL（D039 · 7 tests green · 面积 O(h²) 收敛 + beats voxel + 闭合轮廓）
 - [ ] KK — Reverse-mode AD（tape）
 - [ ] LL — v6 收口（rubric ≥ 99）
 
