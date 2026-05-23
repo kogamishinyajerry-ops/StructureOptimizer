@@ -62,7 +62,7 @@ v6 完成 = `python scripts/test_agent.py --rubric v6` 报告：
 
 - [x] EE — 完整 TL Green-strain Newton（D034 · 8 tests green · objectivity + 解析 patch）
 - [x] FF — Rayleigh 阻尼复频响（D035 · 6 tests green · 半功率带宽解析校验）
-- [ ] GG — 各向异性张量热传导
+- [x] GG — 各向异性张量热传导（D036 · 8 tests green · 解析 patch test + 旋转不变）
 - [ ] HH — NSGA-III ≥3 目标
 - [ ] II — FORM/SORM + importance sampling
 - [ ] JJ — Marching-squares 平滑边界 STL

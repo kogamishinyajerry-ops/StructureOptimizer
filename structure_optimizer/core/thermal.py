@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+
 from structure_optimizer.core.config import BenchmarkConfig
 from structure_optimizer.core.fem2d import SolverError
 from structure_optimizer.core.mesh import StructuredMesh
@@ -77,6 +78,60 @@ def element_thermal_conductivity(conductivity: float, thickness: float = 1.0) ->
     )
 
 
+# --- Wave GG (v6, D036): anisotropic / orthotropic tensor conductivity -----
+
+# 2×2 Gauss on natural [-1,1]²; Q4 node order matches mesh connectivity.
+_GP = 1.0 / np.sqrt(3.0)
+_GAUSS_PTS = [(-_GP, -_GP), (_GP, -_GP), (_GP, _GP), (-_GP, _GP)]
+_NODE_XI = np.array([-1.0, 1.0, 1.0, -1.0])
+_NODE_ETA = np.array([-1.0, -1.0, 1.0, 1.0])
+# Unit-square physical element (side 1), node order n1..n4 = (0,0),(1,0),(1,1),(0,1).
+_UNIT_SQUARE = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+
+
+def conductivity_tensor(kxx: float, kyy: float, kxy: float = 0.0) -> np.ndarray:
+    """Build a symmetric 2×2 conductivity tensor [[kxx, kxy], [kxy, kyy]]."""
+    return np.array([[kxx, kxy], [kxy, kyy]], dtype=float)
+
+
+def rotate_conductivity_tensor(k: np.ndarray, theta: float) -> np.ndarray:
+    """Rotate a conductivity tensor by angle θ (rad): k' = R k Rᵀ."""
+    c, s = np.cos(theta), np.sin(theta)
+    R = np.array([[c, -s], [s, c]])
+    return R @ np.asarray(k, dtype=float) @ R.T
+
+
+def element_thermal_conductivity_tensor(k_matrix: np.ndarray, thickness: float = 1.0) -> np.ndarray:
+    """4-node bilinear quad element conductivity matrix for an anisotropic
+    conductivity tensor, via 2×2 Gauss quadrature on a unit-size element:
+
+        Ke = ∫ Bᵀ k B t dA ,   B = [∂N/∂x; ∂N/∂y]  (2×4)
+
+    For an isotropic tensor ``k·I`` this reduces (to machine precision) to the
+    analytical scalar :func:`element_thermal_conductivity`.
+    """
+    k_matrix = np.asarray(k_matrix, dtype=float)
+    if k_matrix.shape != (2, 2):
+        raise SolverError("conductivity_tensor_must_be_2x2")
+    if not np.allclose(k_matrix, k_matrix.T):
+        raise SolverError("conductivity_tensor_must_be_symmetric")
+    eigvals = np.linalg.eigvalsh(k_matrix)
+    if (eigvals <= 0).any():
+        raise SolverError("conductivity_tensor_must_be_positive_definite")
+
+    ke = np.zeros((4, 4))
+    for xi, eta in _GAUSS_PTS:
+        dn_dxi = 0.25 * _NODE_XI * (1.0 + _NODE_ETA * eta)
+        dn_deta = 0.25 * _NODE_ETA * (1.0 + _NODE_XI * xi)
+        dn_nat = np.column_stack([dn_dxi, dn_deta])      # (4,2)
+        jac = dn_nat.T @ _UNIT_SQUARE                    # (2,2)
+        detj = np.linalg.det(jac)
+        dn_dx = dn_nat @ np.linalg.inv(jac).T            # (4,2) ∂N/∂x,∂N/∂y
+        # Ke += (∂N/∂x)·k·(∂N/∂x)ᵀ · detJ · t   (weight = 1 for 2×2 Gauss)
+        ke += dn_dx @ k_matrix @ dn_dx.T * detj * thickness
+    return ke
+
+
 def _assemble_thermal_dense(
     mesh: StructuredMesh,
     density_scale: np.ndarray,
@@ -108,6 +163,7 @@ def solve_thermal(
     conductivity: float,
     heat_sources: list[dict[str, Any]] | None = None,
     thermal_bcs: list[dict[str, Any]] | None = None,
+    conductivity_tensor: np.ndarray | None = None,
 ) -> ThermalResult:
     """Solve K(ρ) · T = q for nodal temperatures + thermal compliance.
 
@@ -131,10 +187,14 @@ def solve_thermal(
     densities = np.asarray(densities, dtype=float).reshape(-1)
     if densities.shape[0] != mesh.elements.shape[0]:
         raise SolverError("density_count_mismatch")
-    if conductivity <= 0:
-        raise SolverError("nonpositive_conductivity")
 
-    ke = element_thermal_conductivity(conductivity, config.thickness)
+    if conductivity_tensor is not None:
+        # Anisotropic / orthotropic path (Wave GG, D036).
+        ke = element_thermal_conductivity_tensor(conductivity_tensor, config.thickness)
+    else:
+        if conductivity <= 0:
+            raise SolverError("nonpositive_conductivity")
+        ke = element_thermal_conductivity(conductivity, config.thickness)
     active = np.where(mesh.void_mask, opt.min_density, densities)
     density_scale = opt.min_density + (active**opt.penalty) * (1.0 - opt.min_density)
     K = _assemble_thermal_dense(mesh, density_scale, ke)

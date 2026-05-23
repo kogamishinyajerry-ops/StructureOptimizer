@@ -716,6 +716,21 @@ r = solve_damped_frequency_response(config, mesh, densities, omega, alpha=0.1*w1
 `ζ = ½(α/ω + βω)`，通过半功率（−3 dB）带宽 `Δω ≈ 2ζω_n` 解析校验
 （`half_power_bandwidth` 从幅值扫频提取带宽 → 反推 ζ，与设定值吻合）。
 
+### 16.3 各向异性张量热传导（Wave GG，D036）
+
+v5 的 `solve_thermal` 只支持标量 conductivity；v6 加张量 k = [[kxx,kxy],[kxy,kyy]]
+（纤维复合、增材分层、轧制金属），通过 2×2 Gauss 积分 `∫BᵀkB`：
+
+```python
+from structure_optimizer.core.thermal import conductivity_tensor, solve_thermal
+k = conductivity_tensor(kxx=5.0, kyy=1.0, kxy=0.3)  # 正交各向异性 + 耦合
+r = solve_thermal(config, mesh, densities, k_scalar, sources, bcs, conductivity_tensor=k)
+```
+
+**关键升级**：各向同性 k·I 退化为 v5 解析标量矩阵（机器精度）；通过 **FEM patch test**
+定量验证——线性温度场 `T = a·x+b·y` 对任意常张量产生零内部残差（机器精度）。向后兼容：
+不传 `conductivity_tensor` 时走原标量路径。
+
 ---
 
 ## 常见错误
