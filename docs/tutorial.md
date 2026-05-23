@@ -675,6 +675,32 @@ g = gradient_check(f, np.array([1.0, 2.0]), h=1e-7)  # ≈ [2, 4]
 
 ---
 
+## 16. v6.x 生产级公式升级（v5.0 → v6.0）
+
+v6 把 v5 的有意简化升级为严格、可解析校验的生产级实现（见 `docs/blueprint-v6.md`）。
+每个升级都配定量解析校验，不再是 v5 的 qualitative trend。
+
+### 16.1 完整 Total-Lagrangian Green-strain Newton（Wave EE，D034）
+
+v5 的 `core/nonlinear_fem.py` 用矩阵级 `K + ½K_g` 近似 SVK 响应；v6 的
+`core/total_lagrangian.py` 实现真正的 Total-Lagrangian Q4 单元（Bonet & Wood Ch.9）：
+等参 Q4 + 2×2 Gauss，由参考节点坐标算变形梯度 `F = I + ∂u/∂X`，Green-Lagrange 应变
+`E = ½(FᵀF − I)`，2nd PK 应力 `S = D:E`（SVK，SIMP 密度缩放 `D_e = ρ缩放·D₀`），
+内力 `∫B_LᵀS dV` + 一致切线 `∫(B_LᵀD B_L + GᵀΣG)dV`，Newton + 增量加载。
+
+```python
+from structure_optimizer.core.total_lagrangian import solve_total_lagrangian, green_strain_field
+r = solve_total_lagrangian(config, mesh, densities, n_load_steps=5)
+# r.displacements / r.max_displacements / r.converged / r.strain_energy
+```
+
+**关键升级**：完整 TL 满足 frame indifference——有限刚体旋转产生**零** Green 应变
+（`E = ½(RᵀR−I) = 0`，机器精度），这是 v5 `K+½K_g` 近似**不满足**的性质，也是
+Wave EE 的旗舰回归测试。小载荷下退化为线性 FEM；工作载荷下 tip 挠度不超过线性估计
+（elastica 次线性趋势）。
+
+---
+
 ## 常见错误
 
 | 现象 | 原因 | 解决 |

@@ -60,7 +60,7 @@ v6 完成 = `python scripts/test_agent.py --rubric v6` 报告：
 
 ## 进度（wave 勾选 — 本文件即 v6 progress 文件）
 
-- [ ] EE — 完整 TL Green-strain Newton
+- [x] EE — 完整 TL Green-strain Newton（D034 · 8 tests green · objectivity + 解析 patch）
 - [ ] FF — Rayleigh 阻尼复频响
 - [ ] GG — 各向异性张量热传导
 - [ ] HH — NSGA-III ≥3 目标
