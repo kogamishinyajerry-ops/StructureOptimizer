@@ -731,6 +731,26 @@ r = solve_thermal(config, mesh, densities, k_scalar, sources, bcs, conductivity_
 定量验证——线性温度场 `T = a·x+b·y` 对任意常张量产生零内部残差（机器精度）。向后兼容：
 不传 `conductivity_tensor` 时走原标量路径。
 
+### 16.4 NSGA-III ≥3 目标多目标优化（Wave HH，D037）
+
+v5 的 `nsga_ii` 是双目标 NSGA-II（拥挤距离选择）；目标数 ≥3 时拥挤距离会丢失多样性。
+v6 加 `nsga3`：用 **Das-Dennis 结构化参考方向** + **niching** 维持高维目标空间的均匀覆盖：
+
+```python
+import numpy as np
+from structure_optimizer.core.pareto_nsga import nsga3, das_dennis_reference_points
+
+ref = das_dennis_reference_points(n_obj=3, n_divisions=12)  # C(14,2)=91 个参考点
+front = nsga3(eval_fn, n_vars=6, bounds_lower=np.zeros(6), bounds_upper=np.ones(6),
+              n_obj=3, n_divisions=12, n_generations=80)
+# front.objectives: (n_front, 3) 非支配点；front.decisions: 对应决策向量
+```
+
+**关键升级**：参考点数严格等于组合数 `C(n_divisions+n_obj−1, n_obj−1)`（解析校验）；
+分裂前沿用参考线垂距关联 + 最小 niche 计数选择（空 niche 取最近点，否则随机）。
+**定量校验**：在 DTLZ2 基准上（真前沿 = 单位球卦限 Σf²=1）演化前沿收敛到该球面，
+且按目标维均匀展开（非塌缩）。SBX 交叉 / 多项式变异 / 非支配排序与 NSGA-II 共享。
+
 ---
 
 ## 常见错误

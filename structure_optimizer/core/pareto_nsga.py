@@ -22,6 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+
 from structure_optimizer.core.fem2d import SolverError
 
 
@@ -164,7 +165,7 @@ def nsga_ii(
         objs = combined_objs[selected]
         # Track size of first (Pareto) front
         first_front = fronts[0]
-        history.append(int(len(first_front)))
+        history.append(len(first_front))
 
     # Final Pareto front
     final_fronts = _non_dominated_sort(objs)
@@ -172,7 +173,7 @@ def nsga_ii(
     return ParetoFront(
         objectives=objs[front0],
         decisions=pop[front0],
-        n_front=int(len(front0)),
+        n_front=len(front0),
         rank_history=history,
     )
 
@@ -206,6 +207,178 @@ def _generate_offspring(
         offspring[i] = c1
         offspring[i + 1] = c2
     return offspring
+
+
+def das_dennis_reference_points(n_obj: int, n_divisions: int) -> np.ndarray:
+    """Das-Dennis structured reference directions on the unit simplex.
+
+    Returns an (n_ref, n_obj) array; each row is non-negative and sums to 1.
+    The count is C(n_divisions + n_obj − 1, n_obj − 1) — every integer
+    composition of ``n_divisions`` into ``n_obj`` parts, normalized.
+    """
+    if n_obj < 2:
+        raise SolverError("das_dennis_n_obj_too_small")
+    if n_divisions < 1:
+        raise SolverError("das_dennis_n_divisions_too_small")
+
+    def _compositions(parts: int, total: int) -> list[tuple[int, ...]]:
+        if parts == 1:
+            return [(total,)]
+        out: list[tuple[int, ...]] = []
+        for i in range(total + 1):
+            for rest in _compositions(parts - 1, total - i):
+                out.append((i, *rest))
+        return out
+
+    combos = _compositions(n_obj, n_divisions)
+    return np.array(combos, dtype=float) / float(n_divisions)
+
+
+def _normalize_objectives(objs: np.ndarray) -> np.ndarray:
+    """Translate by the ideal point and scale by the per-objective range.
+
+    A robust simplification of the Deb-Jain hyperplane-intercept normalization
+    (D037 honest note); preserves the association geometry for well-formed
+    fronts. Degenerate (zero-range) objectives map to 0.
+    """
+    ideal = objs.min(axis=0)
+    translated = objs - ideal
+    rng = translated.max(axis=0)
+    rng = np.where(rng <= 1e-12, 1.0, rng)
+    return translated / rng
+
+
+def _associate(normalized: np.ndarray, ref_dirs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Associate each point to its nearest reference line (perpendicular dist).
+
+    Returns (assoc_idx (n_points,), perp_dist (n_points,)).
+    """
+    # Unit reference directions (skip the all-zero origin direction if present).
+    norms = np.linalg.norm(ref_dirs, axis=1, keepdims=True)
+    norms = np.where(norms <= 1e-12, 1.0, norms)
+    units = ref_dirs / norms
+    assoc = np.zeros(normalized.shape[0], dtype=int)
+    dist = np.zeros(normalized.shape[0])
+    for i, z in enumerate(normalized):
+        proj = units @ z  # (n_ref,) scalar projections
+        perp = np.linalg.norm(z[None, :] - proj[:, None] * units, axis=1)
+        j = int(np.argmin(perp))
+        assoc[i] = j
+        dist[i] = perp[j]
+    return assoc, dist
+
+
+def _niching_select(
+    last_front: np.ndarray,
+    accepted: np.ndarray,
+    combined_objs: np.ndarray,
+    ref_dirs: np.ndarray,
+    n_needed: int,
+    rng: np.random.Generator,
+) -> list[int]:
+    """NSGA-III niching: pick ``n_needed`` from ``last_front`` balancing niche counts."""
+    pool = np.concatenate([accepted, last_front]) if accepted.size else last_front
+    normalized = _normalize_objectives(combined_objs[pool])
+    assoc, dist = _associate(normalized, ref_dirs)
+    n_acc = accepted.size
+    # niche count of each reference from already-accepted members
+    niche = np.zeros(ref_dirs.shape[0], dtype=int)
+    for a in range(n_acc):
+        niche[assoc[a]] += 1
+    # candidates from last front: map pool index -> last_front member
+    lf_local = np.arange(n_acc, pool.size)  # positions in pool that are last_front
+    available = set(lf_local.tolist())
+    chosen: list[int] = []
+    while len(chosen) < n_needed and available:
+        # reference(s) with the smallest niche count
+        min_count = min(niche[assoc[p]] for p in available)
+        cand_refs = [j for j in range(ref_dirs.shape[0])
+                     if niche[j] == min_count and any(assoc[p] == j for p in available)]
+        j = int(rng.choice(cand_refs))
+        members = [p for p in available if assoc[p] == j]
+        # empty niche → take the point closest to the reference line; else random
+        p = min(members, key=lambda m: dist[m]) if niche[j] == 0 else int(rng.choice(members))
+        chosen.append(int(pool[p]))
+        available.discard(p)
+        niche[j] += 1
+    return chosen
+
+
+def nsga3(
+    eval_fn,
+    n_vars: int,
+    bounds_lower: np.ndarray,
+    bounds_upper: np.ndarray,
+    n_obj: int = 3,
+    n_divisions: int = 12,
+    population_size: int | None = None,
+    n_generations: int = 50,
+    crossover_eta: float = 15.0,
+    mutation_prob: float = 0.1,
+    rng_seed: int = 0,
+) -> ParetoFront:
+    """NSGA-III for ≥3 objectives (Deb & Jain 2014).
+
+    Differs from :func:`nsga_ii` only in the survival selection: instead of
+    crowding distance, the splitting front is thinned by reference-point niching
+    over Das-Dennis directions, which scales to many objectives where crowding
+    distance loses diversity. SBX crossover + polynomial mutation + the
+    non-dominated sort are shared with NSGA-II.
+
+    Args:
+        eval_fn:        callable(x: (n_vars,)) → tuple of ``n_obj`` objectives
+        n_obj:          number of objectives (≥ 2; the point of this over NSGA-II is ≥3)
+        n_divisions:    Das-Dennis divisions (front resolution)
+        population_size: defaults to (#reference points rounded up to a multiple of 4)
+    """
+    if n_obj < 2:
+        raise SolverError("nsga3_n_obj_too_small")
+    ref_dirs = das_dennis_reference_points(n_obj, n_divisions)
+    n_ref = ref_dirs.shape[0]
+    if population_size is None:
+        population_size = int(np.ceil(n_ref / 4.0) * 4)
+    if population_size < 4:
+        raise SolverError("nsga3_population_too_small")
+
+    rng = np.random.default_rng(rng_seed)
+    bl = np.asarray(bounds_lower, dtype=float)
+    bu = np.asarray(bounds_upper, dtype=float)
+    pop = rng.uniform(bl, bu, size=(population_size, n_vars))
+    objs = np.array([eval_fn(x) for x in pop])
+    history: list[int] = []
+
+    for _gen in range(n_generations):
+        offspring = _generate_offspring(pop, bl, bu, crossover_eta, mutation_prob, rng)
+        off_objs = np.array([eval_fn(x) for x in offspring])
+        combined = np.vstack([pop, offspring])
+        combined_objs = np.vstack([objs, off_objs])
+
+        fronts = _non_dominated_sort(combined_objs)
+        selected: list[int] = []
+        for front in fronts:
+            if len(selected) + len(front) <= population_size:
+                selected.extend(front.tolist())
+                continue
+            # `front` is the splitting front F_l → reference-point niching
+            n_needed = population_size - len(selected)
+            picked = _niching_select(
+                front, np.array(selected, dtype=int), combined_objs, ref_dirs, n_needed, rng
+            )
+            selected.extend(picked)
+            break
+        sel = np.array(selected, dtype=int)
+        pop = combined[sel]
+        objs = combined_objs[sel]
+        history.append(len(fronts[0]))
+
+    final_fronts = _non_dominated_sort(objs)
+    front0 = final_fronts[0]
+    return ParetoFront(
+        objectives=objs[front0],
+        decisions=pop[front0],
+        n_front=len(front0),
+        rank_history=history,
+    )
 
 
 def render_pareto(front: ParetoFront, html_path: str, title: str = "Pareto Front") -> None:
