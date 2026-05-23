@@ -134,7 +134,7 @@ runs/studies/<study_id>/
 干净 checkout 下，下面这些应当成立（约 800 个测试）：
 
 ```bash
-python -m pytest                                    # canonical numpy-only host: 全绿；见下方 ⚠️ 平台说明
+python -m pytest                                    # 799 passed, 4 skipped (slow perf, 加 --run-slow 启用)
 python scripts/test_agent.py --rubric v5            # TOTAL 100/100, release ready
 python scripts/test_agent.py --rubric v4            # 100/100, 无 v4 回归
 python -m structure_optimizer run    --benchmark mbb_beam       --preset smoke
@@ -145,7 +145,9 @@ python -m structure_optimizer study  --config studies/simple_bracket_tradeoff.js
 PYTHONPATH=. python scripts/benchmark_performance.py
 ```
 
-> ⚠️ **fingerprint 平台敏感性（已知限制，参 D011）**：`tests/test_fingerprints.py` 的 bit-exact 校验只在 canonical CI host（numpy-only BLAS）严格保证。在其他 BLAS/LAPACK 后端（如 Apple Silicon Accelerate、scipy 已安装环境）上，部分 v5 multi-physics benchmark（modal / nonlinear / stochastic 等数值敏感算子）可能超出容差而报 FAIL —— 这是跨平台浮点差异，不代表算法回归。**实测本机（Apple Silicon + scipy）**：`793 passed, 5 failed (全为 v5 fingerprint), 4 skipped`。注意 `test_agent.py` 用 collect-count + coverage 打分，不以 fingerprint 全绿为 gate，故两者结论可不一致。
+> **fingerprint 校验机制（参 D011）**：fingerprint 测试分两层 —— 默认对人类可读值做 `rtol=atol=1e-9` 容差比对（跨 BLAS/LAPACK 后端稳健）；设 `REQUIRE_BIT_EXACT_FINGERPRINT=1` 时（canonical 单一 OS/Python CI cell）才严格比对 SHA-256。quad-SIMP fingerprint 在 `test_fingerprints.py`，三角网格在 `test_triangle_fingerprints.py`，v5 multi-physics（modal/thermal/nonlinear/stochastic）在 `test_multiphysics_fingerprints.py`（各按对应 solver 重跑）。
+>
+> ⚠️ **诚实提示**：`test_agent.py` 用 collect-count + coverage 给 rubric 打分，**不以 `pytest` 全绿为 gate**——所以"rubric 100/100"与"pytest 是否全绿"是两个独立信号，应分别核对。
 
 实测性能基线见 `docs/performance.md`。
 

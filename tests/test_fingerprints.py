@@ -37,8 +37,28 @@ TOLERANCE = 1e-9
 
 
 def _all_fingerprints() -> list[Path]:
-    """Only quad-path fingerprints — triangle ones live in test_triangle_fingerprints.py."""
-    return sorted(p for p in FINGERPRINT_DIR.glob("*.json") if not p.name.startswith("triangle_"))
+    """Only quad-SIMP fingerprints (the ``input_hash`` + ``scalar_sha256`` schema
+    produced by ``scripts/generate_fingerprints.py``).
+
+    Triangle fixtures (``triangle_*``) live in test_triangle_fingerprints.py.
+    The v5 multi-physics fixtures carry a physics-specific schema (marked by a
+    ``rubric_version`` key, no ``input_hash``) and are validated by
+    test_multiphysics_fingerprints.py — globbing them here used to raise
+    ``KeyError: 'input_hash'`` at runtime. We discriminate by schema, not name,
+    so future quad fingerprints are picked up automatically while non-quad
+    schemas are skipped.
+    """
+    quad: list[Path] = []
+    for path in sorted(FINGERPRINT_DIR.glob("*.json")):
+        if path.name.startswith("triangle_"):
+            continue
+        try:
+            rec = json.loads(path.read_text())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(rec, dict) and "input_hash" in rec and "rubric_version" not in rec:
+            quad.append(path)
+    return quad
 
 
 def _density_sha256(densities: np.ndarray) -> str:
