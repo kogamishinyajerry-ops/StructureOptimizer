@@ -11,12 +11,15 @@ This is the frequency-domain analogue of `fem2d.solve_linear_elastic`. The
 key engineering use is **anti-resonance design**: keep |û(ω)| small at a
 target frequency by topology-optimising K - ω² M to be well-conditioned.
 
-Damping is intentionally omitted (zero structural damping); adding
-Rayleigh damping (C = αM + βK) would extend this to a complex system
+The undamped solve below omits structural damping. Wave FF (v6, D035) adds
+the Rayleigh-damped complex system
 
-    (K - ω² M + iω C) û = f̂
+    (K - ω² M + iω C) û = f̂ ,   C = α M + β K
 
-which is a v5+ extension if real workflows demand it.
+via ``solve_damped_frequency_response`` — see the bottom of this module. The
+damped response is finite at resonance (the undamped one is singular there),
+and its modal damping ratio ζ_i = ½(α/ω_i + β ω_i) is verified through the
+half-power bandwidth Δω ≈ 2 ζ ω_n (``half_power_bandwidth``).
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+
 from structure_optimizer.core.config import BenchmarkConfig
 from structure_optimizer.core.fem2d import SolverError, element_stiffness
 from structure_optimizer.core.mesh import StructuredMesh
@@ -157,4 +161,176 @@ def frequency_sweep(
         "max_displacement": max_disp,
         "response_norm": resp_norm,
         "valid": valid,
+    }
+
+
+# --- Wave FF (v6, D035): Rayleigh-damped complex frequency response --------
+
+
+@dataclass
+class DampedFrequencyResponseResult:
+    """Output of a single-frequency Rayleigh-damped harmonic solve.
+
+    Attributes:
+        omega:           excitation angular frequency (rad/s)
+        displacements:   complex displacement amplitudes û (n_dof,)
+        magnitude:       |û| per DOF (real, ≥ 0)
+        phase:           arg(û) per DOF (rad)
+        max_magnitude:   max |û| (anti-resonance objective)
+        response_norm:   ‖û‖₂ (complex 2-norm)
+        alpha:           mass-proportional Rayleigh coefficient
+        beta:            stiffness-proportional Rayleigh coefficient
+    """
+
+    omega: float
+    displacements: np.ndarray
+    magnitude: np.ndarray
+    phase: np.ndarray
+    max_magnitude: float
+    response_norm: float
+    alpha: float
+    beta: float
+
+
+def rayleigh_modal_damping_ratio(alpha: float, beta: float, omega_n: float) -> float:
+    """Modal damping ratio ζ = ½(α/ω + β ω) for Rayleigh damping C = αM + βK."""
+    if omega_n <= 0:
+        raise SolverError("rayleigh_damping_nonpositive_omega")
+    return 0.5 * (alpha / omega_n + beta * omega_n)
+
+
+def solve_damped_frequency_response(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    omega: float,
+    alpha: float = 0.0,
+    beta: float = 0.0,
+    mass_type: str = "consistent",
+) -> DampedFrequencyResponseResult:
+    """Solve the complex dynamic system (K - ω²M + iωC) û = f̂, C = αM + βK.
+
+    With ``alpha == beta == 0`` this reduces to the undamped real system and
+    its magnitude matches :func:`solve_frequency_response`. With damping the
+    response stays finite at resonance.
+
+    Args:
+        config:     BenchmarkConfig
+        mesh:       structured-quad mesh
+        densities:  per-element densities
+        omega:      excitation angular frequency (rad/s)
+        alpha:      mass-proportional Rayleigh coefficient (≥ 0)
+        beta:       stiffness-proportional Rayleigh coefficient (≥ 0)
+        mass_type:  "consistent" or "lumped"
+    """
+    if omega < 0:
+        raise SolverError("frequency_response_negative_omega")
+    if alpha < 0 or beta < 0:
+        raise SolverError("rayleigh_damping_negative_coefficient")
+
+    opt = config.optimization
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    if densities.shape[0] != mesh.elements.shape[0]:
+        raise SolverError("density_count_mismatch")
+
+    ke = element_stiffness(config.material.young_modulus, config.material.poisson_ratio)
+    me = element_mass_matrix(config.material.density, config.thickness, mass_type)
+
+    active = np.where(mesh.void_mask, opt.min_density, densities)
+    k_scale = opt.min_density + (active**opt.penalty) * (1.0 - opt.min_density)
+    m_scale = opt.min_density + active * (1.0 - opt.min_density)
+
+    K = _assemble_stiffness_dense_modal(mesh, k_scale, ke)
+    M = _assemble_mass_dense(mesh, m_scale, me)
+    C = alpha * M + beta * K  # Rayleigh damping
+
+    n_dof = mesh.ndof
+    f = np.zeros(n_dof)
+    for load in config.loads:
+        nodes = mesh.selector_nodes(load["selector"])
+        if not nodes:
+            continue
+        fx = float(load.get("fx", 0.0))
+        fy = float(load.get("fy", 0.0))
+        for node in nodes:
+            f[2 * node] += fx / len(nodes)
+            f[2 * node + 1] += fy / len(nodes)
+
+    fixed = mesh.fixed_dofs(config.boundary_conditions)
+    free = np.setdiff1d(np.arange(n_dof), fixed)
+    if free.size == 0:
+        raise SolverError("frequency_response_all_dofs_fixed")
+
+    # Complex dynamic stiffness D = K - ω²M + iωC
+    D = (K - (omega**2) * M).astype(complex)
+    D = D + 1j * omega * C
+    D_ff = D[np.ix_(free, free)]
+    f_f = f[free].astype(complex)
+
+    try:
+        u_free = np.linalg.solve(D_ff, f_f)
+    except np.linalg.LinAlgError as exc:
+        raise SolverError("frequency_response_singular") from exc
+
+    u = np.zeros(n_dof, dtype=complex)
+    u[free] = u_free
+    magnitude = np.abs(u)
+    return DampedFrequencyResponseResult(
+        omega=float(omega),
+        displacements=u,
+        magnitude=magnitude,
+        phase=np.angle(u),
+        max_magnitude=float(np.max(magnitude)),
+        response_norm=float(np.linalg.norm(u)),
+        alpha=float(alpha),
+        beta=float(beta),
+    )
+
+
+def half_power_bandwidth(omega_arr: np.ndarray, magnitude: np.ndarray) -> dict[str, float]:
+    """Half-power (−3 dB) bandwidth of a resonance peak in a magnitude sweep.
+
+    Finds the peak, then the frequencies on either side where the magnitude
+    drops to peak/√2. Returns peak frequency, the two half-power frequencies,
+    bandwidth Δω, and the implied damping ratio ζ ≈ Δω / (2 ω_peak).
+
+    Requires the sweep to bracket the peak on both sides at the half-power
+    level; raises ``SolverError`` otherwise.
+    """
+    omega_arr = np.asarray(omega_arr, dtype=float)
+    magnitude = np.asarray(magnitude, dtype=float)
+    if omega_arr.shape != magnitude.shape or omega_arr.size < 3:
+        raise SolverError("half_power_bandwidth_bad_sweep")
+
+    peak_i = int(np.argmax(magnitude))
+    peak_val = magnitude[peak_i]
+    target = peak_val / np.sqrt(2.0)
+    omega_peak = omega_arr[peak_i]
+
+    def _cross(lo_idx: int, hi_idx: int, step: int) -> float:
+        # Walk from peak outward (step ±1) to first index below target, then
+        # linearly interpolate the crossing frequency.
+        i = peak_i
+        while 0 <= i + step <= magnitude.size - 1:
+            j = i + step
+            if magnitude[j] <= target:
+                # interpolate between i (above) and j (below)
+                m_i, m_j = magnitude[i], magnitude[j]
+                w_i, w_j = omega_arr[i], omega_arr[j]
+                if m_i == m_j:
+                    return float(w_j)
+                t = (m_i - target) / (m_i - m_j)
+                return float(w_i + t * (w_j - w_i))
+            i = j
+        raise SolverError("half_power_bandwidth_not_bracketed")
+
+    w_low = _cross(0, peak_i, -1)
+    w_high = _cross(peak_i, magnitude.size - 1, +1)
+    bandwidth = w_high - w_low
+    return {
+        "omega_peak": float(omega_peak),
+        "omega_low": w_low,
+        "omega_high": w_high,
+        "bandwidth": float(bandwidth),
+        "damping_ratio": float(bandwidth / (2.0 * omega_peak)) if omega_peak > 0 else float("nan"),
     }

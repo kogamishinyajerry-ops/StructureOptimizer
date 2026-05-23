@@ -699,6 +699,23 @@ r = solve_total_lagrangian(config, mesh, densities, n_load_steps=5)
 Wave EE 的旗舰回归测试。小载荷下退化为线性 FEM；工作载荷下 tip 挠度不超过线性估计
 （elastica 次线性趋势）。
 
+### 16.2 Rayleigh 阻尼复频响（Wave FF，D035）
+
+v5 的 `solve_frequency_response` 解无阻尼实系统 `(K−ω²M)û=f̂`，在每个固有频率处奇异。
+v6 加 `solve_damped_frequency_response`，解复系统 `(K−ω²M+iωC)û=f̂`，C = αM+βK（Rayleigh）：
+
+```python
+from structure_optimizer.core.freq_response import (
+    solve_damped_frequency_response, half_power_bandwidth, rayleigh_modal_damping_ratio,
+)
+r = solve_damped_frequency_response(config, mesh, densities, omega, alpha=0.1*w1, beta=0.0)
+# r.magnitude / r.phase / r.max_magnitude（复数 û）
+```
+
+**关键升级**：阻尼系统在共振处**有限**（无阻尼是奇异的）。模态阻尼比
+`ζ = ½(α/ω + βω)`，通过半功率（−3 dB）带宽 `Δω ≈ 2ζω_n` 解析校验
+（`half_power_bandwidth` 从幅值扫频提取带宽 → 反推 ζ，与设定值吻合）。
+
 ---
 
 ## 常见错误
