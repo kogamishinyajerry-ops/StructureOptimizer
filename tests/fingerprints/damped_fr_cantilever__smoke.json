@@ -1,0 +1,12 @@
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "rubric_version": "v6.0-wave-FF",
+  "kind": "damped_frequency_response",
+  "omega": 8.0,
+  "alpha": 0.5,
+  "beta": 0.0001,
+  "magnitude_sha256": "sha256:459a84f647686e9b24509272f2c28facda1784ef0b7600336ef96178e7aadc11",
+  "max_magnitude": 0.2394619794882403,
+  "response_norm": 2.0338696902618874
+}

@@ -1,0 +1,10 @@
+{
+  "benchmark": "linear_limit_state",
+  "rubric_version": "v6.0-wave-II",
+  "kind": "form_reliability",
+  "n_vars": 2,
+  "mpp_sha256": "sha256:87bcfb6be78f4b91c1143ded04fe2d13e4667ed6be42e6e6ad6df870011d505f",
+  "beta": 1.9999999999999998,
+  "p_failure": 0.02275013194817921,
+  "converged": true
+}

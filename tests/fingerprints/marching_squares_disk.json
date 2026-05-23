@@ -1,0 +1,10 @@
+{
+  "benchmark": "disk_field",
+  "rubric_version": "v6.0-wave-JJ",
+  "kind": "marching_squares",
+  "grid_n": 65,
+  "radius": 0.3,
+  "contour_sha256": "sha256:9094df605e309d64ddb9f10ae582c6c74317b206402db3e8dd25243b94cd2fde",
+  "total_area": 0.2824972184317005,
+  "n_loops": 1
+}

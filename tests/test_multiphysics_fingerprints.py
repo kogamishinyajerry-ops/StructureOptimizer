@@ -45,9 +45,26 @@ import numpy as np
 import pytest
 from structure_optimizer.benchmarks.registry import load_benchmark
 from structure_optimizer.core.mesh import create_structured_mesh
+from structure_optimizer.core.stl_export import marching_squares_contours, polygon_area
 
 FINGERPRINT_DIR = Path(__file__).parent / "fingerprints"
 TOLERANCE = 1e-9
+
+
+# --- deterministic recipes shared with scripts/generate_v6_fingerprints.py ---
+
+def _fp_linear_limit_state(u) -> float:
+    """v6 FORM fingerprint limit state g(u) = 10 − (3u₀ + 4u₁); β = 10/5 = 2."""
+    u = np.asarray(u, dtype=float)
+    return float(10.0 - (3.0 * u[0] + 4.0 * u[1]))
+
+
+def _fp_disk_field(n: int, r: float, cx: float = 0.5, cy: float = 0.5):
+    """v6 marching-squares fingerprint field: a disk level set on the unit square."""
+    xs = np.linspace(0.0, 1.0, n)
+    ys = np.linspace(0.0, 1.0, n)
+    gx, gy = np.meshgrid(xs, ys)
+    return r * r - ((gx - cx) ** 2 + (gy - cy) ** 2), xs, ys
 
 
 def _multiphysics_fingerprints() -> list[Path]:
@@ -176,6 +193,76 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         ]
         return np.asarray(r.densities), ("density_sha256", rec["density_sha256"]), checks
 
+    if kind == "total_lagrangian":
+        from structure_optimizer.core.total_lagrangian import solve_total_lagrangian
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        densities = np.full(mesh.elements.shape[0], 1.0)
+        r = solve_total_lagrangian(config, mesh, densities, n_load_steps=rec["n_load_steps"])
+        checks = [
+            ("load_steps", rec["load_steps"], r.load_steps),
+            ("max_disp_per_step", rec["max_disp_per_step"], r.max_displacements),
+            ("max_displacement", rec["max_displacement"], float(r.max_displacements[-1])),
+            ("n_newton_iters", rec["n_newton_iters"], r.n_newton_iters),
+            ("converged", rec["converged"], r.converged),
+        ]
+        return np.asarray(r.displacements), ("displacements_sha256", rec["displacements_sha256"]), checks
+
+    if kind == "damped_frequency_response":
+        from structure_optimizer.core.freq_response import solve_damped_frequency_response
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        densities = np.full(mesh.elements.shape[0], 1.0)
+        r = solve_damped_frequency_response(
+            config, mesh, densities, omega=rec["omega"], alpha=rec["alpha"], beta=rec["beta"]
+        )
+        checks = [
+            ("max_magnitude", rec["max_magnitude"], r.max_magnitude),
+            ("response_norm", rec["response_norm"], r.response_norm),
+            ("alpha", rec["alpha"], r.alpha),
+            ("beta", rec["beta"], r.beta),
+        ]
+        return np.asarray(r.magnitude), ("magnitude_sha256", rec["magnitude_sha256"]), checks
+
+    if kind == "anisotropic_thermal":
+        from structure_optimizer.core.thermal import conductivity_tensor, solve_thermal
+        from structure_optimizer.core.thermal_simp import load_thermal_benchmark
+
+        config, k_scalar, sources, bcs = load_thermal_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        densities = np.full(mesh.elements.shape[0], 1.0)
+        ktensor = conductivity_tensor(rec["kxx"], rec["kyy"], rec["kxy"])
+        r = solve_thermal(config, mesh, densities, k_scalar, sources, bcs, conductivity_tensor=ktensor)
+        checks = [
+            ("thermal_compliance", rec["thermal_compliance"], r.thermal_compliance),
+            ("max_temperature", rec["max_temperature"], r.max_temperature),
+        ]
+        return np.asarray(r.temperatures), ("temperatures_sha256", rec["temperatures_sha256"]), checks
+
+    if kind == "form_reliability":
+        from structure_optimizer.core.reliability import form_hlrf
+
+        r = form_hlrf(_fp_linear_limit_state, n_vars=rec["n_vars"])
+        checks = [
+            ("beta", rec["beta"], r.beta),
+            ("p_failure", rec["p_failure"], r.p_failure),
+            ("converged", rec["converged"], r.converged),
+        ]
+        return np.asarray(r.mpp), ("mpp_sha256", rec["mpp_sha256"]), checks
+
+    if kind == "marching_squares":
+        field, xs, ys = _fp_disk_field(rec["grid_n"], rec["radius"])
+        loops = [lp for lp in marching_squares_contours(field, xs, ys, level=0.0) if polygon_area(lp) > 1e-12]
+        total_area = sum(polygon_area(lp) for lp in loops)
+        pts = np.vstack([np.asarray(lp, dtype=float) for lp in loops]) if loops else np.zeros((0, 2))
+        checks = [
+            ("total_area", rec["total_area"], total_area),
+            ("n_loops", rec["n_loops"], len(loops)),
+        ]
+        return pts, ("contour_sha256", rec["contour_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -209,11 +296,18 @@ def test_multiphysics_fingerprint_set_present():
     can't silently drop them (they were unvalidated dead files before)."""
     stems = {p.stem for p in _multiphysics_fingerprints()}
     expected = {
+        # v5 multi-physics
         "vibrating_beam__smoke_modal",
         "heat_sink__smoke",
         "nonlinear_cantilever__smoke",
         "stochastic_uq_smoke",
         "stochastic_worst_case_smoke",
+        # v6 production-grade (Wave LL closure)
+        "tl_cantilever__smoke",
+        "damped_fr_cantilever__smoke",
+        "anisotropic_thermal_heat_sink__smoke",
+        "form_linear_limit_state",
+        "marching_squares_disk",
     }
     missing = expected - stems
-    assert not missing, f"missing v5 multi-physics fingerprints: {sorted(missing)}"
+    assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

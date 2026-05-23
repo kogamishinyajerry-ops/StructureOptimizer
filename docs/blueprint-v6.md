@@ -67,6 +67,6 @@ v6 完成 = `python scripts/test_agent.py --rubric v6` 报告：
 - [x] II — FORM/SORM + importance sampling（D038 · 10 tests green · 线性极限态 β 解析 + Breitung 抛物面 + IS 方差缩减）
 - [x] JJ — Marching-squares 平滑边界 STL（D039 · 7 tests green · 面积 O(h²) 收敛 + beats voxel + 闭合轮廓）
 - [x] KK — Reverse-mode AD（tape）（D040 · 7 tests green · reverse==forward==analytical==中心差分 + DAG 复用 + 2万深链）
-- [ ] LL — v6 收口（rubric ≥ 99）
+- [x] LL — v6 收口（D041 · §5 demos + architecture §16 + CI v6 step + 30 fingerprints · rubric run 确认 ≥99）
 
 > 完成一波把对应 `[ ]` 改 `[x]`，rubric §6.1 检查 ≥6 个 tick。

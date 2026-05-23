@@ -92,6 +92,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
         run: python scripts/test_agent.py --rubric v5
 
+      - name: v6 test agent — production-grade rubric scorecard
+        # v6 §4.7: v6 rubric scored after v5. The v6 run also enforces the D033
+        # pytest-green no-regression gate (hard-fail) and the v4/v5 regression
+        # checks. Informational during development; strict once v6 reaches ≥99.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --rubric v6
+
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
     runs-on: ubuntu-latest

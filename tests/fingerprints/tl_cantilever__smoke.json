@@ -1,0 +1,21 @@
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "rubric_version": "v6.0-wave-EE",
+  "kind": "total_lagrangian",
+  "n_load_steps": 3,
+  "displacements_sha256": "sha256:792b8bd73475d9da049e44c77d6dc0e3129c5900fc2bb9ff46d14d249db4794b",
+  "max_displacement": 0.23944668087827703,
+  "n_newton_iters": 12,
+  "converged": true,
+  "load_steps": [
+    0.3333333333333333,
+    0.6666666666666666,
+    1.0
+  ],
+  "max_disp_per_step": [
+    0.07982011521690657,
+    0.15963681400305774,
+    0.23944668087827703
+  ]
+}

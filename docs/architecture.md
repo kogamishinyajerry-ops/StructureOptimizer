@@ -495,3 +495,39 @@ gradient check 用于敏感度验证。
 - LLM / AI advisor not in scope（永久红线）
 
 详 ADR D025-D032 各自的 "Reopening criteria" 节。
+
+## 16. v6 — production-grade formulations
+
+v6 把 v5 **有意简化**的 7 处公式升级为严格、可解析校验的 production-grade 实现（每处
+都源自对应 v5 ADR 的 "Reopening criteria"），在永久红线**内**把精度推到生产级。§15 的
+对应限制由此解除：
+
+| v5 限制（§15） | v6 升级 | 模块 | ADR | 定量锚点 |
+|---|---|---|---|---|
+| simplified TL，仅 qualitative Gere | 完整 Total-Lagrangian Green-strain + 2nd PK + 一致切线 | `core/total_lagrangian.py` | D034 | 有限旋转 objectivity 1e-10 + 常应变 patch |
+| 频响 undamped only | Rayleigh 阻尼复频响 C=αM+βK | `core/freq_response.py` | D035 | SDOF 半功率带宽解析 |
+| 热传导仅 scalar k | 各向异性 / 正交各向异性张量 k | `core/thermal.py` | D036 | 正交各向异性 patch test 1e-9 + 旋转不变 |
+| NSGA-II 仅 2 目标 | NSGA-III ≥3 目标（Das-Dennis + niching） | `core/pareto_nsga.py` | D037 | 参考点精确组合数 + DTLZ2 单位球收敛 |
+| MC 仅 Gaussian，无尾事件方法 | FORM/SORM + importance sampling | `core/reliability.py` | D038 | 线性极限态 β 解析 + Breitung + IS 方差缩减 |
+| STL 是 voxelized（O(h)） | Marching-squares 平滑边界 STL（O(h²)） | `core/stl_export.py` | D039 | 面积 O(h²) 收敛 + beats voxel |
+| autodiff 实为 forward-mode | Reverse-mode（tape）AD | `core/autodiff.py` | D040 | reverse==forward==解析==中心差分 + DAG 复用 |
+
+### 16.1 production-grade 原则
+
+- 每个升级配**定量解析校验**（不是 v5 的 qualitative trend）——见上表锚点列。
+- 向后兼容：v6 新增 API 不破坏 v5 调用（如 `solve_thermal` 的 `conductivity_tensor`
+  默认 None 走原标量路径；`write_stl` voxel 路径不动；`Var` forward-mode 保留）。
+- 完成度门控：`python scripts/test_agent.py --rubric v6` ≥99/100，且 v4/v5 无回归 +
+  **pytest gate green**（D033）+ 全永久红线保持。
+- 永久红线**全部不变**：numpy-only 运行时、2D/2.5D、本地可跑、单行 stderr、无 LLM、
+  自我贬低优先于自我吹嘘。`marching-squares` 在 2D 仍是 2.5D 挤出；`reverse-mode AD`
+  用纯 numpy tape（不引入 JAX）。
+
+### 16.2 v6 已知限制（诚实范围）
+
+- 张量热传导是 global k（非 per-element 场）；anisotropic 热 TO 灵敏度未接入。
+- SORM 用 Breitung 渐近式；FORM/SORM 假设独立高斯变量（无 Nataf/Rosenblatt）。
+- Marching-squares caps 是 centroid-fan（star-convex 水密）；非 star-convex / 带孔
+  截面需 ear-clipping。
+- Reverse-mode AD 仅 + - * / ** neg 标量算子，未端到端微分 SIMP 目标。
+- 详见 D034-D040 各自 "Honest scope notes" + "Reopening criteria"。

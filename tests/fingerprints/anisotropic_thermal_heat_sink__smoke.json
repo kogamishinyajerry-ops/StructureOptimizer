@@ -1,0 +1,12 @@
+{
+  "benchmark": "heat_sink",
+  "preset": "smoke",
+  "rubric_version": "v6.0-wave-GG",
+  "kind": "anisotropic_thermal",
+  "kxx": 5.0,
+  "kyy": 1.0,
+  "kxy": 0.3,
+  "temperatures_sha256": "sha256:5447d8cf5ffe49e4df6c52bb2856aa9be36c19e597628f4f3c020b7f7282ec9d",
+  "thermal_compliance": 435492.4555886047,
+  "max_temperature": 435.49245558860594
+}
