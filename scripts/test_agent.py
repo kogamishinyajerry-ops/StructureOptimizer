@@ -66,6 +66,7 @@ class Scorecard:
     v2_check: dict = field(default_factory=dict)
     v3_check: dict = field(default_factory=dict)
     v4_check: dict = field(default_factory=dict)
+    v5_check: dict = field(default_factory=dict)
     pytest_check: dict = field(default_factory=dict)
 
     @property
@@ -640,6 +641,245 @@ def check_v5_6_4_adrs_v5() -> tuple[int, str, str]:
     return (3, "PASS", f"{len(new_adrs)} v5 ADRs") if len(new_adrs) >= 8 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥8)")
 
 
+# --- v6 production-grade rubric checks ---------------------------------
+
+
+def check_v6_1_1_total_lagrangian() -> tuple[int, str, str]:
+    """§1.1 full Total-Lagrangian Green-strain Newton (8 pts)."""
+    has = _file_exists("structure_optimizer/core/total_lagrangian.py")
+    has_test = _grep_count(r"total_lagrangian|green_strain|second_piola|2nd.?pk", "tests/**/*.py") >= 1
+    if has and has_test:
+        return 8, "PASS", "total_lagrangian module + quantitative test"
+    if has:
+        return 4, "PARTIAL", "module present, no quantitative test"
+    return 0, "FAIL", "core/total_lagrangian.py missing"
+
+
+def check_v6_1_2_rayleigh_damping() -> tuple[int, str, str]:
+    """§1.2 Rayleigh-damped complex frequency response (6 pts)."""
+    has = _grep_count(r"damped_harmonic|rayleigh_damp|alpha.*M.*beta.*K|C\s*=\s*alpha", "structure_optimizer/core/freq_response.py") >= 1
+    has_test = _grep_count(r"rayleigh|damped.*freq|half_power|damping_ratio", "tests/**/*.py") >= 1
+    if has and has_test:
+        return 6, "PASS", "damped harmonic response + test"
+    if has:
+        return 3, "PARTIAL", "damping in module, no test"
+    return 0, "FAIL", "no Rayleigh-damped response"
+
+
+def check_v6_1_3_anisotropic_thermal() -> tuple[int, str, str]:
+    """§1.3 anisotropic / orthotropic thermal conductivity (6 pts)."""
+    has = _grep_count(r"anisotropic|orthotropic|conductivity_matrix|tensor.*conduct|k_xy|kxy", "structure_optimizer/core/thermal.py") >= 1
+    has_test = _grep_count(r"anisotropic|orthotropic|rotation.*invar|tensor.*conduct", "tests/**/*.py") >= 1
+    if has and has_test:
+        return 6, "PASS", "tensor conductivity + test"
+    if has:
+        return 3, "PARTIAL", "tensor k in module, no test"
+    return 0, "FAIL", "no anisotropic thermal"
+
+
+def check_v6_1_4_nsga3() -> tuple[int, str, str]:
+    """§1.4 NSGA-III for ≥3 objectives (5 pts)."""
+    has = _grep_count(r"nsga3|nsga_iii|das_dennis|reference_direction|reference_point", "structure_optimizer/core/pareto_nsga.py") >= 1
+    has_test = _grep_count(r"nsga3|nsga_iii|three_objective|3.?obj|das_dennis", "tests/**/*.py") >= 1
+    if has and has_test:
+        return 5, "PASS", "NSGA-III + 3-objective test"
+    if has:
+        return 2, "PARTIAL", "NSGA-III in module, no test"
+    return 0, "FAIL", "no NSGA-III"
+
+
+def check_v6_2_1_form() -> tuple[int, str, str]:
+    """§2.1 FORM reliability index β (5 pts)."""
+    has = _grep_count(r"def form|form_reliability|hl_rf|hasofer|reliability_index|\bbeta\b.*reliab", "structure_optimizer/core/reliability.py") >= 1
+    has_test = _grep_count(r"\bform\b|reliability_index|hl_rf|beta.*linear|linear.*limit_state", "tests/**/*.py") >= 1
+    if has and has_test:
+        return 5, "PASS", "FORM + analytical β test"
+    if has:
+        return 2, "PARTIAL", "FORM in module, no test"
+    return 0, "FAIL", "no FORM"
+
+
+def check_v6_2_2_importance_sampling() -> tuple[int, str, str]:
+    """§2.2 importance sampling (4 pts)."""
+    has = _grep_count(r"importance_sampling|importance_sample", "structure_optimizer/core/reliability.py") >= 1
+    has_test = _grep_count(r"importance_sampl|variance_reduction", "tests/**/*.py") >= 1
+    if has and has_test:
+        return 4, "PASS", "importance sampling + variance-reduction test"
+    if has:
+        return 2, "PARTIAL", "IS in module, no test"
+    return 0, "FAIL", "no importance sampling"
+
+
+def check_v6_2_3_sorm() -> tuple[int, str, str]:
+    """§2.3 SORM / curvature correction (3 pts)."""
+    has = _grep_count(r"\bsorm\b|breitung|curvature.*correct|second_order_reliab", "structure_optimizer/core/reliability.py") >= 1
+    has_test = _grep_count(r"\bsorm\b|breitung|curvature.*reliab", "tests/**/*.py") >= 1
+    if has and has_test:
+        return 3, "PASS", "SORM + test"
+    if has:
+        return 1, "PARTIAL", "SORM in module, no test"
+    return 0, "FAIL", "no SORM"
+
+
+def check_v6_2_4_tl_verification() -> tuple[int, str, str]:
+    """§2.4 full-TL quantitative verification (4 pts).
+
+    The rigorous, reliable quantitative proof of a full Green-strain TL is
+    finite-rotation objectivity (zero strain to machine precision) + an
+    analytical constant-strain patch — these distinguish full TL from the v5
+    ``K + ½K_g`` approximation, where a fuzzy continuum-vs-beam elastica match
+    would be flaky. We reward those.
+    """
+    n = _grep_count(
+        r"finite_rotation.*green|rigid.*rotation|uniform_stretch.*analytical|green_strain.*assert|objectivity",
+        "tests/**/*.py",
+    )
+    return (4, "PASS", f"{n} TL-objectivity/patch refs") if n >= 1 else (0, "FAIL", "no full-TL verification test")
+
+
+def check_v6_2_5_half_power_bandwidth() -> tuple[int, str, str]:
+    """§2.5 half-power bandwidth analytical check (4 pts)."""
+    n = _grep_count(r"half_power|bandwidth.*analyt|quality_factor|q_factor|3db", "tests/**/*.py")
+    return (4, "PASS", f"{n} half-power refs") if n >= 1 else (0, "FAIL", "no half-power bandwidth test")
+
+
+def check_v6_3_1_smooth_stl() -> tuple[int, str, str]:
+    """§3.1 marching-squares smooth-boundary STL (5 pts)."""
+    has = _grep_count(r"marching_squares|smooth_boundary|export_stl_smooth|smooth.*contour", "structure_optimizer/core/stl_export.py") >= 1
+    has_test = _grep_count(r"marching_squares|smooth.*stl|area_converg|smooth_boundary", "tests/**/*.py") >= 1
+    if has and has_test:
+        return 5, "PASS", "smooth-boundary STL + area-convergence test"
+    if has:
+        return 2, "PARTIAL", "smooth STL in module, no test"
+    return 0, "FAIL", "no marching-squares smooth STL"
+
+
+def check_v6_3_2_reverse_ad() -> tuple[int, str, str]:
+    """§3.2 reverse-mode AD (tape) (5 pts)."""
+    has = _grep_count(r"reverse_mode|backward|class Tape|def grad\b|\.backward\(", "structure_optimizer/core/autodiff.py") >= 1
+    return (5, "PASS", "reverse-mode AD present") if has else (0, "FAIL", "no reverse-mode AD")
+
+
+def check_v6_3_3_ad_consistency() -> tuple[int, str, str]:
+    """§3.3 reverse-vs-forward-vs-FD consistency test (5 pts)."""
+    n = _grep_count(r"reverse.*forward|forward.*reverse|reverse.*central|grad.*finite_diff|reverse_vs", "tests/**/*.py")
+    return (5, "PASS", f"{n} AD-consistency refs") if n >= 1 else (0, "FAIL", "no reverse-vs-forward AD test")
+
+
+def check_v6_4_1_test_count_850() -> tuple[int, str, str]:
+    """§4.1 ≥ 850 tests (4 pts)."""
+    n = _pytest_collect_count()
+    return (4, "PASS", f"{n} tests collected") if n >= 850 else (0, "FAIL", f"{n} (need ≥850)")
+
+
+def check_v6_4_2_core_coverage_95() -> tuple[int, str, str]:
+    """§4.2 core coverage ≥ 95% incl. v6 (4 pts)."""
+    pct = _pytest_coverage("structure_optimizer/core")
+    return (4, "PASS", f"{pct}% coverage") if pct >= 95.0 else (0, "FAIL", f"{pct}% (need ≥95%)")
+
+
+def check_v6_4_3_property_tests_35() -> tuple[int, str, str]:
+    """§4.3 property tests ≥ 35 (3 pts)."""
+    n = _grep_count(r"^def test_property_", "tests/**/*.py")
+    return (3, "PASS", f"{n} property tests") if n >= 35 else (0, "FAIL", f"{n} (need ≥35)")
+
+
+def check_v6_4_4_mutation_75() -> tuple[int, str, str]:
+    """§4.4 mutation kill rate ≥ 75% (3 pts)."""
+    report = REPO_ROOT / "tests/mutation_report.json"
+    if not report.exists():
+        return 0, "FAIL", "mutation_report missing"
+    data = json.loads(report.read_text())
+    rate = data.get("aggregate_kill_rate", data.get("kill_rate", 0.0))
+    return (3, "PASS", f"{rate * 100:.1f}% kill rate") if rate >= 0.75 else (0, "FAIL", f"{rate * 100:.1f}%")
+
+
+def check_v6_4_5_fingerprints_30() -> tuple[int, str, str]:
+    """§4.5 fingerprint DB ≥ 30 (2 pts)."""
+    n = len(list((REPO_ROOT / "tests/fingerprints").glob("*.json")))
+    return (2, "PASS", f"{n} fingerprints") if n >= 30 else (0, "FAIL", f"{n} (need ≥30)")
+
+
+def check_v6_4_6_pytest_gate() -> tuple[int, str, str]:
+    """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
+    has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
+    has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
+    if has_gate and has_adr:
+        return 2, "PASS", "D033 pytest gate + ADR present"
+    return 0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}"
+
+
+def check_v6_4_7_v6_in_agent_ci() -> tuple[int, str, str]:
+    """§4.7 v6 rubric referenced in agent + CI (2 pts)."""
+    me = (REPO_ROOT / "scripts/test_agent.py").read_text()
+    in_agent = "quality-rubric-v6" in me or "CHECKS_V6" in me
+    ci = REPO_ROOT / ".github/workflows/test.yml"
+    in_ci = ci.exists() and "v6" in ci.read_text().lower()
+    if in_agent and in_ci:
+        return 2, "PASS", "v6 in agent + CI"
+    if in_agent:
+        return 1, "PARTIAL", "v6 in agent, not CI"
+    return 0, "FAIL", "v6 not wired"
+
+
+def check_v6_5_1_convergence_html() -> tuple[int, str, str]:
+    """§5.1 analytical-vs-numerical convergence study HTML (3 pts)."""
+    n = _grep_count(r"convergence_study|render_convergence|convergence.*html", "**/*.py")
+    return (3, "PASS", f"{n} convergence-study refs") if n >= 1 else (0, "FAIL", "no convergence study")
+
+
+def check_v6_5_2_bode_plot() -> tuple[int, str, str]:
+    """§5.2 damped frequency-response (Bode-style) render (3 pts)."""
+    n = _grep_count(r"bode|magnitude.*phase|frequency_response.*render|render.*freq_response", "**/*.py")
+    return (3, "PASS", f"{n} Bode refs") if n >= 1 else (0, "FAIL", "no damped-FR render")
+
+
+def check_v6_5_3_nsga3_render() -> tuple[int, str, str]:
+    """§5.3 3-objective Pareto render (2 pts)."""
+    n = _grep_count(r"render.*nsga3|nsga3.*html|three_obj.*render|render.*3.?obj", "**/*.py")
+    return (2, "PASS", f"{n} NSGA-III render refs") if n >= 1 else (0, "FAIL", "no 3-obj render")
+
+
+def check_v6_5_4_smooth_stl_demo() -> tuple[int, str, str]:
+    """§5.4 smooth-vs-voxel STL demo (2 pts)."""
+    n = _grep_count(r"smooth.*voxel|voxel.*smooth|smooth_stl_demo", "**/*.py")
+    return (2, "PASS", f"{n} smooth-STL demo refs") if n >= 1 else (0, "FAIL", "no smooth-STL demo")
+
+
+def check_v6_6_1_blueprint_v6() -> tuple[int, str, str]:
+    """§6.1 blueprint-v6 ≥6 wave ticks (2 pts)."""
+    p = REPO_ROOT / "docs/blueprint-v6.md"
+    if not p.exists():
+        return 0, "FAIL", "blueprint-v6.md missing"
+    ticks = p.read_text().count("[x]")
+    return (2, "PASS", f"{ticks} ticks") if ticks >= 6 else (0, "PARTIAL", f"{ticks} ticks (need ≥6)")
+
+
+def check_v6_6_2_tutorial_v6() -> tuple[int, str, str]:
+    """§6.2 tutorial v6 ≥4 new sections (3 pts)."""
+    p = REPO_ROOT / "docs/tutorial.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    n = len(re.findall(r"^### 16\.\d|^### 17\.\d", p.read_text(), re.MULTILINE))
+    return (3, "PASS", f"{n} v6 subsections") if n >= 4 else (0, "PARTIAL", f"{n} (need ≥4)")
+
+
+def check_v6_6_3_arch_v6() -> tuple[int, str, str]:
+    """§6.3 architecture v6 section (2 pts)."""
+    p = REPO_ROOT / "docs/architecture.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    txt = p.read_text().lower()
+    return (2, "PASS", "v6 section present") if ("v6" in txt and "production-grade" in txt) else (0, "FAIL", "no v6 section")
+
+
+def check_v6_6_4_adrs_v6() -> tuple[int, str, str]:
+    """§6.4 ADRs D034+ ≥ 7 (3 pts)."""
+    files = list((REPO_ROOT / "docs/decisions").glob("D0[34]*.md"))
+    new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 34]
+    return (3, "PASS", f"{len(new_adrs)} v6 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+
+
 # --- regression checks against v1/v2/v3 rubrics -----------------------
 
 
@@ -696,6 +936,16 @@ def check_v4_no_regression() -> dict:
         "score": sc_v4.total_earned,
         "max": sc_v4.total_max,
         "regression": sc_v4.total_earned < 100,
+    }
+
+
+def check_v5_no_regression() -> dict:
+    """v5 must remain 100/100 for a v6 release (true in-process re-score)."""
+    sc_v5 = run_v5()
+    return {
+        "score": sc_v5.total_earned,
+        "max": sc_v5.total_max,
+        "regression": sc_v5.total_earned < 100,
     }
 
 
@@ -814,6 +1064,43 @@ CHECKS_V5 = [
 ]
 
 
+CHECKS_V6 = [
+    # §1 严格公式升级 (25 pts)
+    ("§1", "1.1", "完整 TL Green-strain Newton", 8, check_v6_1_1_total_lagrangian),
+    ("§1", "1.2", "Rayleigh 阻尼复频响", 6, check_v6_1_2_rayleigh_damping),
+    ("§1", "1.3", "各向异性张量热传导", 6, check_v6_1_3_anisotropic_thermal),
+    ("§1", "1.4", "NSGA-III ≥3 目标", 5, check_v6_1_4_nsga3),
+    # §2 高级可靠性 + 解析校验 (20 pts)
+    ("§2", "2.1", "FORM 可靠性指标 β", 5, check_v6_2_1_form),
+    ("§2", "2.2", "Importance sampling", 4, check_v6_2_2_importance_sampling),
+    ("§2", "2.3", "SORM / 曲率修正", 3, check_v6_2_3_sorm),
+    ("§2", "2.4", "完整 TL objectivity + 解析 patch 校验", 4, check_v6_2_4_tl_verification),
+    ("§2", "2.5", "半功率带宽解析校验", 4, check_v6_2_5_half_power_bandwidth),
+    # §3 几何 + AD (15 pts)
+    ("§3", "3.1", "Marching-squares 平滑 STL", 5, check_v6_3_1_smooth_stl),
+    ("§3", "3.2", "Reverse-mode AD (tape)", 5, check_v6_3_2_reverse_ad),
+    ("§3", "3.3", "AD reverse-vs-forward 一致性", 5, check_v6_3_3_ad_consistency),
+    # §4 工程质量 (20 pts)
+    ("§4", "4.1", "Test count ≥ 850", 4, check_v6_4_1_test_count_850),
+    ("§4", "4.2", "Core coverage ≥ 95% (含 v6)", 4, check_v6_4_2_core_coverage_95),
+    ("§4", "4.3", "Property tests ≥ 35", 3, check_v6_4_3_property_tests_35),
+    ("§4", "4.4", "Mutation kill rate ≥ 75%", 3, check_v6_4_4_mutation_75),
+    ("§4", "4.5", "Fingerprint DB ≥ 30", 2, check_v6_4_5_fingerprints_30),
+    ("§4", "4.6", "pytest gate green (D033)", 2, check_v6_4_6_pytest_gate),
+    ("§4", "4.7", "v6 rubric 写入 agent + CI", 2, check_v6_4_7_v6_in_agent_ci),
+    # §5 用户面 (10 pts)
+    ("§5", "5.1", "收敛研究 HTML", 3, check_v6_5_1_convergence_html),
+    ("§5", "5.2", "阻尼频响 Bode 图", 3, check_v6_5_2_bode_plot),
+    ("§5", "5.3", "3 目标 Pareto 渲染", 2, check_v6_5_3_nsga3_render),
+    ("§5", "5.4", "平滑 STL demo", 2, check_v6_5_4_smooth_stl_demo),
+    # §6 文档 (10 pts)
+    ("§6", "6.1", "blueprint-v6 six waves ticked", 2, check_v6_6_1_blueprint_v6),
+    ("§6", "6.2", "tutorial v6 ≥4 new sections", 3, check_v6_6_2_tutorial_v6),
+    ("§6", "6.3", "architecture v6 + production-grade doc", 2, check_v6_6_3_arch_v6),
+    ("§6", "6.4", "ADRs D034+ ≥ 7", 3, check_v6_6_4_adrs_v6),
+]
+
+
 def _score(checks: list, section_filter: str | None = None) -> list[RubricItem]:
     items: list[RubricItem] = []
     for section, code, title, max_pts, fn in checks:
@@ -844,8 +1131,15 @@ def run_v4(section_filter: str | None = None) -> Scorecard:
     return sc
 
 
+def run_v5(section_filter: str | None = None) -> Scorecard:
+    """Score the v5 rubric in-process. Used for v6's no-regression gate."""
+    sc = Scorecard(version="v5.0.0")
+    sc.items = _score(CHECKS_V5, section_filter)
+    return sc
+
+
 def run_all(section_filter: str | None = None, rubric: str = "v5", run_pytest_gate: bool = True) -> Scorecard:
-    """Score the currently-active rubric. Default = v5 (the latest).
+    """Score the currently-active rubric. Default = v5.
 
     ``run_pytest_gate`` runs the full suite as a hard-fail no-regression gate
     (D033). It is skipped for ``--section`` (partial) runs and via
@@ -853,14 +1147,18 @@ def run_all(section_filter: str | None = None, rubric: str = "v5", run_pytest_ga
     """
     if rubric == "v4":
         sc = run_v4(section_filter)
-    else:
-        sc = Scorecard(version="v5.0.0")
-        sc.items = _score(CHECKS_V5, section_filter)
+    elif rubric == "v5":
+        sc = run_v5(section_filter)
+    else:  # v6
+        sc = Scorecard(version="v6.0.0")
+        sc.items = _score(CHECKS_V6, section_filter)
     sc.v1_check = check_v1_no_regression()
     sc.v2_check = check_v2_no_regression()
     sc.v3_check = check_v3_no_regression()
-    if rubric == "v5":
+    if rubric in ("v5", "v6"):
         sc.v4_check = check_v4_no_regression()
+    if rubric == "v6":
+        sc.v5_check = check_v5_no_regression()
     if run_pytest_gate:
         sc.pytest_check = check_pytest_green()
     return sc
@@ -892,6 +1190,8 @@ def print_summary(sc: Scorecard) -> None:
     print(f"  v3 rubric  : {sc.v3_check.get('score')}/100  regression={sc.v3_check.get('regression')}")
     if sc.v4_check:
         print(f"  v4 rubric  : {sc.v4_check.get('score')}/{sc.v4_check.get('max', 100)}  regression={sc.v4_check.get('regression')}")
+    if sc.v5_check:
+        print(f"  v5 rubric  : {sc.v5_check.get('score')}/{sc.v5_check.get('max', 100)}  regression={sc.v5_check.get('regression')}")
     if sc.pytest_check:
         pc = sc.pytest_check
         marker = "✓" if pc.get("green") else "✗"
@@ -905,6 +1205,7 @@ def print_summary(sc: Scorecard) -> None:
         sc.v2_check.get("regression"),
         sc.v3_check.get("regression"),
         sc.v4_check.get("regression") if sc.v4_check else False,
+        sc.v5_check.get("regression") if sc.v5_check else False,
         sc.pytest_check.get("regression") if sc.pytest_check else False,
     ]
     if sc.total_earned >= 99 and not any(regressions):
@@ -922,9 +1223,9 @@ def main() -> int:
     parser.add_argument("--strict", action="store_true", help="exit 1 if total < 99 or any regression")
     parser.add_argument(
         "--rubric",
-        choices=["v4", "v5"],
+        choices=["v4", "v5", "v6"],
         default="v5",
-        help="which rubric to score (default v5; v4 still scorable for regression check)",
+        help="which rubric to score (default v5; v4/v5 scorable for regression checks)",
     )
     parser.add_argument(
         "--output",
@@ -957,6 +1258,8 @@ def main() -> int:
     }
     if sc.v4_check:
         payload["v4_check"] = sc.v4_check
+    if sc.v5_check:
+        payload["v5_check"] = sc.v5_check
     if sc.pytest_check:
         payload["pytest_check"] = sc.pytest_check
     out_path.write_text(json.dumps(payload, indent=2) + "\n")
@@ -970,6 +1273,7 @@ def main() -> int:
                 sc.v2_check.get("regression"),
                 sc.v3_check.get("regression"),
                 sc.v4_check.get("regression") if sc.v4_check else False,
+                sc.v5_check.get("regression") if sc.v5_check else False,
                 sc.pytest_check.get("regression") if sc.pytest_check else False,
             ]
         )
