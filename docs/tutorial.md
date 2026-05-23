@@ -798,6 +798,31 @@ info = write_stl_marching_squares(mesh, densities, "out.stl", rho_threshold=0.5)
 约 5 倍；轮廓保证闭合（首点≈末点）。鞍点（case 5/10）用格心值消歧。仍是 2.5D 挤出，
 不引入 3D 求解。
 
+### 16.7 Reverse-mode（tape）自动微分（Wave KK，D040）
+
+v5 的 `Var` 名为 reverse 实为 **forward-mode**（每次只带一个种子的导数，n 个输入要
+跑 n 遍）。v6 加真正的 reverse-mode（tape）`RVar`：记录计算图，一次反向传播就拿到
+对**所有**输入的梯度——这正是标量目标对大量设计变量求灵敏度时该用的模式：
+
+```python
+import numpy as np
+from structure_optimizer.core.autodiff import RVar, reverse_grad
+
+# 方式一：直接用 RVar 建表达式
+a, b = RVar(2.0), RVar(3.0)
+y = a * b + a            # y = a·b + a
+y.backward()             # 一次反向传播
+print(a.grad, b.grad)    # ∂y/∂a = b+1 = 4.0，∂y/∂b = a = 2.0
+
+# 方式二：对向量函数求全梯度（f 接收 list[RVar]，返回 RVar）
+g = reverse_grad(lambda v: 100*(v[1]-v[0]**2)**2 + (1-v[0])**2, np.array([0.7, -0.3]))
+```
+
+**关键升级**：reverse 梯度与 forward `Var`、解析解、中心差分**四者一致**（机器精度 /
+1e-6）；共享子表达式的伴随**正确累加**（per-seed 方法会漏）；反向传播用**迭代**后序
+遍历，2 万深的链也不会撞 Python 递归上限。仅支持 + - * / ** neg（灵敏度验证工具，
+非 JAX/PyTorch 替代）。
+
 ---
 
 ## 常见错误
