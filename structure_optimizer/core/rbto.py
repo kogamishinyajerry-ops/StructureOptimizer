@@ -176,3 +176,131 @@ def rbto_simp(
 # Aliases for v7 rubric grep
 reliability_based_to = rbto_simp
 rbto = rbto_simp
+
+
+# --- Wave HHH (v9, D063): system-reliability-based TO ------------------------
+#
+# D042 drives the volume fraction to a target β for a *single* limit state.
+# D055 gave series-system reliability (Ditlevsen bounds + bivariate CDF). D055's
+# reopening criterion named the coupling: drive a topology to a target *system* β.
+# A real structure has several failure modes; here each mode i is a displacement
+# limit state d_allow_i with its own independent load factor s_i ~ N(1, cov_i),
+# so the series-system failure is P_f,sys = 1 − ∏(1 − P_f,i) and the system index
+# is β_sys = Φ⁻¹(1 − P_f,sys). More material lowers d_nominal, raising every β_i
+# and hence β_sys — so the same volume bisection as D042 applies.
+
+
+@dataclass
+class SystemRBTOResult:
+    """Output of ``system_rbto_simp`` (Wave HHH)."""
+
+    densities: np.ndarray
+    volume_fraction: float
+    d_nominal: float
+    per_mode_betas: list[float]
+    beta_system: float
+    p_failure_system: float
+    beta_target: float
+    feasible: bool
+    n_simp_runs: int
+    deterministic_volume_fraction: float
+
+
+def _system_beta(d_nominal: float, d_allows, load_covs) -> tuple[float, float, list[float]]:
+    """Independent series-system index from per-mode displacement limit states.
+
+    Returns ``(beta_system, p_failure_system, per_mode_betas)``."""
+    from structure_optimizer.core.reliability import _standard_normal_ppf
+
+    betas: list[float] = []
+    p_survive = 1.0
+    for d_allow, cov in zip(d_allows, load_covs, strict=True):
+        rel = displacement_reliability(d_nominal, d_allow, cov)
+        betas.append(float(rel.beta))
+        p_survive *= 1.0 - float(rel.p_failure)
+    pf_sys = 1.0 - p_survive
+    pf_sys = min(max(pf_sys, 1e-15), 1.0 - 1e-15)
+    beta_sys = float(_standard_normal_ppf(1.0 - pf_sys))
+    return beta_sys, float(pf_sys), betas
+
+
+def system_rbto_simp(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    d_allows,
+    beta_target: float,
+    load_covs=None,
+    vf_low: float = 0.1,
+    vf_high: float = 0.9,
+    vf_tol: float = 0.02,
+    max_iter: int = 12,
+) -> SystemRBTOResult:
+    """Bisect the volume fraction for the lightest min-compliance design whose
+    **series-system** reliability β_sys ≥ ``beta_target`` (Wave HHH, D063).
+
+    ``d_allows`` is one displacement allowable per failure mode; ``load_covs`` the
+    per-mode load coefficient of variation (default 0.1 for all). With a single
+    mode this reduces exactly to :func:`rbto_simp` (β_sys = β). The modes are
+    treated as independent (series failure 1 − ∏(1 − P_i))."""
+    d_allows = [float(d) for d in d_allows]
+    if len(d_allows) < 1:
+        raise SolverError("system_rbto_no_modes")
+    if any(d <= 0 for d in d_allows):
+        raise SolverError("rbto_nonpositive_allowable")
+    if beta_target < 0:
+        raise SolverError("rbto_negative_beta_target")
+    if load_covs is None:
+        load_covs = [0.1] * len(d_allows)
+    load_covs = [float(c) for c in load_covs]
+    if len(load_covs) != len(d_allows):
+        raise SolverError("system_rbto_cov_shape_mismatch")
+    if any(c <= 0 for c in load_covs):
+        raise SolverError("rbto_nonpositive_cov")
+    if not (0 < vf_low < vf_high <= 1.0):
+        raise SolverError("rbto_invalid_vf_bracket")
+
+    opt = config.optimization
+    n_runs = 0
+
+    def _eval(vf: float):
+        nonlocal n_runs
+        cfg = replace(config, optimization=replace(opt, volume_fraction=vf))
+        r = run_simp(cfg, mesh)
+        n_runs += 1
+        d_nom = float(r.final_analysis.max_displacement)
+        beta_sys, pf_sys, betas = _system_beta(d_nom, d_allows, load_covs)
+        return r, d_nom, beta_sys, pf_sys, betas
+
+    r_hi, d_hi, beta_hi, pf_hi, betas_hi = _eval(vf_high)
+    if beta_hi < beta_target:
+        return SystemRBTOResult(
+            densities=r_hi.densities, volume_fraction=vf_high, d_nominal=d_hi,
+            per_mode_betas=betas_hi, beta_system=beta_hi, p_failure_system=pf_hi,
+            beta_target=beta_target, feasible=False, n_simp_runs=n_runs,
+            deterministic_volume_fraction=opt.volume_fraction,
+        )
+
+    r_lo, d_lo, beta_lo, pf_lo, betas_lo = _eval(vf_low)
+    if beta_lo >= beta_target:
+        best = (vf_low, r_lo, d_lo, beta_lo, pf_lo, betas_lo)
+    else:
+        lo, hi = vf_low, vf_high
+        best = (vf_high, r_hi, d_hi, beta_hi, pf_hi, betas_hi)
+        for _ in range(max_iter):
+            if hi - lo < vf_tol:
+                break
+            mid = 0.5 * (lo + hi)
+            r_m, d_m, beta_m, pf_m, betas_m = _eval(mid)
+            if beta_m >= beta_target:
+                hi = mid
+                best = (mid, r_m, d_m, beta_m, pf_m, betas_m)
+            else:
+                lo = mid
+
+    vf, r, d_nom, beta_sys, pf_sys, betas = best
+    return SystemRBTOResult(
+        densities=r.densities, volume_fraction=float(vf), d_nominal=d_nom,
+        per_mode_betas=betas, beta_system=beta_sys, p_failure_system=pf_sys,
+        beta_target=beta_target, feasible=True, n_simp_runs=n_runs,
+        deterministic_volume_fraction=opt.volume_fraction,
+    )

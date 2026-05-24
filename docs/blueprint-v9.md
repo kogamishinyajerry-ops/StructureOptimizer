@@ -69,7 +69,7 @@ v9 完成 = `python scripts/test_agent.py --rubric v9` 报告：
 - [x] EEE — ≥3 目标多载况 NSGA-III + 种子（D060 · 6 tests green · 精确 n-D 超体积 HSO（vs 2D 公式 + 已知 3D 盒 + 容斥）+ Das-Dennis 3 目标精确组合数 C(d+2,2)=15/28/45 + 三目标前沿单调 HV + 载况真冲突（LC1 最优在 LC2 下更差）+ 梯度种子提升 HV 1.51e9→1.93e9 且端点锐化 8.4×；诚实：仍梯度自由、种子注入非 GA 发现、HSO 不适合多目标大前沿）
 - [x] FFF — Rosenblatt 变换（已知联合分布）（D061 · 6 tests green · 条件 CDF Rosenblatt == Cholesky 白化 L⁻¹(x−μ) 1e-10（两独立推导一致，property）+ round-trip + 精确去相关 Cov(U)=I + 单位方差高斯下与 Nataf 一致 + FORM β == 闭式 (a₀−aᵀμ)/√(aᵀΣa)；诚实：仅 MVN 联合，高斯 copula 退化到 Nataf，非高斯联合是 reopening）
 - [x] GGG — 耦合密度 + orientation 热 TO（D062 · 4 tests green · 交替最小化热柔度 ≤ 单独优化密度（3.1×）且 ≤ 单独优化 orientation（17×）+ 逐 cycle 单调下降 2.88e6→2.59e5 + 各向同性退化精确等于纯密度 TO（Δ=0、角度恒 0）+ 确定性；诚实：块坐标交替非同时 MMA、OC+steepest 非 MMA、无角度场制造约束）
-- [ ] HHH — 系统可靠性驱动 TO
+- [x] HHH — 系统可靠性驱动 TO（D063 · 5 tests green · 体积二分达到目标系统 β（vf 0.413 β_sys 2.06≥2.0）+ β_sys < min 单模态 β（独立 2 模态系统比任一模态更难）+ 单模态精确退化到 D042 rbto_simp + 体积随目标 β 单调 + 独立 Pf 落在 D055 Ditlevsen 界内；诚实：模态视为独立、可靠性旋钮仍是体积分数、线性位移极限态）
 - [ ] III — slit-free 孔三角化（鲁棒水密）
 - [ ] JJJ — v9 收口（rubric ≥ 99）
 

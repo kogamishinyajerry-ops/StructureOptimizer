@@ -1250,6 +1250,23 @@ res = coupled_density_orientation_to(config, mesh, kxx=5.0, kyy=1.0,
 角度恒 0）。诚实声明：**块坐标交替**非同时 (ρ,θ) MMA（收敛到块坐标驻点，未必全局联合最优）；密度步
 OC + 方向步最速下降，均非 MMA；无角度场制造约束（reopening 项，见 D062）。
 
+### 19.6 系统可靠性驱动 TO（Wave HHH，D063）
+
+D042 把体积分数驱动到**单**极限态的目标 β；D055 给了系统可靠性（Ditlevsen 界）。v9 把拓扑驱动到
+目标**系统** β：多个失效模态（各自 d_allow_i + 独立载荷因子 s_i），系统失效 `P_f,sys=1−∏(1−P_i)`：
+
+```python
+from structure_optimizer.core.rbto import system_rbto_simp
+res = system_rbto_simp(config, mesh, d_allows=[da, da*1.1], beta_target=2.0,
+                       load_covs=[0.15, 0.15], vf_low=0.2, vf_high=0.85)
+# res.volume_fraction / beta_system / per_mode_betas / p_failure_system
+```
+
+**关键 / 诚实边界**：体积二分达到目标系统 β（vf 0.413, β_sys 2.06≥2.0）+ **β_sys < min 单模态 β**
+（独立 2 模态系统比任一模态更难）+ 单模态**精确退化**到 D042 `rbto_simp` + 体积随目标 β 单调 +
+独立 Pf 落在 D055 Ditlevsen 界内。诚实声明：模态视为**独立**（相关模态用 `system_reliability_series(ρ)`
+是 reopening）；可靠性旋钮仍是**体积分数**（非逐模态拓扑塑形）；线性位移极限态（见 D063）。
+
 ---
 
 ## 常见错误
