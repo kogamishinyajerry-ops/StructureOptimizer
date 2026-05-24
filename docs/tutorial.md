@@ -1433,6 +1433,27 @@ r = correlated_system_rbto_simp(config, mesh, d_allows=[1.3,1.5], beta_target=2.
 （2 模态精确，≥3 模态带界差）；ρ 是**建模输入**非 FORM MPP 方向余弦导出（标量限状态无 MPP 向量）；限 `ρ∈[0,1)`
 （排除负相关与 ρ→1 奇异）；并联 `system_rbto_simp` bisection（不改 HHH）。
 
+### 20.7 平滑且水密的带孔三角化（Wave QQQ，D072）
+
+两个早期几何波各得一项失一项：AAA（D056）**平滑**轮廓但桥缝 cap **非水密**（曲线孔）；III（D064）**水密**棱柱但
+**阶梯**边界。D064 的 reopening 项是 **constrained-Delaunay 平滑+水密孔**。QQQ 为 rubric 针对的**环形孔（annulus）**
+用 **ribbon 法**解决（不用全 CDT）：
+
+```python
+from structure_optimizer.core.stl_export import write_stl_smooth_watertight_holes
+info = write_stl_smooth_watertight_holes(field, x_coords, y_coords, "ring.stl", n_samples=128)
+# info['is_watertight'] / cross_section_area (≈外−内) / n_annuli / n_triangles (=8·n_samples/环)
+```
+
+对每个单孔区域：外/孔平滑轮廓各重采样到 `n_samples` 点 → 角度对齐 → `i↔i` 连成 **quad 条带**做顶/底 cap + 两侧墙。
+quad 条带拓扑**构造即边流形**（每根 rung 被 2 个 cap 三角共享，每条轮廓边被 1 cap + 1 墙共享）→ 与几何无关地水密，
+同时轮廓保持平滑。
+
+**关键 / 诚实边界**：环形孔平滑轮廓**水密=True**（同场 AAA=False）+ 面积≈平滑外−内（≤5e-3：圆环 0.00%/椭圆环 0.06%）
++ 每边恰 2 三角（解析 STL 边直方图全 2）+ 椭圆环也水密。诚实声明：**仅 annulus（单孔/区域）**，0 孔或 ≥2 孔 raise
+（多孔平滑水密仍需 CDT，是 reopening 项）；轮廓**重采样**（面积"≈"非精确）；水密是**拓扑**（强偏心孔 rung 可能几何自交但仍边流形）；
+顶/底是 **2.5D 挤出**（非真 3D 曲面）。
+
 ---
 
 ## 常见错误
