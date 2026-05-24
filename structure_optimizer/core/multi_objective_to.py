@@ -109,12 +109,17 @@ def multi_objective_to(
     crossover_eta: float = 15.0,
     mutation_prob: float | None = None,
     rng_seed: int = 0,
+    seed_genomes: list[np.ndarray] | None = None,
 ) -> MultiObjectiveTOResult:
     """NSGA-III over density fields, minimising (compliance, volume fraction).
 
     Each genome is the density of the design elements in [0, 1]; the void floor
     is applied before the FEM solve. Returns the final Pareto front plus the
     per-generation hypervolume of the cumulative non-dominated archive.
+
+    ``seed_genomes`` (Wave WW) optionally warm-starts the initial population:
+    each provided design-element genome replaces a random member, so
+    gradient-SIMP optima can be injected (see ``gradient_seeded_multi_objective_to``).
     """
     if n_generations < 1:
         raise SolverError("mo_to_n_generations_must_be_positive")
@@ -145,6 +150,12 @@ def multi_objective_to(
     bl = np.zeros(n_design)
     bu = np.ones(n_design)
     pop = rng.uniform(bl, bu, size=(population_size, n_design))
+    if seed_genomes:
+        for k, g in enumerate(seed_genomes[:population_size]):
+            g = np.asarray(g, dtype=float).reshape(-1)
+            if g.size != n_design:
+                raise SolverError("mo_to_seed_genome_shape_mismatch")
+            pop[k] = np.clip(g, 0.0, 1.0)
     objs = np.array([eval_fn(x) for x in pop])
 
     # Fixed hypervolume reference: worst stiffness (all-min-density) + full volume,
@@ -196,3 +207,28 @@ def multi_objective_to(
         reference_point=reference,
         n_front=front_obj.shape[0],
     )
+
+
+def gradient_seeded_multi_objective_to(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    seed_volume_fractions=(0.2, 0.35, 0.5, 0.65, 0.8),
+    **kwargs,
+) -> MultiObjectiveTOResult:
+    """NSGA-III warm-started with gradient-SIMP optima (Wave WW, D052).
+
+    Runs `run_simp` at each volume fraction in ``seed_volume_fractions`` and
+    injects those (gradient-optimal) density fields into the initial population
+    via ``seed_genomes``. D046's reopening criterion: a gradient-seeded initial
+    population for a sharper front than random initialisation at the same budget.
+    """
+    from dataclasses import replace
+
+    from structure_optimizer.core.simp import run_simp
+
+    design = mesh.design_mask
+    seeds: list[np.ndarray] = []
+    for vf in seed_volume_fractions:
+        cfg = replace(config, optimization=replace(config.optimization, volume_fraction=float(vf)))
+        seeds.append(run_simp(cfg, mesh).densities[design])
+    return multi_objective_to(config, mesh, seed_genomes=seeds, **kwargs)

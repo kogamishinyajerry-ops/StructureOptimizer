@@ -1059,6 +1059,23 @@ Sigmund 滤波**抑制 checkerboard**（直接平滑性质：0.36→5e-4）。�
 灵敏度在共振附近变号，OC 正乘子二分不适用（见 D051）。checkerboard 锚点验的是"滤波器平滑性质"，
 不是最终设计前后对比（这个温和的环本身不产生 checkerboard，无可减）。
 
+### 18.3 梯度种子 NSGA-III（Wave WW，D052）
+
+v7（D046）的 NSGA-III 随机初始化、打不过梯度 SIMP；v8 用 `run_simp` 在多个体积分数的最优解
+**热启动**初始种群：
+
+```python
+from structure_optimizer.core.multi_objective_to import gradient_seeded_multi_objective_to
+res = gradient_seeded_multi_objective_to(config, mesh, n_generations=10, population_size=12,
+                                         seed_volume_fractions=(0.2, 0.35, 0.5, 0.65, 0.8))
+# res.hv_history[-1] 比随机初始化高 ~45%；res.front_objectives 最低柔度端 = 梯度质量
+```
+
+**关键 / 诚实边界**：同预算下种子前沿超体积 **+45%** > 随机，最低柔度端 223 vs 2094（梯度质量，
+~9× 更优）。诚实读法是"**用梯度播种、用 NSGA 多样化**"，不是"NSGA 找到了这些"——巨大的柔度差
+正反映梯度 SIMP 在单目标柔度上远胜梯度自由搜索。仍是双目标 smoke 网；≥3 目标 + 超体积-预算扫描
+是后续（见 D052）。
+
 ---
 
 ## 常见错误
