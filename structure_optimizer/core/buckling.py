@@ -40,6 +40,8 @@ Reference:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
 from structure_optimizer.core.config import BenchmarkConfig
@@ -115,20 +117,25 @@ def assemble_geometric_stiffness(
     mesh: StructuredMesh,
     densities: np.ndarray,
     displacements: np.ndarray,
+    g_penalty: float | None = None,
 ) -> np.ndarray:
     """Assemble the global geometric stiffness K_g (dense, ndof×ndof).
 
-    SIMP-penalized: each element's K_g^e is multiplied by ``ρ_e^p`` (same
-    penalty as K), so void elements contribute negligibly.
+    SIMP-penalized: each element's K_g^e is multiplied by ``ρ_e^{g_penalty}``.
+    ``g_penalty`` defaults to ``opt.penalty`` (the original behaviour, same as K);
+    raising it is the **void-mode relaxation** knob (Wave AAAA, D082) — a steeper
+    geometric-stiffness interpolation drives low-density elements' K_g toward zero
+    faster, suppressing the spurious localized buckling modes they otherwise host.
     """
     opt = config.optimization
+    gp = opt.penalty if g_penalty is None else float(g_penalty)
     ndof = mesh.ndof
     Kg = np.zeros((ndof, ndof))
     for eid in range(mesh.elements.shape[0]):
         edofs = mesh.element_dofs(eid)
         ue = displacements[edofs]
         kge = _element_geometric_stiffness_quad(mesh, config.material.young_modulus, config.material.poisson_ratio, ue)
-        scale = max(densities[eid], opt.min_density) ** opt.penalty
+        scale = max(densities[eid], opt.min_density) ** gp
         Kg[np.ix_(edofs, edofs)] += scale * kge
     return Kg
 
@@ -257,3 +264,171 @@ def buckling_sensitivity(
         numer = float(phi_e @ (dKe_drho + eigenvalue * dKge_drho) @ phi_e)
         sens[eid] = numer / denom
     return sens
+
+
+def design_grade_buckling_sensitivity(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    displacements: np.ndarray,
+    eigenvalue: float,
+    eigenvector: np.ndarray,
+    g_penalty: float | None = None,
+) -> np.ndarray:
+    """**Design-grade** ``∂λ/∂ρ_e`` for one buckling eigenpair — the full adjoint
+    sensitivity that :func:`buckling_sensitivity` truncates (Wave AAAA, D082).
+
+    The analysis-grade formula ignores the indirect ``∂u/∂ρ`` contribution to the
+    geometric stiffness ``K_g = K_g(σ(u(ρ)))``. That truncation is **not** small
+    for design: a fixed-volume λ_crit *ascent* driven by the truncated gradient
+    *lowers* λ_crit (probe: 20.1 → 8.1), because the gradient points the wrong way.
+    Including the adjoint term reverses this (ascent 20.1 → 34.8).
+
+    With ``φ`` re-normalised so ``φᵀ(−K_g)φ = 1`` and ``K φ = λ(−K_g)φ``,
+
+        dλ/dρ_e = dscale_e·φₑᵀkₑφₑ  +  λ·g_dscale_e·φₑᵀkgeₑ(uₑ)φₑ
+                  − λ·dscale_e·μₑᵀkₑuₑ,            K μ = w,
+        w = ∂(φᵀK_gφ)/∂u   (assembled element-wise; K_g is linear in u),
+
+    where ``dscale_e`` is the SIMP derivative of the elastic K (matching
+    :func:`core.fem2d.solve_linear_elastic`) and ``g_dscale_e`` the derivative of
+    the K_g interpolation (``g_penalty``, default ``opt.penalty`` — the value the
+    eigenpair was computed with). Validated against central FD to ≤ 1e-3.
+    """
+    opt = config.optimization
+    gp = opt.penalty if g_penalty is None else float(g_penalty)
+    young, nu = config.material.young_modulus, config.material.poisson_ratio
+    ke = element_stiffness(young, nu)
+    n_elem = mesh.elements.shape[0]
+    rho = np.asarray(densities, dtype=float).reshape(-1)
+
+    # Re-normalise φ so φᵀ(−K_g)φ = 1 (the sensitivity formula assumes this).
+    kg = assemble_geometric_stiffness(config, mesh, rho, displacements, g_penalty=gp)
+    denom = float(eigenvector @ (-kg @ eigenvector))
+    if abs(denom) < 1e-30:
+        return np.zeros(n_elem)
+    phi = eigenvector / np.sqrt(abs(denom))
+
+    # SIMP-scaled elastic K (matches solve_linear_elastic) for the adjoint solve.
+    active = np.where(mesh.void_mask, opt.min_density, rho)
+    k_scale = opt.min_density + (active**opt.penalty) * (1.0 - opt.min_density)
+    big_k = _assemble_stiffness_dense(mesh, k_scale, ke)
+    fixed = mesh.fixed_dofs(config.boundary_conditions)
+    free = np.setdiff1d(np.arange(mesh.ndof), fixed)
+
+    # w = ∂(φᵀ K_g φ)/∂u : K_g^e is linear in u_e, so the per-dof derivative is
+    # φₑᵀ K_g^e(unit_k) φₑ (the geometric stiffness evaluated at a unit displacement).
+    kg_units = [
+        _element_geometric_stiffness_quad(mesh, young, nu, np.eye(8)[k]) for k in range(8)
+    ]
+    w = np.zeros(mesh.ndof)
+    for eid in range(n_elem):
+        edofs = mesh.element_dofs(eid)
+        phe = phi[edofs]
+        sc = max(rho[eid], opt.min_density) ** gp
+        w[edofs] += np.array([sc * float(phe @ (kg_units[k] @ phe)) for k in range(8)])
+
+    mu = np.zeros(mesh.ndof)
+    mu[free] = np.linalg.solve(big_k[np.ix_(free, free)], w[free])
+
+    dscale = opt.penalty * np.where(mesh.void_mask, 0.0, active ** (opt.penalty - 1.0)) * (1.0 - opt.min_density)
+    sens = np.zeros(n_elem)
+    for eid in range(n_elem):
+        edofs = mesh.element_dofs(eid)
+        phe = phi[edofs]
+        ue = displacements[edofs]
+        mue = mu[edofs]
+        kge = _element_geometric_stiffness_quad(mesh, young, nu, ue)
+        g_dscale = gp * max(rho[eid], opt.min_density) ** (gp - 1.0)
+        sens[eid] = (
+            dscale[eid] * float(phe @ (ke @ phe))
+            + eigenvalue * g_dscale * float(phe @ (kge @ phe))
+            - eigenvalue * dscale[eid] * float(mue @ (ke @ ue))
+        )
+    return sens
+
+
+@dataclass
+class BucklingTOResult:
+    """Output of fixed-volume buckling-load maximisation (Wave AAAA, D082)."""
+
+    densities: np.ndarray
+    lambda_history: list[float]
+    volume_history: list[float]
+    converged: bool
+
+
+def maximize_buckling_load(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    vf: float | None = None,
+    n_steps: int = 30,
+    move: float = 0.1,
+    filter_radius: float | None = None,
+    init_densities: np.ndarray | None = None,
+) -> BucklingTOResult:
+    """Maximise the critical buckling load factor ``λ_crit`` at fixed volume, via
+    move-limited MMA on the **design-grade** sensitivity (Wave AAAA, D082).
+
+    Minimises ``−λ_crit`` subject to ``g = mean(ρ) − vf ≤ 0`` using
+    :func:`design_grade_buckling_sensitivity` (density-filtered). With the correct
+    adjoint gradient the ascent genuinely *raises* λ_crit (the analysis-grade
+    gradient does not — see D074/D082). Starts from the volume-fraction design (or
+    ``init_densities``). Stops on ``n_steps``.
+    """
+    from structure_optimizer.core.fem2d import solve_linear_elastic
+    from structure_optimizer.core.filtering import density_filter
+    from structure_optimizer.core.mma import MMAState, mma_step
+
+    opt = config.optimization
+    radius = opt.filter_radius if filter_radius is None else filter_radius
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+    vf_target = float(opt.volume_fraction) if vf is None else float(vf)
+
+    if init_densities is None:
+        rho = np.where(mesh.void_mask, opt.min_density, vf_target)
+    else:
+        rho = np.asarray(init_densities, dtype=float).reshape(-1).copy()
+
+    x = rho[design].astype(float).copy()
+    xmin = np.full(n_design, opt.min_density)
+    xmax = np.ones(n_design)
+    dfdx = np.zeros((1, n_design))
+    dfdx[0, :] = 1.0 / n_design
+    state = MMAState()
+
+    lambda_history: list[float] = []
+    volume_history: list[float] = []
+    converged = False
+    for _ in range(n_steps):
+        rho[design] = x
+        u = solve_linear_elastic(config, mesh, rho).displacements
+        lambdas, phis = buckling_load_factor(config, mesh, rho, u, n_modes=1)
+        lam = float(lambdas[0])
+        dl = design_grade_buckling_sensitivity(config, mesh, rho, u, lam, phis[:, 0])
+        dl = density_filter(mesh, rho, dl, radius, opt.min_density)
+
+        lambda_history.append(lam)
+        volume_history.append(float(np.mean(x)))
+
+        df0dx = -dl[design]  # minimise −λ ⇒ maximise λ
+        fval = np.array([float(np.mean(x) - vf_target)])
+        x_new, _lmbda = mma_step(x, df0dx, fval, dfdx, xmin, xmax, state)
+        change = float(np.max(np.abs(x_new - x)))
+        x = x_new
+        if change < 1e-4:
+            converged = True
+            break
+
+    rho[design] = x
+    u = solve_linear_elastic(config, mesh, rho).displacements
+    lam_final = float(buckling_load_factor(config, mesh, rho, u, n_modes=1)[0][0])
+    lambda_history.append(lam_final)
+    volume_history.append(float(np.mean(x)))
+    return BucklingTOResult(
+        densities=rho,
+        lambda_history=lambda_history,
+        volume_history=volume_history,
+        converged=converged,
+    )

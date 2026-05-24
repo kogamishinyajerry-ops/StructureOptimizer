@@ -1634,6 +1634,35 @@ info = write_stl_cdt_multi_hole(outer_loop, holes, 'part.stl', n_samples=64)
 
 ---
 
+## 22. v12 — design-grade & adaptive：设计级屈曲 + 循环内自适应 + 增广指标 + 分层 copula + 点阵积分 + 周期感知几何
+
+### 22.1 设计级屈曲灵敏度：∂u/∂ρ 伴随（Wave AAAA，D082）
+
+D074（v11）**defer 了屈曲驱动 TO**：既有 analysis-grade `buckling_sensitivity` 忽略几何刚度 `K_g=K_g(σ(u(ρ)))`
+经状态 u 的**间接 ∂u/∂ρ 项**，探针显示定容 λ_crit ascent 反把 λ 从 20.1 拉到 8.1（梯度指错方向）。v12 AAAA 补上
+伴随项，满足 D074 设的 entry condition（ascent 必须升 λ_crit）。
+
+```python
+from structure_optimizer.core.buckling import design_grade_buckling_sensitivity, maximize_buckling_load
+
+dl = design_grade_buckling_sensitivity(config, mesh, rho, u, lam, phi)   # 含 ∂u/∂ρ 伴随，vs FD ≤1e-3
+r = maximize_buckling_load(config, mesh, vf=vf, n_steps=30)              # 定容 λ_crit 上升 driver
+# r.lambda_history（20.1→34.8）/ densities / volume_history
+```
+
+完整公式（φ 归一化使 φᵀ(−K_g)φ=1）：`dλ/dρ_e = dscale_e·φₑᵀkₑφₑ + λ·g_dscale_e·φₑᵀkgeₑφₑ − λ·μₑᵀ(dscale_e·kₑ)uₑ`，
+伴随 `K μ = w`，`w=∂(φᵀK_gφ)/∂u`（K_g 对 u 线性，逐单元 `φₑᵀK_g^e(unit_k)φₑ` 组装）。第三项就是 analysis-grade 丢掉的
+∂u/∂ρ 项。**void-mode relaxation** 旋钮：`assemble_geometric_stiffness(..., g_penalty=)` 越陡，低密度单元 K_g 越快趋零，
+抑制伪局部屈曲模态（默认 = opt.penalty，行为不变）。
+
+**关键 / 定量锚点**：design-grade dλ/dρ vs central-FD ≤1e-3（实测 4e-8，验证 ∂u/∂ρ 项）+ **entry condition**：
+design-grade ascent 升 λ_crit（20.1→34.8）而 analysis-grade 降（20.1→8.1）+ maximize_buckling_load 终 λ>初 λ 体积可行确定性
++ g_penalty 旋钮 default 复现原 K_g、越陡 ‖K_g‖ 越小。**诚实边界**：是 **∂u/∂ρ 伴随**（非 void-mode）解了 smoke mesh
+的 deferral；**单最低模无 mode-tracking**（屈曲 TO 有模态切换/重根，ascent 有 it₅≈8.4 瞬态下凹后爬升）；是 **ascent（最大化 λ）非约束**
+（屈曲约束进 compliance 问题是下一步）；单 Gauss 点 K_g + dense 每步多一次 adjoint solve。
+
+---
+
 ## 常见错误
 
 | 现象 | 原因 | 解决 |

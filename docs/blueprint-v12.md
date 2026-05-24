@@ -60,7 +60,7 @@ v12 完成 = `python scripts/test_agent.py --rubric v12` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] AAAA — 设计级屈曲灵敏度（∂u/∂ρ + void-mode relaxation）
+- [x] AAAA — 设计级屈曲灵敏度（∂u/∂ρ + void-mode relaxation）
 - [ ] BBBB — 循环内自适应频带重采样
 - [ ] CCCC — 增广 Tchebycheff R2 + 多样性指标
 - [ ] DDDD — 分层 Archimedean copula（per-cluster θ）
