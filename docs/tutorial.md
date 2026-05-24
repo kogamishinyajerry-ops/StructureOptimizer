@@ -1366,6 +1366,30 @@ val = igd_plus(obtained_front, reference_pareto_front)   # 越小越好，0 ⇔ 
 调用方提供**参考前沿**（真实 TO 问题无解析前沿，只能用代理参考，是相对收敛非绝对）；`n_obj==2→hypervolume_2d`
 派发纯为逐位兼容。
 
+### 20.4 Archimedean copula Rosenblatt：Clayton / Frank（Wave NNN，D069）
+
+D061 的 `RosenblattTransform` 只支持**多元正态**（依赖完全由协方差描述），无法表达**尾部相关**
+（两个载荷一起飙高的概率远超高斯 copula 预测）。D061 的 reopening 项就是**非高斯 Rosenblatt（Clayton/Frank
+copula）**：
+
+```python
+from structure_optimizer.core.reliability import clayton_copula, frank_copula, build_copula_rosenblatt, Marginal
+cop = clayton_copula(4.0)                              # 下尾相关；frank_copula(θ) 对称无尾相关
+cop.conditional_cdf(u1, u2)                            # Rosenblatt 条件 CDF C_{2|1}=∂C/∂u₁
+cop.conditional_ppf(u1, w)                             # 闭式逆
+cop.kendall_tau()                                      # Clayton θ/(θ+2) / Frank 1−4/θ(1−D₁(θ))
+rb = build_copula_rosenblatt([Marginal("normal",10,2), Marginal("lognormal",0.5,0.3)], cop)
+z = rb.x_to_u(x)   # 物理 → 独立标准正态；rb.wrap_limit_state(g) 直接喂 form_hlrf
+```
+
+双变量 Archimedean copula `C(u,v)` 用单生成元耦合两个均匀边缘，Rosenblatt 条件 CDF
+`C_{2|1}(u₂|u₁)=∂C/∂u₁` 复合 `Φ⁻¹` 把相关对映射到独立标准正态供 FORM 用。
+
+**关键 / 诚实边界**：条件 CDF round-trip ≤1e-9（Clayton ~1.4e-10 / Frank ~2.8e-15）+ θ→0 退化到独立
+（`C_{2|1}→u₂`、`C→u₁u₂`，误差 ≤2θ）+ Kendall τ 闭式（Clayton θ/(θ+2) 精确；Frank Debye D₁ 经 numpy Simpson，
+与 1500 样本经验 τ 差 <0.03）。诚实声明：**仅双变量**（d 维需生成元的 d−1 重条件）；**仅 Clayton/Frank**
+（Gumbel 无闭式条件逆，省略）；Frank τ 的 Debye 是 2000 点 Simpson 近似（非解析）；假设**联合已知**（不从数据拟合 copula）。
+
 ---
 
 ## 常见错误

@@ -62,7 +62,7 @@ v10 完成 = `python scripts/test_agent.py --rubric v10` 报告：
 - [x] KKK — 多约束 MMA（应力 p-norm + 体积）
 - [x] LLL — 目标频带放置（minimax around target）
 - [x] MMM — 泛化 NSGA driver + IGD+ 指标
-- [ ] NNN — Archimedean copula Rosenblatt
+- [x] NNN — Archimedean copula Rosenblatt
 - [ ] OOO — 同时 (ρ,θ) MMA 耦合
 - [ ] PPP — 相关系统模态驱动 TO
 - [ ] QQQ — 平滑且水密的带孔三角化

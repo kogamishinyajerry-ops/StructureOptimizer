@@ -739,6 +739,163 @@ def build_rosenblatt_normal(mean: np.ndarray, cov: np.ndarray) -> RosenblattTran
 
 
 # ---------------------------------------------------------------------------
+# Wave NNN (v10, D069): Archimedean-copula Rosenblatt for non-Gaussian deps.
+#
+# D061's RosenblattTransform is MVN-only — its dependence is fully described by a
+# covariance. Many real joint distributions have *tail* dependence a Gaussian
+# copula cannot express. A bivariate Archimedean copula C(u,v) couples two
+# uniform marginals through a single generator; the Rosenblatt conditional CDF is
+#     C_{2|1}(u_2 | u_1) = ∂C(u_1,u_2)/∂u_1,
+# which (composed with Φ⁻¹) maps the dependent pair to independent standard
+# normals for FORM. We implement Clayton (lower-tail dependence) and Frank (no
+# tail dependence, symmetric), both with closed-form conditional CDF, its inverse
+# (so the transform round-trips exactly), and Kendall's τ.
+# ---------------------------------------------------------------------------
+
+
+def _debye1(theta: float) -> float:
+    """Debye function D₁(θ) = (1/θ)∫₀^θ t/(eᵗ−1) dt, by numpy Simpson (no scipy).
+
+    Used by Frank's Kendall-τ. ``t/(eᵗ−1) → 1`` as ``t → 0`` (handled explicitly).
+    Valid for θ of either sign (the linspace + Simpson carry the sign).
+    """
+    n = 2000  # even, for Simpson
+    t = np.linspace(0.0, theta, n + 1)
+    f = np.empty_like(t)
+    f[0] = 1.0
+    f[1:] = t[1:] / np.expm1(t[1:])
+    h = theta / n
+    s = f[0] + f[-1] + 4.0 * f[1:-1:2].sum() + 2.0 * f[2:-1:2].sum()
+    return float((h / 3.0) * s / theta)
+
+
+@dataclass
+class ArchimedeanCopula:
+    """Bivariate Archimedean copula — Clayton or Frank (Wave NNN, D069).
+
+    ``family`` ∈ {``"clayton"``, ``"frank"``}. Clayton: ``θ > 0`` (lower-tail
+    dependence); Frank: ``θ ≠ 0`` (no tail dependence). Provides the copula CDF,
+    the Rosenblatt conditional CDF ``C_{2|1}(u₂|u₁)=∂C/∂u₁`` and its inverse, and
+    the closed-form Kendall's τ.
+    """
+
+    family: str
+    theta: float
+
+    def __post_init__(self) -> None:
+        if self.family not in ("clayton", "frank"):
+            raise SolverError("copula_unknown_family")
+        if self.family == "clayton" and self.theta <= 0.0:
+            raise SolverError("copula_clayton_nonpositive_theta")
+        if self.family == "frank" and self.theta == 0.0:
+            raise SolverError("copula_frank_zero_theta")
+
+    def cdf(self, u1: float, u2: float) -> float:
+        """The copula CDF ``C(u₁,u₂)``."""
+        th = self.theta
+        if self.family == "clayton":
+            return float((u1 ** (-th) + u2 ** (-th) - 1.0) ** (-1.0 / th))
+        a = np.expm1(-th)  # e^{-θ}−1
+        return float(-1.0 / th * np.log1p(np.expm1(-th * u1) * np.expm1(-th * u2) / a))
+
+    def conditional_cdf(self, u1: float, u2: float) -> float:
+        """Rosenblatt conditional CDF ``C_{2|1}(u₂|u₁) = ∂C/∂u₁`` (in [0,1])."""
+        th = self.theta
+        if self.family == "clayton":
+            return float(u1 ** (-th - 1.0) * (u1 ** (-th) + u2 ** (-th) - 1.0) ** (-1.0 / th - 1.0))
+        a = np.expm1(-th)
+        p = np.exp(-th * u1)
+        qm = np.expm1(-th * u2)  # e^{-θu₂}−1
+        return float(p * qm / (a + (p - 1.0) * qm))
+
+    def conditional_ppf(self, u1: float, w: float) -> float:
+        """Inverse of :meth:`conditional_cdf` in ``u₂``: returns ``u₂`` with
+        ``C_{2|1}(u₂|u₁) = w``. Closed form for both families."""
+        th = self.theta
+        if self.family == "clayton":
+            return float((u1 ** (-th) * (w ** (-th / (th + 1.0)) - 1.0) + 1.0) ** (-1.0 / th))
+        a = np.expm1(-th)
+        p = np.exp(-th * u1)
+        return float(-1.0 / th * np.log1p(w * a / (p * (1.0 - w) + w)))
+
+    def kendall_tau(self) -> float:
+        """Closed-form Kendall's τ: Clayton ``θ/(θ+2)``; Frank ``1 − 4/θ(1 − D₁(θ))``."""
+        th = self.theta
+        if self.family == "clayton":
+            return float(th / (th + 2.0))
+        return float(1.0 - 4.0 / th * (1.0 - _debye1(th)))
+
+
+def clayton_copula(theta: float) -> ArchimedeanCopula:
+    """Clayton copula (lower-tail dependence), ``θ > 0``."""
+    return ArchimedeanCopula(family="clayton", theta=float(theta))
+
+
+def frank_copula(theta: float) -> ArchimedeanCopula:
+    """Frank copula (symmetric, no tail dependence), ``θ ≠ 0``."""
+    return ArchimedeanCopula(family="frank", theta=float(theta))
+
+
+def _marginal_cdf(m: Marginal, x: float) -> float:
+    """Uniform ``u = F(x)`` via the marginal's standard-normal map: ``Φ(Φ⁻¹(F(x)))``."""
+    return _standard_normal_cdf(m.to_standard_normal(x))
+
+
+def _marginal_ppf(m: Marginal, u: float) -> float:
+    """Physical ``x = F⁻¹(u)`` via the marginal's inverse map: ``F⁻¹(Φ(Φ⁻¹(u)))``."""
+    return m.from_standard_normal(_standard_normal_ppf(u))
+
+
+@dataclass
+class CopulaRosenblattTransform:
+    """Rosenblatt transform of a **bivariate** joint distribution given by two
+    marginals coupled with an Archimedean copula (Wave NNN, D069).
+
+    ``x_to_u`` maps physical ``x`` to independent standard normals via
+    ``u₁=F₁(x₁), u₂=F₂(x₂); w₁=u₁, w₂=C_{2|1}(u₂|u₁); z=Φ⁻¹(w)``; ``u_to_x`` is the
+    sequential inverse. Mirrors :class:`RosenblattTransform`'s interface
+    (``wrap_limit_state``) so ``form_hlrf`` runs unchanged.
+    """
+
+    marginals: list[Marginal]
+    copula: ArchimedeanCopula
+
+    @property
+    def n_vars(self) -> int:
+        return 2
+
+    def x_to_u(self, x: np.ndarray) -> np.ndarray:
+        x = np.asarray(x, dtype=float)
+        u1 = _clip_unit(_marginal_cdf(self.marginals[0], x[0]))
+        u2 = _clip_unit(_marginal_cdf(self.marginals[1], x[1]))
+        w2 = _clip_unit(self.copula.conditional_cdf(u1, u2))
+        return np.array([_standard_normal_ppf(u1), _standard_normal_ppf(w2)])
+
+    def u_to_x(self, u: np.ndarray) -> np.ndarray:
+        u = np.asarray(u, dtype=float)
+        w1 = _clip_unit(_standard_normal_cdf(float(u[0])))
+        w2 = _clip_unit(_standard_normal_cdf(float(u[1])))
+        u2 = _clip_unit(self.copula.conditional_ppf(w1, w2))
+        return np.array([_marginal_ppf(self.marginals[0], w1), _marginal_ppf(self.marginals[1], u2)])
+
+    def wrap_limit_state(self, g_physical: Callable[[np.ndarray], float]) -> Callable[[np.ndarray], float]:
+        """Turn a physical-space limit state g(x) into a U-space g(u) for ``form_hlrf``."""
+        return lambda u: g_physical(self.u_to_x(u))
+
+
+def _clip_unit(p: float) -> float:
+    """Clamp a probability strictly inside (0,1) to keep Φ⁻¹ / copula maps finite."""
+    return float(min(max(p, 1e-15), 1.0 - 1e-15))
+
+
+def build_copula_rosenblatt(marginals: list[Marginal], copula: ArchimedeanCopula) -> CopulaRosenblattTransform:
+    """Construct a :class:`CopulaRosenblattTransform` for exactly two marginals."""
+    if len(marginals) != 2:
+        raise SolverError("copula_rosenblatt_requires_two_marginals")
+    return CopulaRosenblattTransform(marginals=list(marginals), copula=copula)
+
+
+# ---------------------------------------------------------------------------
 # Wave XX (v8, D053): general-marginal Nataf via Gauss-Hermite quadrature.
 #
 # D045's closed-form equivalent-correlation handled only normal/lognormal pairs.
