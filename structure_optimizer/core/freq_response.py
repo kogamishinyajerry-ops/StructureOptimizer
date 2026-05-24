@@ -896,3 +896,235 @@ def target_band_placement(
         peak_final=peak_final,
         converged=converged,
     )
+
+
+# ---------------------------------------------------------------------------
+# Wave TTT (v11, D075): adaptive in-band sampling + peak-as-MMA-constraint.
+#
+# D067's reopening criterion named "adaptive band sampling; peak-as-constraint".
+# target_band_placement (D067) samples a *fixed* ω-grid and runs projected-
+# gradient descent with the peak as the *objective*. Both are limited: a sharp
+# resonance falling between fixed grid points is missed (the optimiser then
+# "suppresses" a peak it never saw), and peak-as-objective cannot express
+# "least material such that resonance stays bounded". TTT cashes in both.
+# ---------------------------------------------------------------------------
+
+
+def _dynamic_compliance_objective(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    omega: float,
+    alpha: float = 0.0,
+    beta: float = 0.0,
+    mass_type: str = "consistent",
+) -> float:
+    """Forward-only squared dynamic compliance ``J = |fᵀû|²`` at ``omega``.
+
+    Same complex dynamic-stiffness solve as :func:`dynamic_compliance_sensitivity`
+    but **without** the per-element adjoint loop — used by the adaptive sampler,
+    which needs only the objective at many frequencies.
+    """
+    if omega < 0:
+        raise SolverError("frequency_response_negative_omega")
+    if alpha < 0 or beta < 0:
+        raise SolverError("rayleigh_damping_negative_coefficient")
+    opt = config.optimization
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    if densities.shape[0] != mesh.elements.shape[0]:
+        raise SolverError("density_count_mismatch")
+    ke = element_stiffness(config.material.young_modulus, config.material.poisson_ratio)
+    me = element_mass_matrix(config.material.density, config.thickness, mass_type)
+    active = np.where(mesh.void_mask, opt.min_density, densities)
+    k_scale = opt.min_density + (active**opt.penalty) * (1.0 - opt.min_density)
+    m_scale = opt.min_density + active * (1.0 - opt.min_density)
+    K = _assemble_stiffness_dense_modal(mesh, k_scale, ke)
+    M = _assemble_mass_dense(mesh, m_scale, me)
+    C = alpha * M + beta * K
+    f = _build_harmonic_load(config, mesh)
+    fixed = mesh.fixed_dofs(config.boundary_conditions)
+    free = np.setdiff1d(np.arange(mesh.ndof), fixed)
+    if free.size == 0:
+        raise SolverError("frequency_response_all_dofs_fixed")
+    D = (K - (omega**2) * M).astype(complex) + 1j * omega * C
+    try:
+        u_free = np.linalg.solve(D[np.ix_(free, free)], f[free].astype(complex))
+    except np.linalg.LinAlgError as exc:
+        raise SolverError("frequency_response_singular") from exc
+    c = complex(f[free] @ u_free)
+    return float((c * np.conjugate(c)).real)
+
+
+@dataclass
+class AdaptiveBandResult:
+    """Output of :func:`adaptive_band_sample` (Wave TTT, D075)."""
+
+    omegas: np.ndarray  # sorted sample frequencies (n_init + n_refine,)
+    values: np.ndarray  # J(ω) at each sample
+    peak_value: float
+    peak_omega: float
+    n_evals: int
+
+
+def adaptive_band_sample(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    omega_lo: float,
+    omega_hi: float,
+    n_init: int = 5,
+    n_refine: int = 10,
+    alpha: float = 0.0,
+    beta: float = 0.0,
+    mass_type: str = "consistent",
+) -> AdaptiveBandResult:
+    """Adaptively sample the forced-response magnitude over ``[omega_lo, omega_hi]``
+    to capture a sharp in-band resonance peak (Wave TTT, D075).
+
+    Starts from ``n_init`` uniform samples, then performs ``n_refine`` bisection
+    steps: each step bisects the sub-interval **adjacent to the current peak
+    sample** whose endpoints have the larger summed response, inserting the
+    midpoint. This concentrates evaluations around the resonance, so the returned
+    ``peak_value`` converges to the true band maximum with far fewer solves than a
+    uniform grid of equal resolution.
+
+    Returns an :class:`AdaptiveBandResult` (sorted ``omegas`` / ``values`` +
+    ``peak_value`` / ``peak_omega`` + total ``n_evals``).
+    """
+    if not (omega_hi > omega_lo):
+        raise SolverError("adaptive_band_invalid_range")
+    if n_init < 2:
+        raise SolverError("adaptive_band_too_few_initial")
+    omegas = list(np.linspace(float(omega_lo), float(omega_hi), n_init))
+    values = [
+        _dynamic_compliance_objective(config, mesh, densities, w, alpha, beta, mass_type) for w in omegas
+    ]
+    for _ in range(max(0, n_refine)):
+        i_peak = int(np.argmax(values))
+        candidates: list[tuple[int, int]] = []
+        if i_peak > 0:
+            candidates.append((i_peak - 1, i_peak))
+        if i_peak < len(omegas) - 1:
+            candidates.append((i_peak, i_peak + 1))
+        a, b = max(candidates, key=lambda t: values[t[0]] + values[t[1]])
+        w_mid = 0.5 * (omegas[a] + omegas[b])
+        j_mid = _dynamic_compliance_objective(config, mesh, densities, w_mid, alpha, beta, mass_type)
+        omegas.insert(b, w_mid)
+        values.insert(b, j_mid)
+    omegas_arr = np.asarray(omegas, dtype=float)
+    values_arr = np.asarray(values, dtype=float)
+    ipk = int(np.argmax(values_arr))
+    return AdaptiveBandResult(
+        omegas=omegas_arr,
+        values=values_arr,
+        peak_value=float(values_arr[ipk]),
+        peak_omega=float(omegas_arr[ipk]),
+        n_evals=len(omegas_arr),
+    )
+
+
+@dataclass
+class PeakConstrainedTOResult:
+    """Output of :func:`peak_constrained_mma` (Wave TTT, D075)."""
+
+    densities: np.ndarray
+    compliance_history: list[float]
+    volume_history: list[float]
+    peak_history: list[float]
+    peak_limit: float
+    band_omegas: np.ndarray
+    converged: bool
+
+
+def peak_constrained_mma(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    peak_limit: float,
+    band_omegas: np.ndarray,
+    alpha: float = 0.0,
+    beta: float = 1e-4,
+    vf: float | None = None,
+    max_iter: int = 40,
+    change_tol: float = 1e-3,
+    p: float = 12.0,
+    mass_type: str = "consistent",
+) -> PeakConstrainedTOResult:
+    """Minimise static compliance subject to an in-band **peak-as-constraint** on
+    the forced response *and* a volume fraction, via MMA (Wave TTT, D075).
+
+    D067 drove the peak as the *objective* (volume-preserving descent). Its
+    reopening criterion named making the peak a genuine **constraint** so it can
+    sit alongside a primary objective. This driver does exactly that, reusing the
+    proven D066 two-constraint MMA structure with the dynamic peak swapped in for
+    the stress. The two inequalities for :func:`core.mma.mma_step` are
+
+        ``g₁(x) = J_peak(x) / J_lim − 1 ≤ 0``   (in-band forced-response peak)
+        ``g₂(x) = mean(x) − vf ≤ 0``            (volume)
+
+    minimising the standard SIMP static compliance (gradient
+    ``dc/dρ_e = −dscale_e·(uₑᵀ kₑ uₑ)``). The peak-constraint gradient is the
+    smooth p-norm band-peak sensitivity (:func:`target_band_peak_sensitivity`).
+    Holding volume as its own constraint keeps the design from collapsing to
+    minimum density (which a min-volume objective with a single-frequency peak
+    constraint does, by detuning). Both gradients are density-filtered.
+    """
+    from structure_optimizer.core.fem2d import solve_linear_elastic
+    from structure_optimizer.core.mma import MMAState, mma_step
+
+    if not (peak_limit > 0.0):
+        raise SolverError("peak_constrained_nonpositive_limit")
+    opt = config.optimization
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+    band = np.atleast_1d(np.asarray(band_omegas, dtype=float))
+    vf_target = float(opt.volume_fraction) if vf is None else float(vf)
+    rho = np.where(mesh.void_mask, opt.min_density, vf_target)
+
+    x = rho[design].astype(float).copy()
+    xmin = np.full(n_design, opt.min_density)
+    xmax = np.ones(n_design)
+    state = MMAState()
+
+    compliance_history: list[float] = []
+    volume_history: list[float] = []
+    peak_history: list[float] = []
+    converged = False
+    for _ in range(max_iter):
+        rho[design] = x
+        res = solve_linear_elastic(config, mesh, rho)
+        active = np.where(mesh.void_mask, opt.min_density, rho)
+        dscale = opt.penalty * np.where(mesh.void_mask, 0.0, active ** (opt.penalty - 1.0)) * (1.0 - opt.min_density)
+        dc = -dscale * res.element_strain_energy
+        sens_c = density_filter(mesh, rho, dc, opt.filter_radius, opt.min_density)
+        peak, dpeak, _ = target_band_peak_sensitivity(config, mesh, rho, band, alpha, beta, p, mass_type)
+        sens_p = density_filter(mesh, rho, dpeak, opt.filter_radius, opt.min_density)
+
+        compliance_history.append(res.compliance)
+        volume_history.append(float(np.mean(x)))
+        peak_history.append(peak)
+
+        df0dx = sens_c[design]
+        fval = np.array([peak / peak_limit - 1.0, float(np.mean(x) - vf_target)])
+        dfdx = np.vstack([sens_p[design] / peak_limit, np.full(n_design, 1.0 / n_design)])
+        x_new, _lmbda = mma_step(x, df0dx, fval, dfdx, xmin, xmax, state)
+        change = float(np.max(np.abs(x_new - x)))
+        x = x_new
+        if change < change_tol:
+            converged = True
+            break
+
+    rho[design] = x
+    res = solve_linear_elastic(config, mesh, rho)
+    peak_f, _, _ = target_band_peak_sensitivity(config, mesh, rho, band, alpha, beta, p, mass_type)
+    compliance_history.append(res.compliance)
+    volume_history.append(float(np.mean(x)))
+    peak_history.append(peak_f)
+    return PeakConstrainedTOResult(
+        densities=rho,
+        compliance_history=compliance_history,
+        volume_history=volume_history,
+        peak_history=peak_history,
+        peak_limit=float(peak_limit),
+        band_omegas=band,
+        converged=converged,
+    )

@@ -1487,6 +1487,35 @@ r = qp_stress_constrained_mma(config, mesh, sigma_limit=lim, p=8.0, q=2.5, vf=vf
 探针显示定容 λ_crit ascent **反而**把 λ_crit 从 20.1 拉到 8.1（灵敏度指错方向），所以 SSS 重新限定为**仅 qp 应力**，
 屈曲驱动连同探针证据移入 D074 reopening（绝不谎称屈曲可用）。松弛指数 q=2.5/p=8 非自调；底层仍是 `_approx_` 单元中心应力。
 
+### 21.2 自适应频带采样 + peak-as-constraint（Wave TTT，D075）
+
+D067 在**固定** ω 网格上采样、把 peak 当**目标**做投影梯度下降。两个毛病：共振很**尖**，固定粗网格可能整段落在采样点
+之间——优化器"压低"了一个它从没量到的峰；且 peak 只能当目标，无法表达"在保证带内响应不超标的前提下最小化别的量"。
+TTT 两个都解决。
+
+```python
+from structure_optimizer.core.freq_response import adaptive_band_sample, peak_constrained_mma
+
+# 自适应采样：从 n_init 均匀点出发，n_refine 次"向峰二分"加点
+ab = adaptive_band_sample(config, mesh, rho, omega_lo, omega_hi, n_init=7, n_refine=18, beta=2e-6)
+# ab.peak_value / peak_omega / omegas / values / n_evals
+
+# peak-as-constraint：最小化静柔度 s.t. 带内 peak ≤ 限值 且 体积 ≤ vf（复用 D066 双约束 MMA）
+r = peak_constrained_mma(config, mesh, peak_limit=lim, band_omegas=band, beta=1e-4, vf=vf, max_iter=100)
+# r.peak_history / compliance_history / volume_history / densities
+```
+
+自适应方案每步**二分当前峰相邻、端点响应和更大的子区间**，把算力堆到共振附近。peak-as-constraint 复用 D066 的双
+约束 MMA 结构，把应力换成带内 p-norm peak 灵敏度（`target_band_peak_sensitivity`），目标改静柔度、体积单独做约束
+——这样优化不会塌到 min density。
+
+**关键 / 诚实边界**：自适应 25 evals 还原 dense-400 参考峰**误差 0.015%**，而同等规模 uniform-7 **低估 ≥20%**（探针 41%）
++ 最近样本距峰 < 初始间距/8 + peak 约束 MMA 把峰从 3.99e5 压到 2.23e4 ≤ 限 2.14e4（binding）体积守 0.450。
+**两条硬诚实边界**：(1) **必须有阻尼**——无阻尼时 ω=ω_n 处 `D=K−ω²M` 奇异、J→∞（探针见 4e30 共振奇点），所以用小
+Rayleigh β；(2) **约束必须是频带不是单频**——单频约束会被"失谐"白嫖（优化器把共振挪开单一采样点，真峰反而涨；探针
+min-volume+单频 → 体积塌到 0.01、真峰炸到 2.6e9），故聚合多频 p-norm + 目标取柔度而非最小化材料。贪心二分非全局
+band-max 证明（双共振时次峰可能欠解析）；MMA 内每步用**固定** band_omegas（不在循环里重采样）——这些都进 D075 reopening。
+
 ---
 
 ## 常见错误
