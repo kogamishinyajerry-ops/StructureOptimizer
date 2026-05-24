@@ -119,3 +119,80 @@ def run_nonlinear_simp(
         converged=converged_simp,
         mesh_shape=(mesh.nelx, mesh.nely),
     )
+
+
+@dataclass
+class TLAdjointResult:
+    """End-compliance + adjoint sensitivity of a converged full-TL state (Wave OO)."""
+
+    compliance: float
+    sensitivity: np.ndarray
+    converged: bool
+
+
+def tl_adjoint_compliance_sensitivity(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    n_load_steps: int = 5,
+) -> TLAdjointResult:
+    """End-compliance C = fᵀu of the converged **full Total-Lagrangian** state
+    (D034) plus its adjoint sensitivity dC/dρ_e (Wave OO, D044).
+
+    At convergence the internal force equals the full external load,
+    f_int(u, ρ) = f_total, so the adjoint λ solves K_T λ = f_total and
+
+        dC/dρ_e = -(dk_scale_e/dρ_e / k_scale_e) · (λ_eᵀ f_int,e),
+
+    because each element's TL internal force is linear in its SIMP modulus scale
+    (f_int,e = k_scale_e · g_e(u)). In the linear limit K_T → K, f_int = K u,
+    λ → u and this reduces to the self-adjoint −u_eᵀ(dK_e/dρ)u_e.
+    """
+    from structure_optimizer.core.total_lagrangian import (
+        _build_load_vector,
+        _density_scale,
+        _element_internal_force_and_tangent,
+        _plane_stress_D,
+        solve_total_lagrangian,
+    )
+
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    res = solve_total_lagrangian(config, mesh, densities, n_load_steps=n_load_steps)
+    u = res.displacements
+
+    D0 = _plane_stress_D(config.material.young_modulus, config.material.poisson_ratio)
+    k_scale = _density_scale(config, mesh, densities)
+    f_total = _build_load_vector(config, mesh)
+    n_dof = mesh.ndof
+
+    K_T = np.zeros((n_dof, n_dof))
+    f_int_elems: list[np.ndarray] = []
+    dofs_elems: list[np.ndarray] = []
+    for e, nodes in enumerate(mesh.elements):
+        coords = mesh.nodes[nodes]
+        dofs = np.empty(8, dtype=int)
+        dofs[0::2] = 2 * nodes
+        dofs[1::2] = 2 * nodes + 1
+        fe, ke, _ = _element_internal_force_and_tangent(coords, u[dofs], k_scale[e] * D0)
+        K_T[np.ix_(dofs, dofs)] += ke
+        f_int_elems.append(fe)
+        dofs_elems.append(dofs)
+
+    compliance = float(f_total @ u)
+
+    fixed = mesh.fixed_dofs(config.boundary_conditions)
+    free = np.setdiff1d(np.arange(n_dof), fixed)
+    lam = np.zeros(n_dof)
+    lam[free] = np.linalg.solve(K_T[np.ix_(free, free)], f_total[free])
+
+    opt = config.optimization
+    p, mn = opt.penalty, opt.min_density
+    active = np.where(mesh.void_mask, mn, densities)
+    sens = np.zeros(mesh.elements.shape[0])
+    for e in range(mesh.elements.shape[0]):
+        if mesh.void_mask[e]:
+            continue
+        dks = p * active[e] ** (p - 1.0) * (1.0 - mn)
+        sens[e] = -(dks / k_scale[e]) * float(lam[dofs_elems[e]] @ f_int_elems[e])
+
+    return TLAdjointResult(compliance=compliance, sensitivity=sens, converged=res.converged)

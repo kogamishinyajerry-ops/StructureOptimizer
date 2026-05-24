@@ -882,6 +882,36 @@ sens = anisotropic_thermal_sensitivity(config, mesh, rho, conductivity_tensor=fi
 （rel 1e-4）。注：变化 k 下线性场不再是无源精确解，故不重复声称 patch test——退化锚点
 经均匀情形传递该保证。
 
+### 17.3 几何非线性 TO 的 TL 伴随灵敏度（Wave OO，D044）
+
+v6（D034）的完整 Total-Lagrangian 求解器是**正向**的；v7 把它接成**优化驱动器**所需的
+伴随灵敏度。对端柔度 `C = fᵀu`，收敛态下内力等于外载 `f_int = f_total`，故伴随 `λ` 解
+`K_T λ = f_total`（K_T 为一致切线刚度），灵敏度为
+
+```text
+dC/dρ_e = -(dk_scale_e/dρ_e / k_scale_e) · (λ_eᵀ f_int,e)
+```
+
+因为每个单元的 TL 内力对其 SIMP 模量因子**线性**（f_int,e = k_scale_e · g_e(u)）。线性极限
+下 K_T→K、f_int=Ku、λ→u，退化为经典自伴随 `−u_eᵀ(dK_e/dρ)u_e`。
+
+```python
+import numpy as np
+from structure_optimizer.benchmarks.registry import load_benchmark
+from structure_optimizer.core.mesh import create_structured_mesh
+from structure_optimizer.core.nonlinear_simp import tl_adjoint_compliance_sensitivity
+
+config = load_benchmark("cantilever", preset="smoke")
+mesh = create_structured_mesh(config); rho = np.full(mesh.elements.shape[0], 0.6)
+out = tl_adjoint_compliance_sensitivity(config, mesh, rho, n_load_steps=4)
+# out.compliance = 完整 TL 端柔度；out.sensitivity[e] = dC/dρ_e（伴随，已验对中心差分）
+```
+
+**关键升级 / 诚实边界**：伴随灵敏度对**中心差分**一致（rel 2e-4，受两次独立 Newton 收敛
+容差 + float64 抵消限制，非 1e-5）；TL 端柔度可测地**异于**同设计的线性柔度（非线性真实）；
+本 wave 交付的是**灵敏度**（可验证的难点），把它喂进 `_optimality_criteria_update` 即得
+完整 TL-in-the-loop 优化器——后者更慢且不增新解析锚点，故推迟（见 D044 reopening）。
+
 ---
 
 ## 常见错误

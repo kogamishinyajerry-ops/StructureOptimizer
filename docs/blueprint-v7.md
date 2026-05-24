@@ -62,7 +62,7 @@ v7 完成 = `python scripts/test_agent.py --rubric v7` 报告：
 
 - [x] MM — Reliability-based TO（FORM→SIMP）（D042 · 9 tests green · 线性极限态 FORM β==解析闭式 + 高 β_target 需更多材料）
 - [x] NN — 逐单元各向异性热场 + 各向异性热 TO（D043 · 5 tests green · uniform 场==global tensor 1e-12 + 各向异性灵敏度 vs 中心差分 1e-4）
-- [ ] OO — 几何非线性 TO（TL 伴随）
+- [x] OO — 几何非线性 TO（TL 伴随）（D044 · 4 tests green · TL 伴随灵敏度 vs 中心差分 rel 2e-4 + 非线性柔度≠线性 + 自伴随线性极限）
 - [ ] PP — 相关 / 非高斯不确定性（Nataf）
 - [ ] QQ — NSGA-III 直接优化密度场
 - [ ] RR — 阻尼频响 TO
