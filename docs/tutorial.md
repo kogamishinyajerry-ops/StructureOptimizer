@@ -1564,6 +1564,27 @@ d 维交换 Clayton 用生成元 `φ(u)=u^{-θ}−1`、逆 `ψ(s)=(1+s)^{-1/θ}`
 θ/(θ+2)（±0.04）。**诚实边界**：Gumbel 逆是**二分非闭式**；d 维仅**交换 Clayton**（单 θ 全对称）——非嵌套/分层、非 d 维
 Gumbel/Frank（后者生成元导数需 Bell 多项式/数值微分，deferred）；marginal 仍走正态映射不在此改进；未暴露尾相依系数。
 
+### 21.5 Genz 精确多元系统失效概率（Wave WWW，D078）
+
+D055/D071 的串联系统 P_f 是 **Ditlevsen 二阶界**（一个区间，由两两 Φ₂ 拼出），不是精确值。WWW 用 **Genz (1992)**
+分离变量 Monte Carlo 算**精确**的 m 维正态 CDF `Φ_m(b;R)`，支持**全相关矩阵**。
+
+```python
+from structure_optimizer.core.reliability import genz_mvn_cdf, system_reliability_series_exact
+
+phi_m = genz_mvn_cdf([b1,b2,b3], R, n_samples=20000, seed=0)   # P(Z≤b), Z~N(0,R)
+pf = system_reliability_series_exact(betas, R)                  # 1 − Φ_m(β;R)，单一精确值
+```
+
+Cholesky `R=LLᵀ`，下界 −∞ 时截断积分分离成乘积，对均匀样本 `w∈[0,1]^{m−1}` 求平均：`e₁=Φ(b₁/L₁₁)`，
+`y_{i-1}=Φ⁻¹(w_{i-1}·e_{i-1})`，`e_i=Φ((b_i−Σ_{j<i}L_ij y_j)/L_ii)`，`Φ_m≈mean(Π_i e_i)`。
+
+**关键 / 定量锚点**：Genz 退化到 m=2 对上精确 Gauss-Legendre Φ₂ ≤1e-3；独立 R=I 时 `Φ_m=ΠΦ(b_i)` 精确 ≤1e-12；
+精确串联 P_f（4.13e-2）落在 Ditlevsen 界 [4.09e-2,4.15e-2] **之内**（独立交叉验证）；确定性 + 非 SPD/形状报错。
+**诚实边界**：Genz 是 **MC 估计非闭式**——n_samples→∞ 才收敛到精确，默认 2 万样本标准误 ~1e-3~1e-4（"精确"=无偏收敛非
+逐位）；用**朴素 MC 非随机化点阵**（Korobov 点阵收敛快一个量级，是 reopening）；维数高/强相关时精度退化（测到 m≤4）；
+**R 必须 SPD**（秩亏 ααᵀ 需 nudge 0.98R+0.02I，不内置 ridge 以免掩盖病态）；仍设 FORM 线性化极限状态。
+
 ---
 
 ## 常见错误

@@ -1232,3 +1232,90 @@ def system_reliability_parallel(beta_i: float, beta_j: float, rho: float, n_node
     """Failure probability of a 2-component **parallel** system (fails iff BOTH
     fail): P = P(F_i ∩ F_j) = Φ₂(−β_i, −β_j; ρ)."""
     return bivariate_normal_cdf(-beta_i, -beta_j, rho, n_nodes)
+
+
+# ---------------------------------------------------------------------------
+# Wave WWW (v11, D078): exact multivariate system P_f via the Genz MVN-CDF.
+#
+# D055/D071 bracket the series-system P_f with Ditlevsen second-order *bounds*
+# (built from pairwise Φ₂). D055's reopening criterion named the **exact**
+# multivariate failure probability with a **full** correlation matrix — i.e. the
+# m-variate normal CDF Φ_m(b; R). Genz's (1992) separation-of-variables Monte
+# Carlo estimates Φ_m exactly (in the limit) for an arbitrary SPD R, numpy-only.
+# ---------------------------------------------------------------------------
+
+
+def genz_mvn_cdf(
+    upper: np.ndarray,
+    correlation: np.ndarray,
+    n_samples: int = 20000,
+    seed: int = 0,
+) -> float:
+    """Multivariate-normal CDF ``Φ_m(b; R) = P(Z ≤ b)``, ``Z ~ N(0, R)``, via the
+    **Genz (1992)** separation-of-variables Monte-Carlo estimator (Wave WWW, D078).
+
+    Cholesky-factor ``R = L Lᵀ`` (lower ``L``), then with lower bounds ``−∞`` the
+    truncated integral separates into a product the estimator averages over
+    uniform samples ``w ∈ [0,1]^{m−1}``::
+
+        e₁ = Φ(b₁/L₁₁);  for i≥2: y_{i-1}=Φ⁻¹(w_{i-1}·e_{i-1}),
+        e_i = Φ((b_i − Σ_{j<i} L_ij y_j)/L_ii);   Φ_m ≈ mean(Π_i e_i).
+
+    Converges to the **exact** CDF as ``n_samples → ∞`` (a randomised estimate,
+    seeded for determinism), and handles a **full** correlation matrix (not just
+    pairwise/equicorrelation). Raises ``SolverError`` for a non-SPD ``R``.
+    """
+    b = np.asarray(upper, dtype=float).reshape(-1)
+    m = b.size
+    R = np.asarray(correlation, dtype=float)
+    if R.shape != (m, m):
+        raise SolverError("genz_mvn_correlation_shape")
+    try:
+        chol = np.linalg.cholesky(R)
+    except np.linalg.LinAlgError as exc:
+        raise SolverError("genz_mvn_not_positive_definite") from exc
+    if m == 1:
+        return float(_standard_normal_cdf(b[0] / chol[0, 0]))
+
+    phi = np.vectorize(_standard_normal_cdf, otypes=[float])
+    phinv = np.vectorize(_standard_normal_ppf, otypes=[float])
+    rng = np.random.default_rng(seed)
+    w = rng.random((n_samples, m - 1))
+
+    e_prev = np.full(n_samples, _standard_normal_cdf(b[0] / chol[0, 0]))
+    f = e_prev.copy()
+    y = np.zeros((n_samples, m))
+    for i in range(1, m):
+        arg = np.clip(w[:, i - 1] * e_prev, 1e-15, 1.0 - 1e-15)
+        y[:, i - 1] = phinv(arg)
+        s = y[:, :i] @ chol[i, :i]
+        e_i = phi((b[i] - s) / chol[i, i])
+        f = f * e_i
+        e_prev = e_i
+    return float(np.clip(f.mean(), 0.0, 1.0))
+
+
+def system_reliability_series_exact(
+    betas: np.ndarray,
+    correlation: np.ndarray | None = None,
+    n_samples: int = 20000,
+    seed: int = 0,
+) -> float:
+    """**Exact** (Genz-MC) series-system failure probability with a full
+    correlation matrix (Wave WWW, D078).
+
+    A series system fails if **any** mode fails, so the safe event is "all modes
+    safe": ``P_f = 1 − P(all Z_k < β_k) = 1 − Φ_m(β; R)`` where ``Z ~ N(0, R)`` and
+    ``R_ij = α_iᵀα_j`` are the FORM limit-state correlations. Unlike
+    :func:`system_reliability_series` (Ditlevsen *bounds*) this returns a single
+    value that lies inside those bounds.
+    """
+    betas = np.asarray(betas, dtype=float).reshape(-1)
+    m = betas.size
+    if m < 1:
+        raise SolverError("system_reliability_no_modes")
+    R = np.eye(m) if correlation is None else np.asarray(correlation, dtype=float)
+    if R.shape != (m, m):
+        raise SolverError("system_reliability_correlation_shape")
+    p_safe = genz_mvn_cdf(betas, R, n_samples=n_samples, seed=seed)
+    return float(np.clip(1.0 - p_safe, 0.0, 1.0))
