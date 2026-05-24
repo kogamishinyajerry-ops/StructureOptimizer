@@ -30,6 +30,7 @@ import numpy as np
 
 from structure_optimizer.core.config import BenchmarkConfig
 from structure_optimizer.core.fem2d import SolverError, element_stiffness
+from structure_optimizer.core.filtering import density_filter
 from structure_optimizer.core.mesh import StructuredMesh
 from structure_optimizer.core.modal import (
     _assemble_mass_dense,
@@ -518,3 +519,111 @@ def minimize_dynamic_compliance(
         if cur > 0:
             rho[design] = np.clip(rho[design] * (target_vol / cur), opt.min_density, 1.0)
     return DynamicTOResult(densities=rho, objective_history=history, omega=float(omega))
+
+
+# --- Wave VV (v8, D051): filtered multi-ω dynamic-compliance TO loop ---------
+#
+# D047's reopening criterion named a filtered MMA/OC dynamic-TO loop and a
+# band-averaged (multi-ω) objective. Wave VV delivers a band-averaged
+# objective J(ρ) = mean_ω |fᵀû(ω)|² with a Sigmund density filter (length scale
+# / checkerboard control) and a volume-preserving projected-gradient loop
+# (robust to the sign changes the dynamic-compliance sensitivity shows near
+# resonance — where OC's positive-multiplier bisection is not valid).
+
+
+@dataclass
+class DynamicBandTOResult:
+    """Output of the filtered multi-ω dynamic-compliance loop (Wave VV)."""
+
+    densities: np.ndarray
+    objective_history: list[float]
+    omegas: np.ndarray
+    peak_before: float
+    peak_after: float
+    checkerboard: float
+
+
+def _checkerboard_metric(mesh: StructuredMesh, rho: np.ndarray) -> float:
+    """Mean squared deviation of each interior cell from its 4-neighbour mean.
+
+    A pure checkerboard maximises this; a smooth field drives it to ~0. Used to
+    show the density filter suppresses checkerboarding.
+    """
+    field = np.zeros((mesh.nely, mesh.nelx))
+    for ey in range(mesh.nely):
+        for ex in range(mesh.nelx):
+            field[ey, ex] = rho[mesh.element_index(ex, ey)]
+    inner = field[1:-1, 1:-1]
+    if inner.size == 0:
+        return 0.0
+    neigh = 0.25 * (field[:-2, 1:-1] + field[2:, 1:-1] + field[1:-1, :-2] + field[1:-1, 2:])
+    return float(np.mean((inner - neigh) ** 2))
+
+
+def dynamic_compliance_to(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    omegas,
+    alpha: float = 0.0,
+    beta: float = 0.0,
+    n_steps: int = 20,
+    move: float = 0.1,
+    filter_radius: float | None = None,
+    mass_type: str = "consistent",
+) -> DynamicBandTOResult:
+    """Volume-preserving projected-gradient TO of the **band-averaged** squared
+    dynamic compliance J(ρ) = mean_ω |fᵀû(ω)|² over ``omegas`` (Wave VV, D051).
+
+    The per-ω self-adjoint sensitivities (D047) are averaged, optionally
+    Sigmund-filtered (``filter_radius``, default ``config.optimization.filter_radius``)
+    to control length scale / checkerboarding, then a normalised steepest-descent
+    step (clipped to ``±move``) is taken and the design rescaled to preserve the
+    target volume fraction. Records J each step plus the before/after peak
+    magnitude over the band.
+    """
+    omegas = np.asarray(omegas, dtype=float).reshape(-1)
+    if omegas.size < 1:
+        raise SolverError("dynamic_to_no_omegas")
+    opt = config.optimization
+    design = mesh.design_mask
+    radius = opt.filter_radius if filter_radius is None else filter_radius
+    target_vol = float(opt.volume_fraction)
+    rho = np.where(mesh.void_mask, opt.min_density, target_vol)
+
+    def band_objective(r: np.ndarray) -> float:
+        return float(np.mean([dynamic_compliance_sensitivity(config, mesh, r, w, alpha, beta, mass_type).objective for w in omegas]))
+
+    def band_peak(r: np.ndarray) -> float:
+        return max(
+            solve_damped_frequency_response(config, mesh, r, float(w), alpha, beta, mass_type).max_magnitude
+            for w in omegas
+        )
+
+    peak_before = band_peak(rho)
+    history: list[float] = []
+    for _ in range(n_steps + 1):
+        results = [dynamic_compliance_sensitivity(config, mesh, rho, w, alpha, beta, mass_type) for w in omegas]
+        history.append(float(np.mean([r.objective for r in results])))
+        if len(history) > n_steps:
+            break
+        grad = np.mean([r.sensitivity for r in results], axis=0)
+        grad = density_filter(mesh, rho, grad, radius, opt.min_density)
+        grad[~design] = 0.0
+        gmax = float(np.max(np.abs(grad[design]))) if np.any(design) else 0.0
+        if gmax <= 0.0:
+            break
+        step = np.clip(-(grad / gmax) * move, -move, move)
+        rho = rho.copy()
+        rho[design] = np.clip(rho[design] + step[design], opt.min_density, 1.0)
+        cur = float(np.mean(rho[design]))
+        if cur > 0:
+            rho[design] = np.clip(rho[design] * (target_vol / cur), opt.min_density, 1.0)
+
+    return DynamicBandTOResult(
+        densities=rho,
+        objective_history=history,
+        omegas=omegas,
+        peak_before=peak_before,
+        peak_after=band_peak(rho),
+        checkerboard=_checkerboard_metric(mesh, rho),
+    )

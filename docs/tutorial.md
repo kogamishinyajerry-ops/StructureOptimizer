@@ -1042,6 +1042,23 @@ res = nonlinear_to_oc(config, mesh, n_load_steps=4, max_iter=15)
 不等式需环**收敛够**（截断的环在重载下可能反而高于已收敛的线性解），故测试用 15 迭代留足
 余量（见 D050）。每迭代一次 TL 正向+伴随，比线性 SIMP 慢（~17s/15 迭代）。
 
+### 18.2 滤波动态柔度 TO 完整环（多频带，Wave VV，D051）
+
+v7（D047）只做单频 + 无滤波；v8 升级到**多频带平均** J=mean_ω|fᵀû(ω)|² + **Sigmund 滤波**：
+
+```python
+import numpy as np
+from structure_optimizer.core.freq_response import dynamic_compliance_to
+omegas = np.linspace(30, 70, 5)
+res = dynamic_compliance_to(config, mesh, omegas, alpha=0.5, beta=1e-4, n_steps=18)
+# res.objective_history 单调降；res.peak_before/after = 全带峰值（2.60→1.06）
+```
+
+**关键 / 诚实边界**：带平均 J 单调降 ~83% + **全带**峰值下降（多频比单频的增量价值）+ 体积守恒；
+Sigmund 滤波**抑制 checkerboard**（直接平滑性质：0.36→5e-4）。用**投影梯度非 OC**——动柔度
+灵敏度在共振附近变号，OC 正乘子二分不适用（见 D051）。checkerboard 锚点验的是"滤波器平滑性质"，
+不是最终设计前后对比（这个温和的环本身不产生 checkerboard，无可减）。
+
 ---
 
 ## 常见错误

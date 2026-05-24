@@ -62,7 +62,7 @@ v8 完成 = `python scripts/test_agent.py --rubric v8` 报告：
 ## 进度（wave 勾选）
 
 - [x] UU — 几何非线性 TO 完整 OC 环（D050 · 2 tests green · TL 端柔度 2066→584 + 体积守恒 + TL-aware 比线性优化在 TL 柔度下低 8% + 拓扑可区分 L2/√n 0.066）
-- [ ] VV — 滤波动态柔度 TO 完整环（多频带）
+- [x] VV — 滤波动态柔度 TO 完整环（多频带）（D051 · 3 tests green · 带平均 J 单调降 0.166·J₀ + 全带峰值 2.60→1.06 + Sigmund 滤波抑制 checkerboard 0.36→5e-4 + 体积守恒）
 - [ ] WW — 梯度种子 NSGA-III
 - [ ] XX — 一般 marginal Nataf（Gauss-Hermite）
 - [ ] YY — 纤维转向热 TO
