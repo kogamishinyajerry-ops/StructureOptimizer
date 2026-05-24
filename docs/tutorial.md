@@ -1343,6 +1343,29 @@ r = target_band_placement(config, mesh, band, beta=1e-4, n_steps=20, p=12.0)
 （p-norm，非精确 max，p=12 高估真峰几个百分点）；频带是**用户固定采样**（不自适应跟踪移动的共振）；优化器是**一阶
 投影梯度**（非 MMA，把峰值做成 D066 多约束 MMA 的约束是 reopening 项）；`beta=1e-4` 默认阻尼保证带内解不奇异。
 
+### 20.3 泛化 NSGA driver + IGD⁺ 指标（Wave MMM，D068）
+
+D060 后代码库有**两个几乎一样的 NSGA-III 循环**：`multi_objective_to`（柔度+体积，2 目标）和
+`multi_load_case_to`（各载况柔度+体积，≥3 目标），只差目标数 / 参考点 / 用哪个 hypervolume。D060 的
+reopening 项就是**单个泛化 `nsga3_density_to`** + **多目标 IGD⁺** 指标：
+
+```python
+from structure_optimizer.core.multi_objective_to import nsga3_density_to, igd_plus
+# 单一驱动统辖 2/3/N 目标：n_obj = len(load_cases)+1
+r = nsga3_density_to(config, mesh, load_cases=[list(config.loads), swapped_lc], n_generations=12)
+val = igd_plus(obtained_front, reference_pareto_front)   # 越小越好，0 ⇔ 弱支配参考前沿
+```
+
+`nsga3_density_to` 在 `n_obj==2` 用 `hypervolume_2d`、否则 `hypervolume_nd`，所以两个旧驱动**逐位复现**
+（golden baseline 验证）。`multi_objective_to` / `multi_load_case_to` 现在只是薄壳委托。IGD⁺:
+`d⁺(z,a)=sqrt(Σ_i max(a_i−z_i,0)²)`、`IGD⁺=mean_z min_a d⁺`，弱 Pareto 相容（支配参考前沿则记 0，胜过朴素 IGD）。
+
+**关键 / 诚实边界**：2-obj / 3-obj 委托**逐位一致**（front objectives / densities / hv history 全 `array_equal`，
+对照重构前 golden baseline hv[-1] 118455.6190 / 1.5067600610e9）+ IGD⁺ 闭式（手算 3 点例=1/3；四分之一圆解析前沿
+径向外推 δ → IGD⁺=δ）+ 4 目标可跑。诚实声明：这是**保行为 DRY 重构**（不是算法改进，NSGA-III 仍无梯度）；IGD⁺ 需
+调用方提供**参考前沿**（真实 TO 问题无解析前沿，只能用代理参考，是相对收敛非绝对）；`n_obj==2→hypervolume_2d`
+派发纯为逐位兼容。
+
 ---
 
 ## 常见错误
