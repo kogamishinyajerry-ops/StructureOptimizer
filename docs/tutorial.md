@@ -1135,6 +1135,26 @@ rc = system_reliability_series([2.0, 2.5, 3.0], rho)         # 相关串联
 ρ 钳到 0.999999，故 ρ=1 不精确退化（残差 ~2%，因 φ₂ 在 ρ=1 近奇异）；串联任意 m，并联仅 2 模式
 （m>2 并联需多元正态 CDF，见 D055）。
 
+### 18.7 marching-squares 嵌套环 → 带孔 ear-clipping 封顶（Wave AAA，D056）
+
+v6 的 marching-squares 平滑边界用**质心扇形**封顶——只对星凸环正确且**不支持内孔**。带内孔的密度场
+（如环形）会同时产生外环和内环，封顶必须把内环**挖掉**：
+
+```python
+import numpy as np
+from structure_optimizer.core.stl_export import (
+    classify_loops_even_odd, write_stl_smooth_holes)
+# 偶奇嵌套：方块套方块 → 1 组 1 孔；不相交 → 2 组 0 孔
+groups = classify_loops_even_odd(loops)        # [(outer, [holes]), ...]
+info = write_stl_smooth_holes(mesh, densities, "holed.stl")
+# info['cross_section_area'] = 外环 − 内环；info['is_watertight'] / 'n_groups'
+```
+
+**关键 / 诚实边界**：偶奇嵌套检测精确（射线投射定深度，偶=实心外环、奇=孔；三层嵌套→外环带孔+实心岛）；
+面积守恒 = 外环−内环，1e-9（矩形孔与环形孔均成立）。**水密仅对洁净直角孔断言**：曲线（多顶点）孔用
+零宽桥缝挖洞会留一条非流形边——这**不是** AAA 引入的回归，D049 既有 `write_stl_polygon` 在同一环形上
+同样非水密（其方块孔测试恰好落在良态几何上）。无桥缝孔三角化（约束 Delaunay）是 reopening 项（见 D056）。
+
 ---
 
 ## 常见错误

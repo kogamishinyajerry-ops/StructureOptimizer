@@ -416,16 +416,17 @@ def ear_clipping_triangulate(loop) -> tuple[np.ndarray, list[tuple[int, int, int
     tris: list[tuple[int, int, int]] = []
     guard = 0
     max_guard = pts.shape[0] ** 2 + 1
+    eps = 1e-9
     while len(idx) > 3 and guard < max_guard:
         guard += 1
         m = len(idx)
+        # Pass 1: clip a strictly-convex ear containing no other vertex.
         clipped = False
         for ii in range(m):
             i0, i1, i2 = idx[(ii - 1) % m], idx[ii], idx[(ii + 1) % m]
             a, b, c = pts[i0], pts[i1], pts[i2]
-            # convex (CCW left turn) ?
             cross = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])
-            if cross <= 1e-12:
+            if cross <= eps:  # reflex or collinear — not a strict ear
                 continue
             if any(
                 _point_strictly_in_tri(pts[j], a, b, c)
@@ -437,7 +438,23 @@ def ear_clipping_triangulate(loop) -> tuple[np.ndarray, list[tuple[int, int, int
             del idx[ii]
             clipped = True
             break
-        if not clipped:
+        if clipped:
+            continue
+        # Pass 2: drop a redundant collinear vertex (|cross| ≤ eps). It lies on
+        # the straight edge between its neighbours, so removing it leaves the
+        # polygon unchanged — no triangle is emitted (it would be degenerate).
+        # This is what lets marching-squares staircase runs (many collinear
+        # vertices) be triangulated.
+        removed = False
+        for ii in range(m):
+            i0, i1, i2 = idx[(ii - 1) % m], idx[ii], idx[(ii + 1) % m]
+            a, b, c = pts[i0], pts[i1], pts[i2]
+            cross = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])
+            if abs(cross) <= eps:
+                del idx[ii]
+                removed = True
+                break
+        if not removed:
             raise SolverError("ear_clipping_no_ear_found")
     if len(idx) == 3:
         tris.append((idx[0], idx[1], idx[2]))
@@ -596,3 +613,164 @@ def stl_is_watertight(triangle_blocks: list[str]) -> bool:
         for a, b in ((verts[0], verts[1]), (verts[1], verts[2]), (verts[2], verts[0])):
             edges[tuple(sorted((a, b)))] += 1
     return all(count == 2 for count in edges.values())
+
+
+# --- Wave AAA (v8, D056): marching-squares nested-loop holes → ear-clipping ---
+#
+# D048's reopening criterion: auto-detect nested marching-squares loops
+# (even-odd parity) and route each (outer, holes) group through the
+# ear-clipping `triangulate_with_holes`, so a density field with an interior
+# void (e.g. an annulus) extrudes to a watertight prism with the hole carved out
+# — which the centroid-fan cap of `write_stl_marching_squares` cannot do.
+
+
+def _clean_ring(loop, tol: float = 1e-9) -> np.ndarray:
+    """Drop consecutive-duplicate and collinear vertices from a ring.
+
+    Used so the cap triangulation and the side walls share the **same** vertex
+    set (collinear vertices removed once, up front) — otherwise ear clipping
+    would silently drop boundary vertices the walls still carry, breaking
+    watertightness. Never reduces below 3 vertices.
+    """
+    pts = _dedupe_ring(loop)
+    # remove consecutive duplicates
+    keep = [pts[0]]
+    for p in pts[1:]:
+        if np.linalg.norm(p - keep[-1]) > tol:
+            keep.append(p)
+    pts = np.array(keep)
+    if pts.shape[0] < 3:
+        return pts
+    # remove collinear vertices
+    out = []
+    n = pts.shape[0]
+    for i in range(n):
+        a, b, c = pts[(i - 1) % n], pts[i], pts[(i + 1) % n]
+        cross = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])
+        if abs(cross) > tol:
+            out.append(b)
+    return np.array(out) if len(out) >= 3 else pts
+
+
+def _point_in_loop(point, loop) -> bool:
+    """Ray-casting point-in-polygon test for a closed loop (open or closed ring)."""
+    pts = _dedupe_ring(loop)
+    x, y = float(point[0]), float(point[1])
+    inside = False
+    n = pts.shape[0]
+    j = n - 1
+    for i in range(n):
+        xi, yi = pts[i]
+        xj, yj = pts[j]
+        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi + 1e-300) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
+def classify_loops_even_odd(loops):
+    """Group MS contour loops into (outer, [holes]) by even-odd nesting depth.
+
+    A loop's depth = number of other loops that contain it (containment tested on
+    a representative vertex — MS loops never cross). Even depth = solid outer; odd
+    depth = hole. Each hole is assigned to its immediate container (depth−1).
+    Returns a list of ``(outer_loop, [hole_loops])`` groups; deeper nesting
+    (islands inside holes) become their own outer groups.
+    """
+    rings = [_dedupe_ring(lp) for lp in loops]
+    n = len(rings)
+    contains = [[False] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            if i != j and rings[i].shape[0] >= 1:
+                contains[j][i] = _point_in_loop(rings[i][0], rings[j])
+    depth = [sum(1 for j in range(n) if contains[j][i]) for i in range(n)]
+    groups = []
+    for i in range(n):
+        if depth[i] % 2 == 0:  # solid outer
+            holes = [rings[h] for h in range(n) if depth[h] == depth[i] + 1 and contains[i][h]]
+            groups.append((rings[i], holes))
+    return groups
+
+
+def write_stl_smooth_holes(
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    out_path: str | Path,
+    rho_threshold: float = 0.5,
+    z_thickness: float = 1.0,
+    solid_name: str = "topology_smooth_holes",
+) -> dict:
+    """Smooth-boundary STL with **holes**: marching-squares contours → even-odd
+    nesting → ear-clipping caps + outer/hole side walls (Wave AAA, D056).
+
+    Unlike ``write_stl_marching_squares`` (centroid fan, no holes), this carves
+    interior voids out of the cap. Returns ``n_triangles``, ``cross_section_area``
+    (outer − holes), ``n_groups``, ``is_watertight``, ``out_path``.
+    """
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    if densities.shape[0] != mesh.elements.shape[0]:
+        raise SolverError("density_count_mismatch")
+    if z_thickness <= 0:
+        raise SolverError("stl_export_nonpositive_thickness")
+
+    cell_w = mesh.width / mesh.nelx
+    cell_h = mesh.height / mesh.nely
+    field = np.zeros((mesh.nely, mesh.nelx))
+    for ey in range(mesh.nely):
+        for ex in range(mesh.nelx):
+            field[ey, ex] = densities[mesh.element_index(ex, ey)]
+    x_coords = (np.arange(mesh.nelx) + 0.5) * cell_w
+    y_coords = (np.arange(mesh.nely) + 0.5) * cell_h
+
+    loops = [lp for lp in marching_squares_contours(field, x_coords, y_coords, rho_threshold)
+             if polygon_area(lp) > 1e-12]
+    groups = classify_loops_even_odd(loops)
+
+    triangles: list[str] = []
+    total_area = 0.0
+    for outer, holes in groups:
+        # Clean rings once (remove collinear) so cap boundary and walls share the
+        # same vertices → watertight (see _clean_ring).
+        outer_c = _clean_ring(outer)
+        holes_c = [_clean_ring(h) for h in holes]
+        pts, tris = triangulate_with_holes(outer_c, holes_c)
+        total_area += sum(_tri_area(pts[i], pts[j], pts[k]) for i, j, k in tris)
+        for i, j, k in tris:
+            a, b, c = pts[i], pts[j], pts[k]
+            a_lo, b_lo, c_lo = (np.array([p[0], p[1], 0.0]) for p in (a, b, c))
+            a_hi, b_hi, c_hi = (np.array([p[0], p[1], z_thickness]) for p in (a, b, c))
+            triangles.append(_format_triangle(a_lo, c_lo, b_lo, np.array([0.0, 0.0, -1.0])))
+            triangles.append(_format_triangle(a_hi, b_hi, c_hi, np.array([0.0, 0.0, 1.0])))
+        for ring in [outer_c, *holes_c]:
+            ring = np.asarray(ring, dtype=float)
+            if _signed_area(ring) < 0:
+                ring = ring[::-1].copy()
+            rn = ring.shape[0]
+            for kk in range(rn):
+                a, b = ring[kk], ring[(kk + 1) % rn]
+                a_lo = np.array([a[0], a[1], 0.0])
+                b_lo = np.array([b[0], b[1], 0.0])
+                a_hi = np.array([a[0], a[1], z_thickness])
+                b_hi = np.array([b[0], b[1], z_thickness])
+                edge = b - a
+                wall_n = np.array([edge[1], -edge[0], 0.0])
+                nrm = np.linalg.norm(wall_n)
+                wall_n = wall_n / nrm if nrm > 1e-300 else np.array([1.0, 0.0, 0.0])
+                triangles.append(_format_triangle(a_lo, b_lo, b_hi, wall_n))
+                triangles.append(_format_triangle(a_lo, b_hi, a_hi, wall_n))
+
+    out_path = Path(out_path)
+    with open(out_path, "w") as f:
+        f.write(f"solid {solid_name[:80]}\n")
+        for tri in triangles:
+            f.write(tri)
+        f.write(f"endsolid {solid_name[:80]}\n")
+
+    return {
+        "n_triangles": len(triangles),
+        "cross_section_area": float(total_area),
+        "n_groups": len(groups),
+        "is_watertight": stl_is_watertight(triangles),
+        "out_path": str(out_path),
+    }
