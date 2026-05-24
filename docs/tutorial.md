@@ -855,6 +855,33 @@ print(out.feasible, out.volume_fraction, out.beta)
 均匀缩放不变，可靠度旋钮是**体积分数**——更多材料 → d_nom 下降 → β 上升。更苛刻的
 β_target 需要 ≥ 同等的材料量（RBTO vs 确定性设计的差异，可量化）。仍 numpy-only / 2D。
 
+### 17.2 逐单元各向异性热场 + 各向异性热 TO（Wave NN，D043）
+
+v6（D036）的张量热传导是**全局**一个 k；v7 升级到**逐单元**各向异性场（每个单元一个
+方向/张量，如纤维复合的局部纤维角），并给出**各向异性热 TO 灵敏度**：
+
+```python
+import numpy as np
+from structure_optimizer.core.mesh import create_structured_mesh
+from structure_optimizer.core.thermal import orientation_field_to_tensors, solve_thermal
+from structure_optimizer.core.thermal_simp import (
+    anisotropic_thermal_sensitivity, load_thermal_benchmark)
+
+config, k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
+mesh = create_structured_mesh(config); rho = np.full(mesh.elements.shape[0], 1.0)
+# 逐单元方向场（基张量 kxx=5,kyy=1 旋转 per-element 角度）
+field = orientation_field_to_tensors(5.0, 1.0, np.linspace(0, np.pi/2, mesh.elements.shape[0]))
+r = solve_thermal(config, mesh, rho, 1.0, sources, bcs, conductivity_tensor_field=field)
+# 各向异性热 TO 灵敏度 dC/dρ（自伴随，与标量同式，但能量带张量）
+sens = anisotropic_thermal_sensitivity(config, mesh, rho, conductivity_tensor=field[0],
+                                       heat_sources=sources, thermal_bcs=bcs)
+```
+
+**关键升级**：均匀方向场**精确退化**到 v6 全局张量解（1e-12，故继承 D036 patch test）；
+变化的方向场产生不同的温度场（物理有效）；各向异性 SIMP 灵敏度与中心差分**一致**
+（rel 1e-4）。注：变化 k 下线性场不再是无源精确解，故不重复声称 patch test——退化锚点
+经均匀情形传递该保证。
+
 ---
 
 ## 常见错误

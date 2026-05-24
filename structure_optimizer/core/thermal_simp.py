@@ -174,3 +174,37 @@ def run_thermal_simp(
         converged=converged,
         mesh_shape=(mesh.nelx, mesh.nely),
     )
+
+
+def anisotropic_thermal_sensitivity(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    conductivity_tensor: np.ndarray | None = None,
+    heat_sources: list[dict[str, Any]] | None = None,
+    thermal_bcs: list[dict[str, Any]] | None = None,
+    conductivity_tensor_field: np.ndarray | None = None,
+) -> np.ndarray:
+    """Anisotropic thermal SIMP compliance sensitivity dC/dρ_e (Wave NN, D043).
+
+    The thermal problem K(ρ)·T = q is self-adjoint, so for thermal compliance
+    C = qᵀT = TᵀK T the sensitivity is
+
+        dC/dρ_e = -p · ρ_e^(p-1) · (1 - ρ_min) · (Tₑᵀ ke_e Tₑ),
+
+    identical in form to the scalar case (``run_thermal_simp``) — the only change
+    is that ``ke_e`` (and hence ``element_thermal_energy``) carries the
+    anisotropic tensor / per-element field. Pass either a global
+    ``conductivity_tensor`` or a per-element ``conductivity_tensor_field``.
+    """
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    result = solve_thermal(
+        config, mesh, densities, conductivity=1.0,
+        heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+        conductivity_tensor=conductivity_tensor,
+        conductivity_tensor_field=conductivity_tensor_field,
+    )
+    opt = config.optimization
+    active = np.where(mesh.void_mask, opt.min_density, densities)
+    p = opt.penalty
+    return -p * np.power(active, p - 1.0) * (1.0 - opt.min_density) * result.element_thermal_energy

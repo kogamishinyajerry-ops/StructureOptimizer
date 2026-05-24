@@ -150,6 +150,44 @@ def _assemble_thermal_dense(
     return K
 
 
+def _assemble_thermal_dense_field(
+    mesh: StructuredMesh,
+    density_scale: np.ndarray,
+    ke_field: np.ndarray,
+) -> np.ndarray:
+    """Assemble with a per-element conductivity element matrix (Wave NN, D043).
+
+    ``ke_field`` has shape (n_elements, 4, 4) — one element matrix per element,
+    so each element may carry its own (orientation-rotated) anisotropic tensor.
+    """
+    n_nodes = mesh.nodes.shape[0]
+    K = np.zeros((n_nodes, n_nodes), dtype=float)
+    for elem_id, elem in enumerate(mesh.elements):
+        scale = float(density_scale[elem_id])
+        ke = ke_field[elem_id]
+        for i_local in range(4):
+            ni = elem[i_local]
+            for j_local in range(4):
+                K[ni, elem[j_local]] += scale * ke[i_local, j_local]
+    return K
+
+
+def orientation_field_to_tensors(kxx: float, kyy: float, angles, kxy: float = 0.0) -> np.ndarray:
+    """Build a per-element conductivity-tensor field from a base orthotropic tensor
+    rotated by a per-element orientation (fibre-angle) field.
+
+    Args:
+        kxx, kyy, kxy: principal-axis base tensor [[kxx,kxy],[kxy,kyy]].
+        angles:        per-element rotation angles (rad), shape (n_elements,).
+
+    Returns:
+        (n_elements, 2, 2) tensor field; element e uses R(θ_e)·k·R(θ_e)ᵀ.
+    """
+    base = conductivity_tensor(kxx, kyy, kxy)
+    angles = np.asarray(angles, dtype=float).reshape(-1)
+    return np.stack([rotate_conductivity_tensor(base, float(a)) for a in angles])
+
+
 def thermal_node_selector(mesh: StructuredMesh, selector: str) -> list[int]:
     """Map a string selector to node IDs (mirrors mesh.selector_nodes)."""
     nodes = mesh.selector_nodes(selector)
@@ -164,6 +202,7 @@ def solve_thermal(
     heat_sources: list[dict[str, Any]] | None = None,
     thermal_bcs: list[dict[str, Any]] | None = None,
     conductivity_tensor: np.ndarray | None = None,
+    conductivity_tensor_field: np.ndarray | None = None,
 ) -> ThermalResult:
     """Solve K(ρ) · T = q for nodal temperatures + thermal compliance.
 
@@ -188,8 +227,18 @@ def solve_thermal(
     if densities.shape[0] != mesh.elements.shape[0]:
         raise SolverError("density_count_mismatch")
 
-    if conductivity_tensor is not None:
-        # Anisotropic / orthotropic path (Wave GG, D036).
+    ke_field = None
+    if conductivity_tensor_field is not None:
+        # Per-element anisotropic field (Wave NN, D043).
+        field = np.asarray(conductivity_tensor_field, dtype=float)
+        if field.shape != (mesh.elements.shape[0], 2, 2):
+            raise SolverError("conductivity_tensor_field_shape")
+        ke_field = np.stack(
+            [element_thermal_conductivity_tensor(field[e], config.thickness) for e in range(field.shape[0])]
+        )
+        ke = None
+    elif conductivity_tensor is not None:
+        # Global anisotropic / orthotropic tensor (Wave GG, D036).
         ke = element_thermal_conductivity_tensor(conductivity_tensor, config.thickness)
     else:
         if conductivity <= 0:
@@ -197,7 +246,10 @@ def solve_thermal(
         ke = element_thermal_conductivity(conductivity, config.thickness)
     active = np.where(mesh.void_mask, opt.min_density, densities)
     density_scale = opt.min_density + (active**opt.penalty) * (1.0 - opt.min_density)
-    K = _assemble_thermal_dense(mesh, density_scale, ke)
+    if ke_field is not None:
+        K = _assemble_thermal_dense_field(mesh, density_scale, ke_field)
+    else:
+        K = _assemble_thermal_dense(mesh, density_scale, ke)
 
     n_nodes = mesh.nodes.shape[0]
     q = np.zeros(n_nodes)
@@ -255,7 +307,8 @@ def solve_thermal(
     elem_energy = np.zeros(mesh.elements.shape[0])
     for i, elem in enumerate(mesh.elements):
         Te = T[elem]
-        elem_energy[i] = float(Te @ ke @ Te)
+        ke_i = ke_field[i] if ke_field is not None else ke
+        elem_energy[i] = float(Te @ ke_i @ Te)
 
     return ThermalResult(
         temperatures=T,
