@@ -196,3 +196,73 @@ def tl_adjoint_compliance_sensitivity(
         sens[e] = -(dks / k_scale[e]) * float(lam[dofs_elems[e]] @ f_int_elems[e])
 
     return TLAdjointResult(compliance=compliance, sensitivity=sens, converged=res.converged)
+
+
+# --- Wave UU (v8, D050): geometric-nonlinear TO full OC loop ----------------
+#
+# D044 delivered the TL adjoint sensitivity but stopped short of a driver ("a TL
+# in-the-loop optimiser ... is deferred"). Wave UU closes that loop: an
+# optimality-criteria SIMP loop whose sensitivity is the full-TL adjoint
+# dC/dρ_e (not the v5 linear-on-nonlinear approximation of run_nonlinear_simp),
+# so the optimiser sees genuine large-deformation stiffness at every iteration.
+
+
+@dataclass
+class NonlinearTOResult:
+    """Output of the full-TL adjoint OC loop (Wave UU)."""
+
+    densities: np.ndarray
+    compliance_history: list[float]
+    volume_history: list[float]
+    converged: bool
+    mesh_shape: tuple[int, int]
+
+
+def nonlinear_to_oc(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    n_load_steps: int = 4,
+    max_iter: int = 25,
+    change_tol: float = 1e-2,
+) -> NonlinearTOResult:
+    """Optimality-criteria topology optimisation of the **full Total-Lagrangian**
+    end-compliance, driven by the D044 TL adjoint sensitivity (Wave UU, D050).
+
+    Each iteration: solve the forward TL + adjoint for dC/dρ
+    (``tl_adjoint_compliance_sensitivity``), density-filter the sensitivity, OC
+    update under the volume constraint, re-apply masks. Stops on
+    ``max|Δρ| < change_tol`` or ``max_iter``. Reuses the same OC update and
+    density filter as the linear SIMP loop — only the sensitivity is the
+    large-deformation one.
+    """
+    opt = config.optimization
+    rho = _default_initial_density(config, mesh)
+    compliance_history: list[float] = []
+    volume_history: list[float] = []
+    converged = False
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+
+    for _ in range(max_iter):
+        out = tl_adjoint_compliance_sensitivity(config, mesh, rho, n_load_steps=n_load_steps)
+        compliance_history.append(out.compliance)
+        volume_history.append(float(np.sum(rho[design]) / n_design))
+        sens = density_filter(mesh, rho, out.sensitivity, opt.filter_radius, opt.min_density)
+        sens[~design] = 0.0
+        previous = rho.copy()
+        rho = _optimality_criteria_update(config, mesh, rho, sens)
+        rho = _apply_density_masks(config, mesh, rho)
+        if float(np.max(np.abs(rho - previous))) < change_tol:
+            converged = True
+            break
+
+    final = tl_adjoint_compliance_sensitivity(config, mesh, rho, n_load_steps=n_load_steps)
+    compliance_history.append(final.compliance)
+    volume_history.append(float(np.sum(rho[design]) / n_design))
+    return NonlinearTOResult(
+        densities=rho,
+        compliance_history=compliance_history,
+        volume_history=volume_history,
+        converged=converged,
+        mesh_shape=(mesh.nelx, mesh.nely),
+    )

@@ -61,7 +61,7 @@ v8 完成 = `python scripts/test_agent.py --rubric v8` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] UU — 几何非线性 TO 完整 OC 环
+- [x] UU — 几何非线性 TO 完整 OC 环（D050 · 2 tests green · TL 端柔度 2066→584 + 体积守恒 + TL-aware 比线性优化在 TL 柔度下低 8% + 拓扑可区分 L2/√n 0.066）
 - [ ] VV — 滤波动态柔度 TO 完整环（多频带）
 - [ ] WW — 梯度种子 NSGA-III
 - [ ] XX — 一般 marginal Nataf（Gauss-Hermite）

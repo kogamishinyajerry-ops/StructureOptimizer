@@ -1015,6 +1015,35 @@ info = write_stl_polygon(outer, "part.stl", holes=[hole], z_thickness=2.0)
 
 ---
 
+## 18. v8 — closing the loop: gradient drivers & general distributions
+
+v8 把 v7 的半成品 driver **闭成完整环**，并把不确定性/几何提升到一般情形。每个 wave 源自
+v7（或更早）ADR 的 reopening criterion。
+
+### 18.1 几何非线性 TO 完整 OC 环（Wave UU，D050）
+
+v7（D044）给了完整 TL 伴随灵敏度但没接驱动器；v8 用它驱动一个**完整 OC 环**（每次迭代
+= 正向 TL + 伴随 → 滤波 → OC 更新），目标是大变形端柔度：
+
+```python
+from structure_optimizer.benchmarks.registry import load_benchmark
+from structure_optimizer.core.mesh import create_structured_mesh
+from structure_optimizer.core.nonlinear_simp import nonlinear_to_oc
+
+config = load_benchmark("cantilever", preset="smoke")
+mesh = create_structured_mesh(config)
+res = nonlinear_to_oc(config, mesh, n_load_steps=4, max_iter=15)
+# res.compliance_history 单调下降（2066→584）；res.volume_history 守恒在 0.45
+```
+
+**关键 / 诚实边界**：TL 端柔度大幅下降 + 体积守恒；**大变形真的有影响**——TL-aware 最优解
+在 TL 柔度下比"线性 SIMP 最优解"低 ~8%（拓扑也可区分 L2/√n≈0.066）。但差异**幅度随载荷**：
+轻载差异小、重载（~5×）差异 ~15% 且布局明显不同。是 **OC 非 MMA**、单目标；"beats linear"
+不等式需环**收敛够**（截断的环在重载下可能反而高于已收敛的线性解），故测试用 15 迭代留足
+余量（见 D050）。每迭代一次 TL 正向+伴随，比线性 SIMP 慢（~17s/15 迭代）。
+
+---
+
 ## 常见错误
 
 | 现象 | 原因 | 解决 |
