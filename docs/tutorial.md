@@ -1609,6 +1609,29 @@ D(90°) 交换 E₁↔E₂、`dD/dθ` vs FD ≤1e-6 + dC/dρ 与**新增 dC/dθ*
 **诚实边界**：连续性度量是**原始角差平方非周期感知**（+89°/−89° 物理差 2° 却被罚大，周期感知 `sin²Δθ` 是 reopening）+
 **单层平面非层合** + dense 装配每迭代重建 ke + MMA 非凸（约束版柔度更低是局部最优假象，只声明"可比"）。
 
+### 21.7 约束 Delaunay 多孔平滑 + 水密（Wave YYY，D080）
+
+D056 平滑多孔但桥缝 cap **非水密**（曲线孔）；D072 ribbon 水密但**仅 annulus（单孔）**。YYY 用**约束 Delaunay**
+三角化多连通区域——无桥缝，支持**任意个孔**，构造即水密。
+
+```python
+from structure_optimizer.core.stl_export import write_stl_cdt_multi_hole, constrained_delaunay_triangulate
+
+pts, tris = constrained_delaunay_triangulate(outer_loop, holes)   # 多孔 CDT
+info = write_stl_cdt_multi_hole(outer_loop, holes, 'part.stl', n_samples=64)
+# info['is_watertight'] / n_holes / cross_section_area
+```
+
+实现 = 全环顶点 Bowyer-Watson Delaunay → 按质心是否在区域内（外环内、所有孔外）过滤三角 → **验证不变量**：保留三角
+的边界边（恰属 1 个三角的边）== 全部环边。满足则顶 CDT cap + 底 + 沿每条环边的墙 = 每边恰 2 facet → 水密。
+
+**关键 / 定量锚点**：圆外环 **2 孔与 3 孔**均水密（独立边直方图证每边恰 2 facet）+ 截面积 ≈ 外−Σ孔 ≤1%（圆 r=1 减两 r=0.18）
++ CDT 边界边数 == 外+孔环边总数 + 0 孔（实心 π）/椭圆外环 2 孔均水密 + 退化输入报错。
+**诚实边界**：**无 flip 约束恢复**——靠环边本就是 Delaunay 边（密采样平滑边界成立，已验证）；稀疏/强非凸边界缺约束边时
+**显式报错**（`cdt_constraint_recovery_failed`）而非默默吐非水密网格（flip 恢复是 reopening）；O(n²) Bowyer-Watson；
+水密是**拓扑边流形**（同 D072/D056 标准，不保证病态自交输入的几何非自交）；cap 是 **2.5D 挤出**；无 Steiner 点质量细化
+（边界采样不均处可能瘦三角）；面积是**采样多边形面积**（"≈"随密采样收敛）。
+
 ---
 
 ## 常见错误

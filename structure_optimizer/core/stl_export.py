@@ -1012,3 +1012,174 @@ def write_stl_smooth_watertight_holes(
         "n_annuli": len(annuli),
         "out_path": str(out_path),
     }
+
+
+# --- Wave YYY (v11, D080): constrained-Delaunay multi-hole smooth+watertight ---
+#
+# D056 (smooth holes) used bridge-based ear clipping → smooth but the bridge/cap
+# seam is not reliably watertight on curved holes. D072 (ribbon) is watertight by
+# construction but **annulus-only** (exactly one hole/region). D072's reopening
+# criterion named the general fix: **constrained-Delaunay** triangulation of the
+# multiply-connected region, which supports an arbitrary number of holes and is
+# watertight by construction (no bridges). This is that path — a Bowyer-Watson
+# Delaunay of all ring vertices, region-filtered, with the boundary-edge ==
+# ring-edge invariant *verified* (the watertightness guarantee).
+
+
+def _circumcircle(a: np.ndarray, b: np.ndarray, c: np.ndarray):
+    """Circumcentre + squared radius of triangle (a,b,c); None if degenerate."""
+    ax, ay = float(a[0]), float(a[1])
+    bx, by = float(b[0]), float(b[1])
+    cx, cy = float(c[0]), float(c[1])
+    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    if abs(d) < 1e-300:
+        return None
+    a2, b2, c2 = ax * ax + ay * ay, bx * bx + by * by, cx * cx + cy * cy
+    ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d
+    uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d
+    return np.array([ux, uy]), (ax - ux) ** 2 + (ay - uy) ** 2
+
+
+def _bowyer_watson_delaunay(points: np.ndarray) -> list[tuple[int, int, int]]:
+    """Bowyer-Watson Delaunay triangulation of 2-D ``points`` (numpy-only, O(n²);
+    fine for the few-hundred-vertex ring boundaries here)."""
+    p = np.asarray(points, dtype=float)
+    n = p.shape[0]
+    if n < 3:
+        raise SolverError("cdt_too_few_points")
+    mn, mx = p.min(axis=0), p.max(axis=0)
+    ctr = 0.5 * (mn + mx)
+    span = float((mx - mn).max()) * 10.0 + 1.0
+    pp = np.vstack([p, [ctr[0] - span, ctr[1] - span], [ctr[0] + span, ctr[1] - span], [ctr[0], ctr[1] + span]])
+    tris: list[tuple[int, int, int]] = [(n, n + 1, n + 2)]
+    for ip in range(n):
+        pt = pp[ip]
+        bad = []
+        for t in tris:
+            cc = _circumcircle(pp[t[0]], pp[t[1]], pp[t[2]])
+            if cc is None:
+                continue
+            center, r2 = cc
+            if (pt[0] - center[0]) ** 2 + (pt[1] - center[1]) ** 2 < r2 - 1e-12:
+                bad.append(t)
+        edge_count: dict[tuple[int, int], int] = {}
+        for t in bad:
+            for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+                k = tuple(sorted(e))
+                edge_count[k] = edge_count.get(k, 0) + 1
+        boundary = [e for e, ct in edge_count.items() if ct == 1]
+        bad_set = set(bad)
+        tris = [t for t in tris if t not in bad_set]
+        for a, b in boundary:
+            tris.append((a, b, ip))
+    return [t for t in tris if max(t) < n]
+
+
+def constrained_delaunay_triangulate(outer_loop, holes=None) -> tuple[np.ndarray, list[tuple[int, int, int]]]:
+    """Constrained-Delaunay triangulation of the region inside ``outer_loop`` and
+    outside every loop in ``holes`` (Wave YYY, D080).
+
+    Bowyer-Watson Delaunay of all ring vertices, then keep only triangles whose
+    centroid lies in the region (inside outer, outside all holes). The
+    watertightness guarantee is **verified**: the boundary edges of the kept
+    triangulation (edges in exactly one kept triangle) must equal exactly the set
+    of ring edges. If a constraint edge was not recovered (the Delaunay
+    triangulation did not contain it — possible for sparsely-sampled or strongly
+    non-convex boundaries), this raises ``SolverError`` rather than emit a
+    non-watertight cap. Returns ``(pts, tris)``.
+    """
+    outer = _clean_ring(outer_loop)
+    hole_rings = [_clean_ring(h) for h in (holes or [])]
+    pts_list: list[np.ndarray] = []
+    constraints: set[tuple[int, int]] = set()
+    for ring in [outer, *hole_rings]:
+        start = len(pts_list)
+        pts_list.extend(ring)
+        m = ring.shape[0]
+        for k in range(m):
+            constraints.add(tuple(sorted((start + k, start + (k + 1) % m))))
+    pts = np.asarray(pts_list, dtype=float)
+
+    tris = _bowyer_watson_delaunay(pts)
+    kept = []
+    for t in tris:
+        centroid = pts[list(t)].mean(axis=0)
+        if _point_in_loop(centroid, outer) and not any(_point_in_loop(centroid, h) for h in hole_rings):
+            kept.append(t)
+
+    edge_count: dict[tuple[int, int], int] = {}
+    for t in kept:
+        for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+            k = tuple(sorted(e))
+            edge_count[k] = edge_count.get(k, 0) + 1
+    boundary = {e for e, ct in edge_count.items() if ct == 1}
+    if boundary != constraints:
+        raise SolverError("cdt_constraint_recovery_failed")
+    return pts, kept
+
+
+def write_stl_cdt_multi_hole(
+    outer_loop,
+    holes=None,
+    out_path: str | Path = "cdt_multi_hole.stl",
+    z_thickness: float = 1.0,
+    n_samples: int | None = None,
+    solid_name: str = "topology_cdt_multi_hole",
+) -> dict:
+    """Extrude a smooth multiply-connected polygon (outer + **arbitrary** holes) to
+    a watertight STL prism via constrained-Delaunay caps (Wave YYY, D080).
+
+    Unlike D072's annulus ribbon (exactly one hole), this handles any number of
+    holes. Optional ``n_samples`` resamples every ring to equal arc-length spacing
+    (denser sampling makes the constraint edges Delaunay-favoured). Returns
+    ``n_triangles`` / ``cross_section_area`` / ``n_holes`` / ``is_watertight`` /
+    ``out_path``.
+    """
+    if z_thickness <= 0:
+        raise SolverError("stl_export_nonpositive_thickness")
+    outer = _resample_closed_ring(outer_loop, n_samples) if n_samples else _clean_ring(outer_loop)
+    hole_rings = [
+        _resample_closed_ring(h, n_samples) if n_samples else _clean_ring(h) for h in (holes or [])
+    ]
+    pts, tris = constrained_delaunay_triangulate(outer, hole_rings)
+
+    triangles: list[str] = []
+    total_area = 0.0
+    for i, j, k in tris:
+        a, b, c = pts[i], pts[j], pts[k]
+        total_area += _tri_area(a, b, c)
+        a_lo, b_lo, c_lo = (np.array([p[0], p[1], 0.0]) for p in (a, b, c))
+        a_hi, b_hi, c_hi = (np.array([p[0], p[1], z_thickness]) for p in (a, b, c))
+        triangles.append(_format_triangle(a_lo, c_lo, b_lo, np.array([0.0, 0.0, -1.0])))
+        triangles.append(_format_triangle(a_hi, b_hi, c_hi, np.array([0.0, 0.0, 1.0])))
+    for ring in [outer, *hole_rings]:
+        ring = np.asarray(ring, dtype=float)
+        if _signed_area(ring) < 0:
+            ring = ring[::-1].copy()
+        rn = ring.shape[0]
+        for kk in range(rn):
+            a, b = ring[kk], ring[(kk + 1) % rn]
+            a_lo = np.array([a[0], a[1], 0.0])
+            b_lo = np.array([b[0], b[1], 0.0])
+            a_hi = np.array([a[0], a[1], z_thickness])
+            b_hi = np.array([b[0], b[1], z_thickness])
+            edge = b - a
+            wall_n = np.array([edge[1], -edge[0], 0.0])
+            nrm = np.linalg.norm(wall_n)
+            wall_n = wall_n / nrm if nrm > 1e-300 else np.array([1.0, 0.0, 0.0])
+            triangles.append(_format_triangle(a_lo, b_lo, b_hi, wall_n))
+            triangles.append(_format_triangle(a_lo, b_hi, a_hi, wall_n))
+
+    out_path = Path(out_path)
+    with open(out_path, "w") as f:
+        f.write(f"solid {solid_name[:80]}\n")
+        for tri in triangles:
+            f.write(tri)
+        f.write(f"endsolid {solid_name[:80]}\n")
+    return {
+        "n_triangles": len(triangles),
+        "cross_section_area": float(total_area),
+        "n_holes": len(hole_rings),
+        "is_watertight": stl_is_watertight(triangles),
+        "out_path": str(out_path),
+    }

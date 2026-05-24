@@ -64,7 +64,7 @@ v11 完成 = `python scripts/test_agent.py --rubric v11` 报告：
 - [x] VVV — d 维 / Gumbel Archimedean copula
 - [x] WWW — 全相关矩阵 + Genz 精确多元系统 P_f
 - [x] XXX — 弹性同时 (ρ,θ) MMA + fibre-continuity
-- [ ] YYY — 约束 Delaunay 多孔平滑+水密
+- [x] YYY — 约束 Delaunay 多孔平滑+水密
 - [ ] ZZZ — v11 收口（rubric ≥ 99）
 
 > 注：v11 需在 `docs/quality-rubric-v11.md` + `scripts/test_agent.py` 的 `CHECKS_V11`
