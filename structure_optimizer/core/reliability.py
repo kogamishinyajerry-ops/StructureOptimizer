@@ -653,6 +653,92 @@ def correlated_gaussian_reliability(
 
 
 # ---------------------------------------------------------------------------
+# Wave FFF (v9, D061): Rosenblatt transform for a known joint distribution.
+#
+# When the *joint* distribution is known (not just marginals + a correlation),
+# the Rosenblatt transform maps X → independent standard normals U through the
+# chain of conditional CDFs:
+#     u_1 = Φ⁻¹(F_1(x_1)),  u_k = Φ⁻¹(F_{k|1..k-1}(x_k | x_1..x_{k-1})).
+# For a multivariate normal N(μ, Σ) the conditionals are Gaussian, so the
+# Φ⁻¹∘F_{k|..} collapses to the standardised conditional
+#     u_k = (x_k − μ_{k|..}) / σ_{k|..},
+# which (with the natural ordering) is exactly the forward substitution
+# u = L⁻¹(x − μ) for the Cholesky factor Σ = L Lᵀ — the cross-check anchor.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RosenblattTransform:
+    """Rosenblatt transform for a multivariate-normal joint X ~ N(mean, cov).
+
+    ``x_to_u`` applies the chain of (Gaussian) conditional CDFs; ``u_to_x`` is the
+    sequential inverse. Independent standard normals U result (Cov(U)=I exactly).
+    Mirrors :class:`NatafTransform`'s interface (``wrap_limit_state``) so FORM runs
+    unchanged.
+    """
+
+    mean: np.ndarray
+    cov: np.ndarray
+
+    @property
+    def n_vars(self) -> int:
+        return int(self.mean.shape[0])
+
+    def _conditional(self, k: int, x_prefix: np.ndarray) -> tuple[float, float]:
+        """(μ_{k|0..k-1}, σ_{k|0..k-1}) given x[:k] = ``x_prefix``."""
+        mean, cov = self.mean, self.cov
+        if k == 0:
+            return float(mean[0]), float(np.sqrt(cov[0, 0]))
+        s = cov[:k, :k]
+        c = cov[k, :k]
+        w = np.linalg.solve(s, c)  # Σ[:k,:k]⁻¹ Σ[:k,k]
+        mu = float(mean[k] + w @ (x_prefix[:k] - mean[:k]))
+        var = float(cov[k, k] - c @ w)
+        if var <= 0:
+            raise SolverError("rosenblatt_nonpositive_conditional_variance")
+        return mu, float(np.sqrt(var))
+
+    def x_to_u(self, x: np.ndarray) -> np.ndarray:
+        x = np.asarray(x, dtype=float)
+        u = np.empty(self.n_vars)
+        for k in range(self.n_vars):
+            mu, sig = self._conditional(k, x)
+            # u_k = Φ⁻¹(F_{k|..}(x_k)) = Φ⁻¹(Φ((x_k−μ)/σ)) = (x_k−μ)/σ
+            u[k] = (x[k] - mu) / sig
+        return u
+
+    def u_to_x(self, u: np.ndarray) -> np.ndarray:
+        u = np.asarray(u, dtype=float)
+        x = np.empty(self.n_vars)
+        for k in range(self.n_vars):
+            mu, sig = self._conditional(k, x)
+            x[k] = mu + u[k] * sig
+        return x
+
+    def wrap_limit_state(self, g_physical: Callable[[np.ndarray], float]) -> Callable[[np.ndarray], float]:
+        """Turn a physical-space limit state g(x) into a U-space g(u) for ``form_hlrf``."""
+        return lambda u: g_physical(self.u_to_x(u))
+
+
+def build_rosenblatt_normal(mean: np.ndarray, cov: np.ndarray) -> RosenblattTransform:
+    """Construct a :class:`RosenblattTransform` for X ~ N(mean, cov).
+
+    ``cov`` must be symmetric positive-definite (checked via Cholesky)."""
+    mean = np.asarray(mean, dtype=float).reshape(-1)
+    cov = np.asarray(cov, dtype=float)
+    n = mean.shape[0]
+    if cov.shape != (n, n):
+        raise SolverError("rosenblatt_cov_shape_mismatch")
+    if not np.allclose(cov, cov.T, atol=1e-12):
+        raise SolverError("rosenblatt_cov_not_symmetric")
+    try:
+        np.linalg.cholesky(cov)
+    except np.linalg.LinAlgError as exc:
+        raise SolverError("rosenblatt_cov_not_positive_definite") from exc
+    return RosenblattTransform(mean=mean, cov=cov)
+
+
+# ---------------------------------------------------------------------------
 # Wave XX (v8, D053): general-marginal Nataf via Gauss-Hermite quadrature.
 #
 # D045's closed-form equivalent-correlation handled only normal/lognormal pairs.

@@ -1214,6 +1214,24 @@ res = multi_load_case_to(config, mesh, n_generations=12, population_size=16)
 梯度种子暖启动提升 HV（1.51e9→1.93e9）且单目标端点锐化 8.4×。诚实声明：仍是**梯度自由**搜索
 （种子是**注入**梯度端点，非 GA 自己发现）；HSO 是 `O(k^{n−1})`，不适合多目标大前沿（见 D060）。
 
+### 19.4 Rosenblatt 变换（已知联合分布，Wave FFF，D061）
+
+Nataf（D045/D053）用**边缘 + 相关矩阵**（假设高斯 copula）映射到独立标准正态。当**完整联合
+分布**已知时，精确变换是 **Rosenblatt**——条件 CDF 链 `u_k = Φ⁻¹(F_{k|1..k-1}(x_k|…))`。
+对多元正态联合，条件是高斯，故 `Φ⁻¹∘F_{k|..}` 退化为标准化条件：
+
+```python
+from structure_optimizer.core.reliability import build_rosenblatt_normal, form_hlrf
+rt = build_rosenblatt_normal(mean, cov)      # X ~ N(mean, cov)
+u = rt.x_to_u(x); x = rt.u_to_x(u)           # 条件 CDF 链 / 逆
+beta = form_hlrf(rt.wrap_limit_state(lambda x: a0 - a @ x), n_vars=len(mean)).beta
+```
+
+**关键 / 诚实边界**：条件 CDF Rosenblatt == Cholesky 白化 `L⁻¹(x−μ)`，1e-10（Schur 条件 vs 前代
+两独立推导一致）+ round-trip + 精确去相关 `Cov(U)=I` + 单位方差高斯下与 Nataf 一致 + FORM β ==
+闭式 `(a₀−aᵀμ)/√(aᵀΣa)`。诚实声明：仅实现 **MVN 联合**；高斯 copula + 非高斯边缘会退化回 Nataf
+（不增益）；真正非高斯联合（Clayton/Frank copula）是 reopening 项。Rosenblatt **依赖变量顺序**（见 D061）。
+
 ---
 
 ## 常见错误
