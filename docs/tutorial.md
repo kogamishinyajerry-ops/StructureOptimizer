@@ -943,6 +943,27 @@ g_u = nataf.wrap_limit_state(lambda x: 5.0 - x.sum())   # 喂给 form_hlrf
 且相关≠0 直接**拒绝**（无闭式，不静默近似）；其余 marginal（Weibull/Gumbel）需 Nataf
 积分，推迟（见 D045 reopening）。独立情形精确退化为 `standardize_gaussian`。
 
+### 17.5 NSGA-III 直接优化密度场（Wave QQ，D046）
+
+v5（Wave DD）的 NSGA 只跑 **proxy**（材料分配 / 截面）或对预算解后处理，因为"每个基因
+= 整个密度场"太贵。v7 兑现 D037/D023 reopening：基因**就是**密度场，目标 =（柔度, 体积）：
+
+```python
+from structure_optimizer.benchmarks.registry import load_benchmark
+from structure_optimizer.core.mesh import create_structured_mesh
+from structure_optimizer.core.multi_objective_to import multi_objective_to
+
+config = load_benchmark("cantilever", preset="smoke")
+mesh = create_structured_mesh(config)
+res = multi_objective_to(config, mesh, n_generations=10, population_size=12)
+# res.front_objectives (n,2) 已按柔度升序；res.hv_history 累积存档超体积（单调）
+```
+
+**关键 / 诚实边界**：2D 超体积有**精确解析**校验；累积非支配存档 + 固定参考点保证超体积
+**单调不减**（算法不变量，与优化质量无关）；前沿是真柔度/体积权衡（体积随柔度升而降）。
+**这是梯度自由搜索，打不过梯度 SIMP**——测试显式断言"前沿不支配梯度 SIMP 点"而非吹嘘
+超越。价值在于"真密度场的可验证 Pareto 前沿 + 收敛信号"，单目标 SIMP 给不了。
+
 ---
 
 ## 常见错误

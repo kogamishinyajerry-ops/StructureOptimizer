@@ -64,7 +64,7 @@ v7 完成 = `python scripts/test_agent.py --rubric v7` 报告：
 - [x] NN — 逐单元各向异性热场 + 各向异性热 TO（D043 · 5 tests green · uniform 场==global tensor 1e-12 + 各向异性灵敏度 vs 中心差分 1e-4）
 - [x] OO — 几何非线性 TO（TL 伴随）（D044 · 4 tests green · TL 伴随灵敏度 vs 中心差分 rel 2e-4 + 非线性柔度≠线性 + 自伴随线性极限）
 - [x] PP — 相关 / 非高斯不确定性（Nataf）（D045 · 8 tests green · 相关高斯线性极限态 β==(a₀−aᵀμ)/√(aᵀΣa) rel 1e-6 + 对数正态等效相关闭式 1e-12 + Φ⁻¹ 1e-10）
-- [ ] QQ — NSGA-III 直接优化密度场
+- [x] QQ — NSGA-III 直接优化密度场（D046 · 6 tests green · 2D 超体积精确解析 + 累积存档超体积单调 + 真密度场柔度/体积 Pareto + 梯度自由前沿不支配梯度 SIMP）
 - [ ] RR — 阻尼频响 TO
 - [ ] SS — Ear-clipping 通用多边形 STL + 孔洞
 - [ ] TT — v7 收口（rubric ≥ 99）
