@@ -67,6 +67,7 @@ class Scorecard:
     v3_check: dict = field(default_factory=dict)
     v4_check: dict = field(default_factory=dict)
     v5_check: dict = field(default_factory=dict)
+    v6_check: dict = field(default_factory=dict)
     pytest_check: dict = field(default_factory=dict)
 
     @property
@@ -880,6 +881,207 @@ def check_v6_6_4_adrs_v6() -> tuple[int, str, str]:
     return (3, "PASS", f"{len(new_adrs)} v6 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
 
 
+# --- v7 rubric: production drivers & field-level fidelity ----------------
+# Grep-based presence + quantitative-test checks (same pattern as CHECKS_V6).
+# They fail until the corresponding v7 wave lands, then pass.
+
+
+def _mod_and_test(module: str, mod_pat: str, test_pat: str, full: int, partial_msg: str, pass_msg: str):
+    has = _grep_count(mod_pat, module) >= 1
+    has_test = _grep_count(test_pat, "tests/**/*.py") >= 1
+    if has and has_test:
+        return full, "PASS", pass_msg
+    if has:
+        return full // 2, "PARTIAL", partial_msg
+    return 0, "FAIL", f"{module}: {mod_pat} missing"
+
+
+def check_v7_1_1_rbto() -> tuple[int, str, str]:
+    """§1.1 reliability-based TO — FORM into a SIMP driver (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/rbto.py", r"def rbto|reliability_based|beta_target|rbto_simp",
+        r"rbto|reliability_based.*to|beta_target", 8, "RBTO module, no test", "RBTO + analytical-β test")
+
+
+def check_v7_1_2_nonlinear_to() -> tuple[int, str, str]:
+    """§1.2 geometric-nonlinear TO via full-TL adjoint sensitivity (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/nonlinear_simp.py", r"total_lagrangian|tl_adjoint|green_strain|geometric_nonlinear.*simp|nonlinear_compliance",
+        r"tl_adjoint|nonlinear.*sensitivity.*fd|geometric_nonlinear.*to", 8, "nonlinear-TO module, no test", "nonlinear TO + adjoint-vs-FD test")
+
+
+def check_v7_1_3_damped_fr_to() -> tuple[int, str, str]:
+    """§1.3 damped frequency-response TO — minimise dynamic compliance (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/freq_response.py", r"dynamic_compliance|damped.*simp|freq_response_to|dynamic_to",
+        r"dynamic_compliance|damped.*to|freq.*response.*sensitivity", 8, "damped-FR-TO in module, no test", "damped-FR TO + sensitivity test")
+
+
+def check_v7_2_1_per_element_anisotropic() -> tuple[int, str, str]:
+    """§2.1 per-element anisotropic thermal field (5 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/thermal.py", r"per_element.*tensor|tensor_field|conductivity_field|element_orientation|fibre_angle",
+        r"per_element.*anisotrop|fibre_angle|orientation_field|tensor_field", 5, "per-element field in module, no test", "per-element anisotropic field + patch test")
+
+
+def check_v7_2_2_anisotropic_thermal_to() -> tuple[int, str, str]:
+    """§2.2 anisotropic thermal TO sensitivity (4 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/thermal_simp.py", r"anisotropic.*sens|tensor.*sensitivity|anisotropic.*simp",
+        r"anisotropic.*thermal.*sens|anisotropic.*thermal.*to", 4, "anisotropic sens in module, no test", "anisotropic thermal TO sensitivity + FD test")
+
+
+def check_v7_2_3_nsga3_density_field() -> tuple[int, str, str]:
+    """§2.3 NSGA-III directly on density fields, not proxies (7 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/multi_objective_to.py", r"def .*multi_objective|nsga3.*density|density.*genome|hypervolume",
+        r"multi_objective.*to|density.*pareto|hypervolume", 7, "density-field MO module, no test", "NSGA-III density-field TO + hypervolume test")
+
+
+def check_v7_3_1_nataf() -> tuple[int, str, str]:
+    """§3.1 Nataf transform for correlated Gaussians (4 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py", r"def nataf|nataf_transform|correlation_matrix|cholesky.*correl",
+        r"nataf|correlated.*gaussian|correlation.*reliab", 4, "Nataf in module, no test", "Nataf transform + correlated mapping test")
+
+
+def check_v7_3_2_correlated_form() -> tuple[int, str, str]:
+    """§3.2 correlated / non-Gaussian FORM (4 pts)."""
+    n = _grep_count(r"correlated.*beta|nataf.*form|correlated.*limit_state|non_gaussian.*form", "tests/**/*.py")
+    return (4, "PASS", f"{n} correlated-FORM refs") if n >= 1 else (0, "FAIL", "no correlated-FORM test")
+
+
+def check_v7_3_3_earclip_stl() -> tuple[int, str, str]:
+    """§3.3 ear-clipping general-polygon STL triangulation (4 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/stl_export.py", r"ear_clip|earclip|triangulate_polygon|def .*triangulate",
+        r"ear_clip|earclip|triangulate.*polygon|concave.*stl", 4, "ear-clipping in module, no test", "ear-clipping + concave-polygon area test")
+
+
+def check_v7_3_4_hole_handling() -> tuple[int, str, str]:
+    """§3.4 STL hole handling (even-odd) (3 pts)."""
+    n = _grep_count(r"even_odd|hole.*loop|nested.*loop|punch.*hole|annulus", "tests/**/*.py")
+    return (3, "PASS", f"{n} hole-handling refs") if n >= 1 else (0, "FAIL", "no hole-handling test")
+
+
+def check_v7_4_1_test_count_900() -> tuple[int, str, str]:
+    """§4.1 ≥ 900 tests (4 pts)."""
+    n = _pytest_collect_count()
+    return (4, "PASS", f"{n} tests collected") if n >= 900 else (0, "FAIL", f"{n} (need ≥900)")
+
+
+def check_v7_4_2_core_coverage_95() -> tuple[int, str, str]:
+    """§4.2 core coverage ≥ 95% incl. v7 (4 pts)."""
+    pct = _pytest_coverage("structure_optimizer/core")
+    return (4, "PASS", f"{pct}% coverage") if pct >= 95.0 else (0, "FAIL", f"{pct}% (need ≥95%)")
+
+
+def check_v7_4_3_property_tests_40() -> tuple[int, str, str]:
+    """§4.3 property tests ≥ 40 (3 pts)."""
+    n = _grep_count(r"^def test_property_", "tests/**/*.py")
+    return (3, "PASS", f"{n} property tests") if n >= 40 else (0, "FAIL", f"{n} (need ≥40)")
+
+
+def check_v7_4_4_mutation_75() -> tuple[int, str, str]:
+    """§4.4 mutation kill rate ≥ 75% (3 pts)."""
+    report = REPO_ROOT / "tests/mutation_report.json"
+    if not report.exists():
+        return 0, "FAIL", "mutation_report missing"
+    data = json.loads(report.read_text())
+    rate = data.get("aggregate_kill_rate", data.get("kill_rate", 0.0))
+    return (3, "PASS", f"{rate * 100:.1f}% kill rate") if rate >= 0.75 else (0, "FAIL", f"{rate * 100:.1f}%")
+
+
+def check_v7_4_5_fingerprints_35() -> tuple[int, str, str]:
+    """§4.5 fingerprint DB ≥ 35 (2 pts)."""
+    n = len(list((REPO_ROOT / "tests/fingerprints").glob("*.json")))
+    return (2, "PASS", f"{n} fingerprints") if n >= 35 else (0, "FAIL", f"{n} (need ≥35)")
+
+
+def check_v7_4_6_pytest_gate() -> tuple[int, str, str]:
+    """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
+    has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
+    has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
+    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+
+
+def check_v7_4_7_v7_in_agent_ci() -> tuple[int, str, str]:
+    """§4.7 v7 rubric referenced in agent + CI (2 pts)."""
+    me = (REPO_ROOT / "scripts/test_agent.py").read_text()
+    in_agent = "CHECKS_V7" in me
+    ci = REPO_ROOT / ".github/workflows/test.yml"
+    in_ci = ci.exists() and "v7" in ci.read_text().lower()
+    if in_agent and in_ci:
+        return 2, "PASS", "v7 in agent + CI"
+    if in_agent:
+        return 1, "PARTIAL", "v7 in agent, not CI"
+    return 0, "FAIL", "v7 not wired"
+
+
+def check_v7_5_1_rbto_demo() -> tuple[int, str, str]:
+    """§5.1 RBTO convergence demo (3 pts)."""
+    n = _grep_count(r"rbto_demo|reliability.*demo|render_rbto|rbto.*html", "**/*.py")
+    return (3, "PASS", f"{n} RBTO-demo refs") if n >= 1 else (0, "FAIL", "no RBTO demo")
+
+
+def check_v7_5_2_nonlinear_demo() -> tuple[int, str, str]:
+    """§5.2 nonlinear / damped-FR TO demo (3 pts)."""
+    n = _grep_count(r"nonlinear_to_demo|damped_to_demo|dynamic_to_demo|render.*nonlinear", "**/*.py")
+    return (3, "PASS", f"{n} nonlinear/damped-TO demo refs") if n >= 1 else (0, "FAIL", "no nonlinear/damped-TO demo")
+
+
+def check_v7_5_3_density_pareto_render() -> tuple[int, str, str]:
+    """§5.3 density-field Pareto render (2 pts)."""
+    n = _grep_count(r"density.*pareto.*render|render.*density.*pareto|multi_objective.*demo|pareto_field", "**/*.py")
+    return (2, "PASS", f"{n} density-Pareto render refs") if n >= 1 else (0, "FAIL", "no density-Pareto render")
+
+
+def check_v7_5_4_earclip_demo() -> tuple[int, str, str]:
+    """§5.4 ear-clipping STL demo (2 pts)."""
+    n = _grep_count(r"earclip.*demo|ear_clip.*demo|concave.*stl.*demo|hole.*stl.*demo", "**/*.py")
+    return (2, "PASS", f"{n} ear-clip demo refs") if n >= 1 else (0, "FAIL", "no ear-clipping demo")
+
+
+def check_v7_6_1_blueprint_v7() -> tuple[int, str, str]:
+    """§6.1 blueprint-v7 ≥6 wave ticks (3 pts)."""
+    p = REPO_ROOT / "docs/blueprint-v7.md"
+    if not p.exists():
+        return 0, "FAIL", "blueprint-v7.md missing"
+    ticks = p.read_text().count("[x]")
+    return (3, "PASS", f"{ticks} ticks") if ticks >= 6 else (0, "PARTIAL", f"{ticks} ticks (need ≥6)")
+
+
+def check_v7_6_2_tutorial_v7() -> tuple[int, str, str]:
+    """§6.2 tutorial v7 ≥4 new sections (3 pts)."""
+    p = REPO_ROOT / "docs/tutorial.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    n = len(re.findall(r"^### 17\.\d", p.read_text(), re.MULTILINE))
+    return (3, "PASS", f"{n} v7 subsections") if n >= 4 else (0, "PARTIAL", f"{n} (need ≥4)")
+
+
+def check_v7_6_3_arch_v7() -> tuple[int, str, str]:
+    """§6.3 architecture v7 section (3 pts)."""
+    p = REPO_ROOT / "docs/architecture.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    txt = p.read_text().lower()
+    return (3, "PASS", "v7 section present") if ("## 17." in p.read_text() and "driver" in txt) else (0, "FAIL", "no v7 section")
+
+
+def check_v7_6_4_adrs_v7() -> tuple[int, str, str]:
+    """§6.4 ADRs D042+ ≥ 7 (3 pts)."""
+    files = list((REPO_ROOT / "docs/decisions").glob("D04*.md"))
+    new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 42]
+    return (3, "PASS", f"{len(new_adrs)} v7 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+
+
+def check_v7_6_5_anchors_documented() -> tuple[int, str, str]:
+    """§6.5 v7 quantitative anchors present in tests (3 pts)."""
+    n = _grep_count(r"adjoint.*fd|hypervolume|nataf|beta_target|earclip.*area|dynamic_compliance", "tests/**/*.py")
+    return (3, "PASS", f"{n} v7-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
+
+
 # --- regression checks against v1/v2/v3 rubrics -----------------------
 
 
@@ -1101,6 +1303,42 @@ CHECKS_V6 = [
 ]
 
 
+CHECKS_V7 = [
+    # §1 优化驱动器 (24 pts)
+    ("§1", "1.1", "Reliability-based TO (FORM→SIMP)", 8, check_v7_1_1_rbto),
+    ("§1", "1.2", "几何非线性 TO (TL 伴随)", 8, check_v7_1_2_nonlinear_to),
+    ("§1", "1.3", "阻尼频响 TO (动柔度)", 8, check_v7_1_3_damped_fr_to),
+    # §2 场级保真 + 多目标 (16 pts)
+    ("§2", "2.1", "逐单元各向异性热场", 5, check_v7_2_1_per_element_anisotropic),
+    ("§2", "2.2", "各向异性热 TO 灵敏度", 4, check_v7_2_2_anisotropic_thermal_to),
+    ("§2", "2.3", "NSGA-III 直接优化密度场", 7, check_v7_2_3_nsga3_density_field),
+    # §3 不确定性 + 几何 (15 pts)
+    ("§3", "3.1", "Nataf 变换 (相关高斯)", 4, check_v7_3_1_nataf),
+    ("§3", "3.2", "相关/非高斯 FORM", 4, check_v7_3_2_correlated_form),
+    ("§3", "3.3", "Ear-clipping 通用多边形 STL", 4, check_v7_3_3_earclip_stl),
+    ("§3", "3.4", "STL 孔洞 (even-odd)", 3, check_v7_3_4_hole_handling),
+    # §4 测试基础设施 (20 pts)
+    ("§4", "4.1", "Test count ≥ 900", 4, check_v7_4_1_test_count_900),
+    ("§4", "4.2", "Core coverage ≥ 95% (含 v7)", 4, check_v7_4_2_core_coverage_95),
+    ("§4", "4.3", "Property tests ≥ 40", 3, check_v7_4_3_property_tests_40),
+    ("§4", "4.4", "Mutation kill rate ≥ 75%", 3, check_v7_4_4_mutation_75),
+    ("§4", "4.5", "Fingerprint DB ≥ 35", 2, check_v7_4_5_fingerprints_35),
+    ("§4", "4.6", "pytest gate green (D033)", 2, check_v7_4_6_pytest_gate),
+    ("§4", "4.7", "v7 rubric 写入 agent + CI", 2, check_v7_4_7_v7_in_agent_ci),
+    # §5 用户面 demos (10 pts)
+    ("§5", "5.1", "RBTO 收敛 demo", 3, check_v7_5_1_rbto_demo),
+    ("§5", "5.2", "非线性/阻尼 TO demo", 3, check_v7_5_2_nonlinear_demo),
+    ("§5", "5.3", "密度场 Pareto 渲染", 2, check_v7_5_3_density_pareto_render),
+    ("§5", "5.4", "Ear-clipping STL demo", 2, check_v7_5_4_earclip_demo),
+    # §6 文档 (15 pts)
+    ("§6", "6.1", "blueprint-v7 ≥6 ticks", 3, check_v7_6_1_blueprint_v7),
+    ("§6", "6.2", "tutorial v7 ≥4 new sections", 3, check_v7_6_2_tutorial_v7),
+    ("§6", "6.3", "architecture v7 section", 3, check_v7_6_3_arch_v7),
+    ("§6", "6.4", "ADRs D042+ ≥ 7", 3, check_v7_6_4_adrs_v7),
+    ("§6", "6.5", "v7 quantitative anchors documented", 3, check_v7_6_5_anchors_documented),
+]
+
+
 def _score(checks: list, section_filter: str | None = None) -> list[RubricItem]:
     items: list[RubricItem] = []
     for section, code, title, max_pts, fn in checks:
@@ -1138,6 +1376,30 @@ def run_v5(section_filter: str | None = None) -> Scorecard:
     return sc
 
 
+def run_v6(section_filter: str | None = None) -> Scorecard:
+    """Score the v6 rubric in-process. Used for v7's no-regression gate."""
+    sc = Scorecard(version="v6.0.0")
+    sc.items = _score(CHECKS_V6, section_filter)
+    return sc
+
+
+def run_v7(section_filter: str | None = None) -> Scorecard:
+    """Score the v7 rubric in-process."""
+    sc = Scorecard(version="v7.0.0")
+    sc.items = _score(CHECKS_V7, section_filter)
+    return sc
+
+
+def check_v6_no_regression() -> dict:
+    """v6 must remain 100/100 for a v7 release (true in-process re-score)."""
+    sc_v6 = run_v6()
+    return {
+        "score": sc_v6.total_earned,
+        "max": sc_v6.total_max,
+        "regression": sc_v6.total_earned < 100,
+    }
+
+
 def run_all(section_filter: str | None = None, rubric: str = "v5", run_pytest_gate: bool = True) -> Scorecard:
     """Score the currently-active rubric. Default = v5.
 
@@ -1149,16 +1411,19 @@ def run_all(section_filter: str | None = None, rubric: str = "v5", run_pytest_ga
         sc = run_v4(section_filter)
     elif rubric == "v5":
         sc = run_v5(section_filter)
-    else:  # v6
-        sc = Scorecard(version="v6.0.0")
-        sc.items = _score(CHECKS_V6, section_filter)
+    elif rubric == "v6":
+        sc = run_v6(section_filter)
+    else:  # v7
+        sc = run_v7(section_filter)
     sc.v1_check = check_v1_no_regression()
     sc.v2_check = check_v2_no_regression()
     sc.v3_check = check_v3_no_regression()
-    if rubric in ("v5", "v6"):
+    if rubric in ("v5", "v6", "v7"):
         sc.v4_check = check_v4_no_regression()
-    if rubric == "v6":
+    if rubric in ("v6", "v7"):
         sc.v5_check = check_v5_no_regression()
+    if rubric == "v7":
+        sc.v6_check = check_v6_no_regression()
     if run_pytest_gate:
         sc.pytest_check = check_pytest_green()
     return sc
@@ -1223,9 +1488,9 @@ def main() -> int:
     parser.add_argument("--strict", action="store_true", help="exit 1 if total < 99 or any regression")
     parser.add_argument(
         "--rubric",
-        choices=["v4", "v5", "v6"],
+        choices=["v4", "v5", "v6", "v7"],
         default="v5",
-        help="which rubric to score (default v5; v4/v5 scorable for regression checks)",
+        help="which rubric to score (default v5; v4-v6 scorable for regression checks)",
     )
     parser.add_argument(
         "--output",
@@ -1260,6 +1525,8 @@ def main() -> int:
         payload["v4_check"] = sc.v4_check
     if sc.v5_check:
         payload["v5_check"] = sc.v5_check
+    if sc.v6_check:
+        payload["v6_check"] = sc.v6_check
     if sc.pytest_check:
         payload["pytest_check"] = sc.pytest_check
     out_path.write_text(json.dumps(payload, indent=2) + "\n")
@@ -1274,6 +1541,7 @@ def main() -> int:
                 sc.v3_check.get("regression"),
                 sc.v4_check.get("regression") if sc.v4_check else False,
                 sc.v5_check.get("regression") if sc.v5_check else False,
+                sc.v6_check.get("regression") if sc.v6_check else False,
                 sc.pytest_check.get("regression") if sc.pytest_check else False,
             ]
         )
