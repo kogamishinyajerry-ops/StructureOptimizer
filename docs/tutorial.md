@@ -1585,6 +1585,30 @@ Cholesky `R=LLᵀ`，下界 −∞ 时截断积分分离成乘积，对均匀样
 逐位）；用**朴素 MC 非随机化点阵**（Korobov 点阵收敛快一个量级，是 reopening）；维数高/强相关时精度退化（测到 m≤4）；
 **R 必须 SPD**（秩亏 ααᵀ 需 nudge 0.98R+0.02I，不内置 ridge 以免掩盖病态）；仍设 FORM 线性化极限状态。
 
+### 21.6 弹性正交各向异性同时 (ρ,θ) MMA + fibre 连续性（Wave XXX，D079）
+
+D070 把密度+纤维方向**一起**用 MMA 优化，但针对**热传导**张量。XXX 做**弹性**版：正交各向异性层合刚度 `D₀` 按
+逐单元纤维角 θ 旋转，建 Q4 单元刚度——这些原来都没有（弹性 FEM 只有各向同性闭式 ke）。再加 **fibre 连续性**约束。
+
+```python
+from structure_optimizer.core.orthotropic_simp import (
+    orthotropic_plane_stress_matrix, simultaneous_elastic_orientation_mma)
+
+D0 = orthotropic_plane_stress_matrix(E1=2*E, E2=0.5*E, nu12=0.3, G12=0.4*E)
+r = simultaneous_elastic_orientation_mma(config, mesh, D0, vf=vf,
+        fibre_continuity_limit=0.14)   # None=仅体积约束
+# r.densities / angles / compliance_history / continuity_history
+```
+
+旋转用**四阶张量** `C'=QQQQ:C`（工程剪切记账精确，避开易错的 Q̄ Reuter 矩阵），`dD/dθ` 经 `dQ/dθ` 解析。单元刚度
+`∫BᵀDB` 2×2 Gauss，节点序对齐 mesh。连续性约束 = 相邻设计单元角差平方均值 ≤ 限值（梯度 = 设计图 Laplacian）。
+
+**关键 / 定量锚点**：各向同性 D 时 ke **复现闭式** `element_stiffness` ≤1e-9（验 B/节点序/积分）+ 旋转：各向同性不变、
+D(90°) 交换 E₁↔E₂、`dD/dθ` vs FD ≤1e-6 + dC/dρ 与**新增 dC/dθ** vs central-FD ≤1e-4（实测 9e-7/1e-5）+ 同时 MMA
+柔度 1200→262 体积守 0.450 确定性 + 连续性约束 **binding**（自由 0.461 超限 → 约束后 0.138≤限，柔度可比）。
+**诚实边界**：连续性度量是**原始角差平方非周期感知**（+89°/−89° 物理差 2° 却被罚大，周期感知 `sin²Δθ` 是 reopening）+
+**单层平面非层合** + dense 装配每迭代重建 ke + MMA 非凸（约束版柔度更低是局部最优假象，只声明"可比"）。
+
 ---
 
 ## 常见错误
