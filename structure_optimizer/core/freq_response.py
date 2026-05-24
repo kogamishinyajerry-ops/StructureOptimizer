@@ -36,6 +36,7 @@ from structure_optimizer.core.modal import (
     _assemble_mass_dense,
     _assemble_stiffness_dense_modal,
     element_mass_matrix,
+    solve_modal,
 )
 
 
@@ -626,4 +627,141 @@ def dynamic_compliance_to(
         peak_before=peak_before,
         peak_after=band_peak(rho),
         checkerboard=_checkerboard_metric(mesh, rho),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Wave DDD (v9, D059): eigenfrequency band-gap objective on the modal solver.
+#
+# D051's reopening criterion named an "eigenfrequency-gap (band-stop) objective
+# built on the modal solver". The band gap between consecutive modes is
+# g = ω²_{m+1} − ω²_m; maximising it pushes the natural frequencies apart (a
+# phononic band-stop). The eigenvalue sensitivity is the textbook result for
+# mass-normalised modes (φᵀMφ = 1):
+#     dλ_i/dρ_e = φ_e,iᵀ (dk_scale_e·ke − λ_i·dm_scale_e·me) φ_e,i ,
+# so dg/dρ_e = dλ_{m+1}/dρ_e − dλ_m/dρ_e. solve_modal returns φ already
+# mass-normalised (it whitens with the mass Cholesky factor).
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class BandGapResult:
+    """Output of band-gap maximisation (Wave DDD)."""
+
+    densities: np.ndarray
+    gap_history: list[float]
+    omega2_initial: np.ndarray
+    omega2_final: np.ndarray
+    lower_mode: int
+    converged: bool
+
+
+def _eigenvalue_sensitivities(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    n_modes: int,
+    mass_type: str = "consistent",
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return ``(omega2[n_modes], dlambda_drho[n_modes, n_elem])`` — the smallest
+    ``n_modes`` eigenvalues and their analytic sensitivities w.r.t. each density.
+    """
+    opt = config.optimization
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    modal = solve_modal(config, mesh, densities, n_modes=n_modes, mass_type=mass_type)
+    omega2 = modal.omega_squared
+    phi_free = modal.eigenvectors  # (n_free, n_modes), mass-normalised
+    free = modal.free_dofs
+
+    ke = element_stiffness(config.material.young_modulus, config.material.poisson_ratio)
+    me = element_mass_matrix(config.material.density, config.thickness, mass_type)
+    active = np.where(mesh.void_mask, opt.min_density, densities)
+    dk = opt.penalty * np.power(active, opt.penalty - 1.0) * (1.0 - opt.min_density)
+    dm = np.full_like(active, 1.0 - opt.min_density)
+
+    # Scatter eigenvectors to the full DOF vector (0 on fixed DOFs).
+    n_elem = mesh.elements.shape[0]
+    phi_full = np.zeros((mesh.ndof, n_modes))
+    phi_full[free, :] = phi_free
+    dlambda = np.zeros((n_modes, n_elem))
+    for e, nodes in enumerate(mesh.elements):
+        if mesh.void_mask[e]:
+            continue
+        dofs = np.empty(8, dtype=int)
+        dofs[0::2] = 2 * nodes
+        dofs[1::2] = 2 * nodes + 1
+        phi_e = phi_full[dofs, :]  # (8, n_modes)
+        ke_phi = ke @ phi_e
+        me_phi = me @ phi_e
+        for i in range(n_modes):
+            pe = phi_e[:, i]
+            dlambda[i, e] = dk[e] * float(pe @ ke_phi[:, i]) - omega2[i] * dm[e] * float(pe @ me_phi[:, i])
+    return omega2, dlambda
+
+
+def band_gap_sensitivity(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    lower_mode: int = 0,
+    mass_type: str = "consistent",
+) -> tuple[float, np.ndarray]:
+    """Band gap ``g = ω²_{m+1} − ω²_m`` and its sensitivity ``dg/dρ`` (Wave DDD,
+    D059), where ``m = lower_mode`` (0-indexed). Returns ``(gap, dgap_drho)``."""
+    if lower_mode < 0:
+        raise SolverError("band_gap_negative_mode")
+    omega2, dlambda = _eigenvalue_sensitivities(config, mesh, densities, lower_mode + 2, mass_type)
+    gap = float(omega2[lower_mode + 1] - omega2[lower_mode])
+    dgap = dlambda[lower_mode + 1] - dlambda[lower_mode]
+    return gap, dgap
+
+
+def maximize_band_gap(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    lower_mode: int = 0,
+    n_steps: int = 20,
+    move: float = 0.1,
+    filter_radius: float | None = None,
+    mass_type: str = "consistent",
+) -> BandGapResult:
+    """Volume-preserving projected-gradient **ascent** on the band gap
+    ``ω²_{m+1} − ω²_m`` (Wave DDD, D059): a band-stop topology that pushes two
+    adjacent natural frequencies apart. Reuses the Sigmund density filter and the
+    same move-limited, volume-rescaled step as ``dynamic_compliance_to``."""
+    opt = config.optimization
+    radius = opt.filter_radius if filter_radius is None else filter_radius
+    design = mesh.design_mask
+    rho = np.where(mesh.void_mask, opt.min_density, opt.volume_fraction)
+    target_vol = float(np.mean(rho[design])) if np.any(design) else 0.0
+
+    omega2_initial, _ = _eigenvalue_sensitivities(config, mesh, rho, lower_mode + 2, mass_type)
+    gap_history: list[float] = []
+    converged = False
+    for _ in range(n_steps):
+        gap, dgap = band_gap_sensitivity(config, mesh, rho, lower_mode, mass_type)
+        gap_history.append(gap)
+        grad = density_filter(mesh, rho, dgap, radius, opt.min_density)
+        grad[~design] = 0.0
+        gmax = float(np.max(np.abs(grad[design]))) if np.any(design) else 0.0
+        if gmax <= 0.0:
+            converged = True
+            break
+        step = np.clip((grad / gmax) * move, -move, move)  # + : ascend the gap
+        rho = rho.copy()
+        rho[design] = np.clip(rho[design] + step[design], opt.min_density, 1.0)
+        cur = float(np.mean(rho[design]))
+        if cur > 0:
+            rho[design] = np.clip(rho[design] * (target_vol / cur), opt.min_density, 1.0)
+
+    final_gap, _ = band_gap_sensitivity(config, mesh, rho, lower_mode, mass_type)
+    gap_history.append(final_gap)
+    omega2_final, _ = _eigenvalue_sensitivities(config, mesh, rho, lower_mode + 2, mass_type)
+    return BandGapResult(
+        densities=rho,
+        gap_history=gap_history,
+        omega2_initial=omega2_initial,
+        omega2_final=omega2_final,
+        lower_mode=lower_mode,
+        converged=converged,
     )

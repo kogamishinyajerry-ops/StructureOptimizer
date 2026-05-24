@@ -1179,6 +1179,23 @@ OC 竞争**（同体积下柔度在 OC 的 5% 以内，实测比值 0.946 即 MM
 在 **compliance-only** 问题上 MMA ≈ OC（不是碾压）；MMA 的真正价值是**额外约束**（应力/屈曲），
 这是 reopening 项。体积约束是唯一接入的约束，`mma_step` 的多约束能力尚未使用（见 D058）。
 
+### 19.2 特征频率带隙目标（Wave DDD，D059）
+
+v8 的频域 TO 都建在受迫响应上；v9 直接在 **modal solver** 上做**带隙**（band-stop）目标：
+把相邻两阶固有频率推开，`g = ω²_{m+1} − ω²_m`。质量归一化模态的特征值灵敏度是教科书闭式：
+
+```python
+from structure_optimizer.core.freq_response import band_gap_sensitivity, maximize_band_gap
+gap, dgap = band_gap_sensitivity(config, mesh, densities, lower_mode=0)  # g 与 dg/dρ
+res = maximize_band_gap(config, mesh, lower_mode=0, n_steps=20, move=0.1)
+# res.gap_history / omega2_initial / omega2_final
+```
+
+**关键 / 诚实边界**：带隙灵敏度 `dg/dρ` vs 中心差分 rel 1.76e-6（`dλ_i/dρ_e =
+φ_eᵀ(dk·ke − λ_i·dm·me)φ_e`，`φᵀMφ=1` 精确）+ 体积守恒爬升使带隙加宽 ~2.2× + 模态被推开。
+诚实声明：假设**非重根**（重根处灵敏度是次梯度集，对称设计模态合并会失效）；驱动是**投影梯度
+爬升**非 MMA；只做相邻模态带隙，未做**目标频带放置**或 minimax 频带（reopening 项，见 D059）。
+
 ---
 
 ## 常见错误
