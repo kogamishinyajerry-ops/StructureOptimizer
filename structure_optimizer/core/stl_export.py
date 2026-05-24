@@ -774,3 +774,106 @@ def write_stl_smooth_holes(
         "is_watertight": stl_is_watertight(triangles),
         "out_path": str(out_path),
     }
+
+
+# --- Wave III (v9, D064): slit-free, robustly-watertight holed prism ---------
+#
+# D056's ear-clipping holed cap opens each hole with a zero-width *bridge slit*,
+# which leaves a non-manifold edge for high-vertex curved holes (an annulus is
+# NOT watertight — the well-documented D056 limitation). Its reopening criterion
+# named a "slit-free hole triangulation (constrained Delaunay / monotone-polygon
+# decomposition) so curved-hole prisms are robustly watertight". This delivers
+# the simplest such decomposition: each solid grid cell is trivially y-monotone,
+# so triangulating the rasterised region cell-by-cell (2 tris per cap face + a
+# wall on every solid↔void boundary edge) is slit-free and edge-manifold for ANY
+# hole topology — the annulus included. The trade-off vs D056 is a staircase
+# (cell-resolution) boundary instead of the smooth marching-squares contour.
+
+
+def write_stl_slit_free_holes(
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    out_path: str | Path,
+    rho_threshold: float = 0.5,
+    z_thickness: float = 1.0,
+    solid_name: str = "topology_slit_free",
+) -> dict:
+    """Slit-free, robustly-watertight extruded prism of the solid cells (Wave III,
+    D064). Unlike :func:`write_stl_smooth_holes` (smooth but non-manifold on curved
+    holes) this is watertight for any **edge-connected** hole topology — annuli and
+    multi-hole plates included — at the cost of a cell-resolution staircase
+    boundary. Returns ``n_triangles``, ``cross_section_area`` (= n_solid_cells ·
+    cell_area), ``n_solid_cells``, ``is_watertight``, ``out_path``.
+
+    Honest limitation: a *diagonal pinch* (two solid cells touching only at a
+    corner, as in a checkerboard) is a genuine non-manifold point and is reported
+    as ``is_watertight=False`` — density-filtered topology-optimised designs do not
+    contain these, but raw random fields can.
+    """
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    if densities.shape[0] != mesh.elements.shape[0]:
+        raise SolverError("density_count_mismatch")
+    if z_thickness <= 0:
+        raise SolverError("stl_export_nonpositive_thickness")
+
+    nelx, nely = mesh.nelx, mesh.nely
+    cw = mesh.width / nelx
+    ch = mesh.height / nely
+    solid = np.zeros((nely, nelx), dtype=bool)
+    for ey in range(nely):
+        for ex in range(nelx):
+            solid[ey, ex] = densities[mesh.element_index(ex, ey)] > rho_threshold
+
+    zt = float(z_thickness)
+    triangles: list[str] = []
+    up = np.array([0.0, 0.0, 1.0])
+    down = np.array([0.0, 0.0, -1.0])
+    n_solid = 0
+    for ey in range(nely):
+        for ex in range(nelx):
+            if not solid[ey, ex]:
+                continue
+            n_solid += 1
+            x0, x1 = ex * cw, (ex + 1) * cw
+            y0, y1 = ey * ch, (ey + 1) * ch
+            bl, br = np.array([x0, y0, 0.0]), np.array([x1, y0, 0.0])
+            tr, tl = np.array([x1, y1, 0.0]), np.array([x0, y1, 0.0])
+            blz, brz = np.array([x0, y0, zt]), np.array([x1, y0, zt])
+            trz, tlz = np.array([x1, y1, zt]), np.array([x0, y1, zt])
+            # top cap (+z) and bottom cap (-z), consistent bl–tr diagonal
+            triangles.append(_format_triangle(blz, brz, trz, up))
+            triangles.append(_format_triangle(blz, trz, tlz, up))
+            triangles.append(_format_triangle(bl, tr, br, down))
+            triangles.append(_format_triangle(bl, tl, tr, down))
+            # side walls on every solid↔(void|outside) edge
+            # bottom edge bl-br (neighbour ey-1)
+            if ey == 0 or not solid[ey - 1, ex]:
+                triangles.append(_format_triangle(bl, br, brz, np.array([0.0, -1.0, 0.0])))
+                triangles.append(_format_triangle(bl, brz, blz, np.array([0.0, -1.0, 0.0])))
+            # top edge tr-tl (neighbour ey+1)
+            if ey == nely - 1 or not solid[ey + 1, ex]:
+                triangles.append(_format_triangle(tr, tl, tlz, np.array([0.0, 1.0, 0.0])))
+                triangles.append(_format_triangle(tr, tlz, trz, np.array([0.0, 1.0, 0.0])))
+            # left edge tl-bl (neighbour ex-1)
+            if ex == 0 or not solid[ey, ex - 1]:
+                triangles.append(_format_triangle(tl, bl, blz, np.array([-1.0, 0.0, 0.0])))
+                triangles.append(_format_triangle(tl, blz, tlz, np.array([-1.0, 0.0, 0.0])))
+            # right edge br-tr (neighbour ex+1)
+            if ex == nelx - 1 or not solid[ey, ex + 1]:
+                triangles.append(_format_triangle(br, tr, trz, np.array([1.0, 0.0, 0.0])))
+                triangles.append(_format_triangle(br, trz, brz, np.array([1.0, 0.0, 0.0])))
+
+    out_path = Path(out_path)
+    with open(out_path, "w") as f:
+        f.write(f"solid {solid_name[:80]}\n")
+        for tri in triangles:
+            f.write(tri)
+        f.write(f"endsolid {solid_name[:80]}\n")
+
+    return {
+        "n_triangles": len(triangles),
+        "cross_section_area": float(n_solid * cw * ch),
+        "n_solid_cells": int(n_solid),
+        "is_watertight": stl_is_watertight(triangles),
+        "out_path": str(out_path),
+    }

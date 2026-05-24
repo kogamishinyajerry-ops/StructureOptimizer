@@ -1267,6 +1267,23 @@ res = system_rbto_simp(config, mesh, d_allows=[da, da*1.1], beta_target=2.0,
 独立 Pf 落在 D055 Ditlevsen 界内。诚实声明：模态视为**独立**（相关模态用 `system_reliability_series(ρ)`
 是 reopening）；可靠性旋钮仍是**体积分数**（非逐模态拓扑塑形）；线性位移极限态（见 D063）。
 
+### 19.7 slit-free 孔三角化（鲁棒水密，Wave III，D064）
+
+AAA（D056）的平滑封顶用**零宽桥缝**挖孔，曲线孔（环形）会留非流形边 → **不水密**。v9 给出最简
+**slit-free** 分解：每个实心格是平凡 y-monotone 四边形，逐格三角化（2 三角顶/底盖 + 实心↔空边墙），
+无桥无缝 → 任意**边连通**孔拓扑都边流形水密：
+
+```python
+from structure_optimizer.core.stl_export import write_stl_slit_free_holes
+info = write_stl_slit_free_holes(mesh, densities, "ring.stl")
+# info['is_watertight'] / cross_section_area (=实心格数×格面积) / n_solid_cells
+```
+
+**关键 / 诚实边界**：环形孔 slit-free **水密=True** 而 AAA 同场=False（解决 D056 曲线孔限制）+ 面积=
+实心格数×格面积精确 + 多曲线孔拓扑（4 环 + 双孔板）皆水密。诚实声明：**仅边连通区域**水密——
+**对角 pinch**（棋盘：两实心格仅角接触）是真非流形，如实报 `False`（密度滤波后的拓扑优化设计无此问题，
+原始随机场可能有）；**阶梯边界**（cell 分辨率），非平滑——平滑 + 鲁棒水密需 MS 轮廓的 CDT（reopening，见 D064）。
+
 ---
 
 ## 常见错误
