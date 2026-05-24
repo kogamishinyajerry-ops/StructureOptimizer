@@ -71,6 +71,7 @@ class Scorecard:
     v7_check: dict = field(default_factory=dict)
     v8_check: dict = field(default_factory=dict)
     v9_check: dict = field(default_factory=dict)
+    v10_check: dict = field(default_factory=dict)
     pytest_check: dict = field(default_factory=dict)
 
     @property
@@ -2083,6 +2084,242 @@ def check_v9_no_regression() -> dict:
     }
 
 
+# ===========================================================================
+# v11 rubric — exact & robust (Wave SSS-ZZZ, D074-D081)
+# ===========================================================================
+
+
+def check_v11_1_1_stress_relaxation_buckling() -> tuple[int, str, str]:
+    """§1.1 stress-singularity relaxation (qp/ε) + buckling eigenvalue constraint (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/stress.py",
+        r"qp_stress|relaxed_stress|epsilon_relax|stress_singularity|buckling",
+        r"qp_stress|relaxed_stress|stress_singularity|buckling|relaxation",
+        8, "stress relaxation/buckling in module, no test", "qp-relaxed stress + buckling constraint + test")
+
+
+def check_v11_1_2_adaptive_band() -> tuple[int, str, str]:
+    """§1.2 adaptive band sampling + peak-as-constraint (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/freq_response.py",
+        r"adaptive_band|band_refine|peak_constraint|adaptive.*sampl",
+        r"adaptive_band|peak_constraint|adaptive.*sampl|peak.*as.*constraint",
+        8, "adaptive band in module, no test", "adaptive band sampling + peak-as-constraint + test")
+
+
+def check_v11_1_3_reference_free_indicator() -> tuple[int, str, str]:
+    """§1.3 reference-free multi-objective quality indicator (hypervolume-only / R2) (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/multi_objective_to.py",
+        r"hypervolume_indicator|r2_indicator|reference_free|hv_only",
+        r"hypervolume_indicator|r2_indicator|reference_free|r2.*indicator",
+        8, "reference-free indicator in module, no test", "reference-free quality indicator + test")
+
+
+def check_v11_2_1_gumbel_dim_copula() -> tuple[int, str, str]:
+    """§2.1 d-dimensional / Gumbel Archimedean copula (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"gumbel_copula|nested_copula|d_dim.*copula|copula.*nested",
+        r"gumbel|nested_copula|d_dim.*copula|gumbel.*copula",
+        8, "Gumbel/nested copula in module, no test", "Gumbel / d-dim copula + round-trip test")
+
+
+def check_v11_2_2_genz_system() -> tuple[int, str, str]:
+    """§2.2 full correlation matrix + Genz exact multivariate system P_f (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"genz|multivariate_normal_cdf|mvn_cdf|full_correlation",
+        r"genz|multivariate_normal_cdf|mvn_cdf|full.*correlation",
+        8, "Genz/MVN-CDF in module, no test", "Genz multivariate system P_f + test")
+
+
+def check_v11_3_1_elastic_simultaneous_mma() -> tuple[int, str, str]:
+    """§3.1 elastic simultaneous (ρ,θ) MMA + fibre-continuity (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/orthotropic_simp.py",
+        r"elastic.*orientation|orthotropic.*mma|fibre_continuity|simultaneous.*elastic|elastic_simultaneous",
+        r"elastic.*orientation|orthotropic|fibre_continuity|elastic.*simultaneous",
+        8, "elastic simultaneous MMA in module, no test", "elastic simultaneous (ρ,θ) MMA + fibre-continuity test")
+
+
+def check_v11_3_2_constrained_delaunay() -> tuple[int, str, str]:
+    """§3.2 constrained-Delaunay multi-hole smooth + watertight (7 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/stl_export.py",
+        r"constrained_delaunay|cdt|multi_hole.*watertight|delaunay",
+        r"constrained_delaunay|cdt|multi_hole|delaunay",
+        7, "constrained-Delaunay in module, no test", "constrained-Delaunay multi-hole + test")
+
+
+def check_v11_4_1_test_count_1050() -> tuple[int, str, str]:
+    """§4.1 ≥ 1050 tests (4 pts)."""
+    n = _pytest_collect_count()
+    return (4, "PASS", f"{n} tests collected") if n >= 1050 else (0, "FAIL", f"{n} (need ≥1050)")
+
+
+def check_v11_4_2_core_coverage_95() -> tuple[int, str, str]:
+    """§4.2 core coverage ≥ 95% incl. v11 (4 pts)."""
+    pct = _pytest_coverage("structure_optimizer/core")
+    return (4, "PASS", f"{pct}% coverage") if pct >= 95.0 else (0, "FAIL", f"{pct}% (need ≥95%)")
+
+
+def check_v11_4_3_property_tests_48() -> tuple[int, str, str]:
+    """§4.3 property tests ≥ 48 (3 pts)."""
+    n = _grep_count(r"^def test_property_", "tests/**/*.py")
+    return (3, "PASS", f"{n} property tests") if n >= 48 else (0, "FAIL", f"{n} (need ≥48)")
+
+
+def check_v11_4_4_mutation_75() -> tuple[int, str, str]:
+    """§4.4 mutation kill rate ≥ 75% (3 pts)."""
+    report = REPO_ROOT / "tests/mutation_report.json"
+    if not report.exists():
+        return 0, "FAIL", "mutation_report missing"
+    data = json.loads(report.read_text())
+    rate = data.get("aggregate_kill_rate", data.get("kill_rate", 0.0))
+    return (3, "PASS", f"{rate * 100:.1f}% kill rate") if rate >= 0.75 else (0, "FAIL", f"{rate * 100:.1f}%")
+
+
+def check_v11_4_5_fingerprints_55() -> tuple[int, str, str]:
+    """§4.5 fingerprint DB ≥ 55 (2 pts)."""
+    n = len(list((REPO_ROOT / "tests/fingerprints").glob("*.json")))
+    return (2, "PASS", f"{n} fingerprints") if n >= 55 else (0, "FAIL", f"{n} (need ≥55)")
+
+
+def check_v11_4_6_pytest_gate() -> tuple[int, str, str]:
+    """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
+    has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
+    has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
+    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+
+
+def check_v11_4_7_v11_in_agent_ci() -> tuple[int, str, str]:
+    """§4.7 v11 rubric referenced in agent + CI (2 pts)."""
+    me = (REPO_ROOT / "scripts/test_agent.py").read_text()
+    in_agent = "CHECKS_V11" in me
+    ci = REPO_ROOT / ".github/workflows/test.yml"
+    in_ci = ci.exists() and "v11" in ci.read_text().lower()
+    if in_agent and in_ci:
+        return 2, "PASS", "v11 in agent + CI"
+    if in_agent:
+        return 1, "PARTIAL", "v11 in agent, not CI"
+    return 0, "FAIL", "v11 not wired"
+
+
+def check_v11_5_1_constraint_demo() -> tuple[int, str, str]:
+    """§5.1 stress-relaxation+buckling / adaptive-band demo (3 pts)."""
+    n = _grep_count(r"qp_stress_demo|buckling_demo|adaptive_band_demo|relaxation_demo", "**/*.py")
+    return (3, "PASS", f"{n} robust-driver-demo refs") if n >= 1 else (0, "FAIL", "no robust-driver demo")
+
+
+def check_v11_5_2_indicator_demo() -> tuple[int, str, str]:
+    """§5.2 reference-free indicator demo (3 pts)."""
+    n = _grep_count(r"hypervolume_indicator_demo|r2_demo|reference_free_demo|hv_indicator_demo", "**/*.py")
+    return (3, "PASS", f"{n} indicator-demo refs") if n >= 1 else (0, "FAIL", "no indicator demo")
+
+
+def check_v11_5_3_reliability_demo() -> tuple[int, str, str]:
+    """§5.3 Gumbel copula / Genz system demo (2 pts)."""
+    n = _grep_count(r"gumbel_demo|genz_demo|mvn_cdf_demo|nested_copula_demo", "**/*.py")
+    return (2, "PASS", f"{n} reliability-demo refs") if n >= 1 else (0, "FAIL", "no reliability demo")
+
+
+def check_v11_5_4_geometry_demo() -> tuple[int, str, str]:
+    """§5.4 elastic-MMA / constrained-Delaunay demo (2 pts)."""
+    n = _grep_count(r"elastic_mma_demo|cdt_demo|constrained_delaunay_demo|elastic_simultaneous_demo", "**/*.py")
+    return (2, "PASS", f"{n} geometry-demo refs") if n >= 1 else (0, "FAIL", "no geometry demo")
+
+
+def check_v11_6_1_blueprint_v11() -> tuple[int, str, str]:
+    """§6.1 blueprint-v11 ≥6 wave ticks (3 pts)."""
+    p = REPO_ROOT / "docs/blueprint-v11.md"
+    if not p.exists():
+        return 0, "FAIL", "blueprint-v11.md missing"
+    ticks = p.read_text().count("[x]")
+    return (3, "PASS", f"{ticks} ticks") if ticks >= 6 else (0, "PARTIAL", f"{ticks} ticks (need ≥6)")
+
+
+def check_v11_6_2_tutorial_v11() -> tuple[int, str, str]:
+    """§6.2 tutorial v11 ≥4 new sections (3 pts)."""
+    p = REPO_ROOT / "docs/tutorial.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    n = len(re.findall(r"^### 21\.\d", p.read_text(), re.MULTILINE))
+    return (3, "PASS", f"{n} v11 subsections") if n >= 4 else (0, "PARTIAL", f"{n} (need ≥4)")
+
+
+def check_v11_6_3_arch_v11() -> tuple[int, str, str]:
+    """§6.3 architecture v11 section (3 pts)."""
+    p = REPO_ROOT / "docs/architecture.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    txt = p.read_text().lower()
+    return (3, "PASS", "v11 section present") if ("## 21." in p.read_text() and "robust" in txt) else (0, "FAIL", "no v11 section")
+
+
+def check_v11_6_4_adrs_v11() -> tuple[int, str, str]:
+    """§6.4 ADRs D074+ ≥ 7 (3 pts)."""
+    files = list((REPO_ROOT / "docs/decisions").glob("D0[78]*.md"))
+    new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 74]
+    return (3, "PASS", f"{len(new_adrs)} v11 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+
+
+def check_v11_6_5_anchors_documented() -> tuple[int, str, str]:
+    """§6.5 v11 quantitative anchors present in tests (3 pts)."""
+    n = _grep_count(r"qp_stress|buckling|adaptive_band|reference_free|gumbel|genz|elastic.*orientation|constrained_delaunay", "tests/**/*.py")
+    return (3, "PASS", f"{n} v11-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
+
+
+CHECKS_V11 = [
+    # §1 鲁棒约束 driver (24 pts)
+    ("§1", "1.1", "应力奇异性松弛 + 屈曲约束", 8, check_v11_1_1_stress_relaxation_buckling),
+    ("§1", "1.2", "自适应频带 + peak 约束", 8, check_v11_1_2_adaptive_band),
+    ("§1", "1.3", "reference-free 质量指标", 8, check_v11_1_3_reference_free_indicator),
+    # §2 不确定性 (16 pts)
+    ("§2", "2.1", "d 维 / Gumbel copula", 8, check_v11_2_1_gumbel_dim_copula),
+    ("§2", "2.2", "Genz 精确多元系统 P_f", 8, check_v11_2_2_genz_system),
+    # §3 几何 + 场 (15 pts)
+    ("§3", "3.1", "弹性同时 (ρ,θ) MMA", 8, check_v11_3_1_elastic_simultaneous_mma),
+    ("§3", "3.2", "约束 Delaunay 多孔水密", 7, check_v11_3_2_constrained_delaunay),
+    # §4 测试基础设施 (20 pts)
+    ("§4", "4.1", "Test count ≥ 1050", 4, check_v11_4_1_test_count_1050),
+    ("§4", "4.2", "Core coverage ≥ 95% (含 v11)", 4, check_v11_4_2_core_coverage_95),
+    ("§4", "4.3", "Property tests ≥ 48", 3, check_v11_4_3_property_tests_48),
+    ("§4", "4.4", "Mutation kill rate ≥ 75%", 3, check_v11_4_4_mutation_75),
+    ("§4", "4.5", "Fingerprint DB ≥ 55", 2, check_v11_4_5_fingerprints_55),
+    ("§4", "4.6", "pytest gate green (D033)", 2, check_v11_4_6_pytest_gate),
+    ("§4", "4.7", "v11 rubric 写入 agent + CI", 2, check_v11_4_7_v11_in_agent_ci),
+    # §5 用户面 demos (10 pts)
+    ("§5", "5.1", "应力松弛+屈曲 / 自适应频带 demo", 3, check_v11_5_1_constraint_demo),
+    ("§5", "5.2", "reference-free 指标 demo", 3, check_v11_5_2_indicator_demo),
+    ("§5", "5.3", "Gumbel / Genz demo", 2, check_v11_5_3_reliability_demo),
+    ("§5", "5.4", "弹性 MMA / 约束 Delaunay demo", 2, check_v11_5_4_geometry_demo),
+    # §6 文档 (15 pts)
+    ("§6", "6.1", "blueprint-v11 ≥6 ticks", 3, check_v11_6_1_blueprint_v11),
+    ("§6", "6.2", "tutorial v11 ≥4 new sections", 3, check_v11_6_2_tutorial_v11),
+    ("§6", "6.3", "architecture v11 section", 3, check_v11_6_3_arch_v11),
+    ("§6", "6.4", "ADRs D074+ ≥ 7", 3, check_v11_6_4_adrs_v11),
+    ("§6", "6.5", "v11 quantitative anchors documented", 3, check_v11_6_5_anchors_documented),
+]
+
+
+def run_v11(section_filter: str | None = None) -> Scorecard:
+    """Score the v11 rubric in-process."""
+    sc = Scorecard(version="v11.0.0")
+    sc.items = _score(CHECKS_V11, section_filter)
+    return sc
+
+
+def check_v10_no_regression() -> dict:
+    """v10 must remain 100/100 for a v11 release (true in-process re-score)."""
+    sc_v10 = run_v10()
+    return {
+        "score": sc_v10.total_earned,
+        "max": sc_v10.total_max,
+        "regression": sc_v10.total_earned < 100,
+    }
+
+
 def check_v6_no_regression() -> dict:
     """v6 must remain 100/100 for a v7 release (true in-process re-score)."""
     sc_v6 = run_v6()
@@ -2132,23 +2369,27 @@ def run_all(section_filter: str | None = None, rubric: str = "v5", run_pytest_ga
         sc = run_v8(section_filter)
     elif rubric == "v9":
         sc = run_v9(section_filter)
-    else:  # v10
+    elif rubric == "v10":
         sc = run_v10(section_filter)
+    else:  # v11
+        sc = run_v11(section_filter)
     sc.v1_check = check_v1_no_regression()
     sc.v2_check = check_v2_no_regression()
     sc.v3_check = check_v3_no_regression()
-    if rubric in ("v5", "v6", "v7", "v8", "v9", "v10"):
+    if rubric in ("v5", "v6", "v7", "v8", "v9", "v10", "v11"):
         sc.v4_check = check_v4_no_regression()
-    if rubric in ("v6", "v7", "v8", "v9", "v10"):
+    if rubric in ("v6", "v7", "v8", "v9", "v10", "v11"):
         sc.v5_check = check_v5_no_regression()
-    if rubric in ("v7", "v8", "v9", "v10"):
+    if rubric in ("v7", "v8", "v9", "v10", "v11"):
         sc.v6_check = check_v6_no_regression()
-    if rubric in ("v8", "v9", "v10"):
+    if rubric in ("v8", "v9", "v10", "v11"):
         sc.v7_check = check_v7_no_regression()
-    if rubric in ("v9", "v10"):
+    if rubric in ("v9", "v10", "v11"):
         sc.v8_check = check_v8_no_regression()
-    if rubric == "v10":
+    if rubric in ("v10", "v11"):
         sc.v9_check = check_v9_no_regression()
+    if rubric == "v11":
+        sc.v10_check = check_v10_no_regression()
     if run_pytest_gate:
         sc.pytest_check = check_pytest_green()
     return sc
@@ -2190,6 +2431,8 @@ def print_summary(sc: Scorecard) -> None:
         print(f"  v8 rubric  : {sc.v8_check.get('score')}/{sc.v8_check.get('max', 100)}  regression={sc.v8_check.get('regression')}")
     if sc.v9_check:
         print(f"  v9 rubric  : {sc.v9_check.get('score')}/{sc.v9_check.get('max', 100)}  regression={sc.v9_check.get('regression')}")
+    if sc.v10_check:
+        print(f"  v10 rubric : {sc.v10_check.get('score')}/{sc.v10_check.get('max', 100)}  regression={sc.v10_check.get('regression')}")
     if sc.pytest_check:
         pc = sc.pytest_check
         marker = "✓" if pc.get("green") else "✗"
@@ -2208,6 +2451,7 @@ def print_summary(sc: Scorecard) -> None:
         sc.v7_check.get("regression") if sc.v7_check else False,
         sc.v8_check.get("regression") if sc.v8_check else False,
         sc.v9_check.get("regression") if sc.v9_check else False,
+        sc.v10_check.get("regression") if sc.v10_check else False,
         sc.pytest_check.get("regression") if sc.pytest_check else False,
     ]
     if sc.total_earned >= 99 and not any(regressions):
@@ -2225,9 +2469,9 @@ def main() -> int:
     parser.add_argument("--strict", action="store_true", help="exit 1 if total < 99 or any regression")
     parser.add_argument(
         "--rubric",
-        choices=["v4", "v5", "v6", "v7", "v8", "v9", "v10"],
+        choices=["v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"],
         default="v5",
-        help="which rubric to score (default v5; v4-v9 scorable for regression checks)",
+        help="which rubric to score (default v5; v4-v10 scorable for regression checks)",
     )
     parser.add_argument(
         "--output",
@@ -2270,6 +2514,8 @@ def main() -> int:
         payload["v8_check"] = sc.v8_check
     if sc.v9_check:
         payload["v9_check"] = sc.v9_check
+    if sc.v10_check:
+        payload["v10_check"] = sc.v10_check
     if sc.pytest_check:
         payload["pytest_check"] = sc.pytest_check
     out_path.write_text(json.dumps(payload, indent=2) + "\n")
@@ -2288,6 +2534,7 @@ def main() -> int:
                 sc.v7_check.get("regression") if sc.v7_check else False,
                 sc.v8_check.get("regression") if sc.v8_check else False,
                 sc.v9_check.get("regression") if sc.v9_check else False,
+                sc.v10_check.get("regression") if sc.v10_check else False,
                 sc.pytest_check.get("regression") if sc.pytest_check else False,
             ]
         )
