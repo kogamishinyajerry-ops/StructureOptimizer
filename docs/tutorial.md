@@ -1232,6 +1232,24 @@ beta = form_hlrf(rt.wrap_limit_state(lambda x: a0 - a @ x), n_vars=len(mean)).be
 闭式 `(a₀−aᵀμ)/√(aᵀΣa)`。诚实声明：仅实现 **MVN 联合**；高斯 copula + 非高斯边缘会退化回 Nataf
 （不增益）；真正非高斯联合（Clayton/Frank copula）是 reopening 项。Rosenblatt **依赖变量顺序**（见 D061）。
 
+### 19.5 耦合密度 + orientation 热 TO（Wave GGG，D062）
+
+D043 优化密度（固定方向）、D054 优化纤维方向（固定密度）。v9 **交替最小化**同时优化两者：
+每个外循环 = 密度 OC 步（固定 θ）+ orientation 最速下降步（固定 ρ），循环到收敛：
+
+```python
+from structure_optimizer.core.thermal_simp import coupled_density_orientation_to
+res = coupled_density_orientation_to(config, mesh, kxx=5.0, kyy=1.0,
+                                     n_outer=8, n_orient_steps=8,
+                                     heat_sources=sources, thermal_bcs=bcs)
+# res.densities / angles / compliance_history（逐 cycle 单调）/ converged
+```
+
+**关键 / 诚实边界**：交替最小化热柔度 ≤ 单独优化密度（实测 3.1×）且 ≤ 单独优化 orientation（17×）+
+逐 cycle 单调下降（2.88e6→2.59e5）+ **各向同性退化**（kxx==kyy → dC/dθ≡0 → 精确等于纯密度 TO，
+角度恒 0）。诚实声明：**块坐标交替**非同时 (ρ,θ) MMA（收敛到块坐标驻点，未必全局联合最优）；密度步
+OC + 方向步最速下降，均非 MMA；无角度场制造约束（reopening 项，见 D062）。
+
 ---
 
 ## 常见错误

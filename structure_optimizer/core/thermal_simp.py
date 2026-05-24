@@ -335,3 +335,91 @@ def fibre_steering_thermal_to(
             break
         angles = angles - step * (g / gmax)
     return FibreSteeringResult(angles=angles, compliance_history=history, kxx=float(kxx), kyy=float(kyy))
+
+
+# --- Wave GGG (v9, D062): coupled density + orientation thermal TO -----------
+#
+# D054 (fibre steering) optimised the orientation field θ at *fixed* density;
+# run_thermal_simp / anisotropic_thermal_sensitivity optimise density at fixed θ.
+# D054's reopening criterion named the coupling: optimise BOTH by alternating
+# minimisation — a density OC step (fixed θ) then an orientation steepest-descent
+# step (fixed ρ), cycling until convergence. Each sub-step lowers the (self-
+# adjoint) thermal compliance, so the alternation is monotone and reaches a design
+# at least as good as optimising either field alone.
+
+
+@dataclass
+class CoupledThermalResult:
+    """Output of coupled density + orientation thermal TO (Wave GGG)."""
+
+    densities: np.ndarray
+    angles: np.ndarray
+    compliance_history: list[float]
+    converged: bool
+
+
+def coupled_density_orientation_to(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    kxx: float,
+    kyy: float,
+    kxy: float = 0.0,
+    n_outer: int = 8,
+    n_orient_steps: int = 8,
+    orient_step: float = 0.3,
+    init_angles: np.ndarray | None = None,
+    heat_sources: list[dict[str, Any]] | None = None,
+    thermal_bcs: list[dict[str, Any]] | None = None,
+    change_tol: float = 1e-3,
+) -> CoupledThermalResult:
+    """Coupled density + fibre-orientation thermal TO by alternating minimisation
+    (Wave GGG, D062).
+
+    Each outer cycle: (1) a density OC step (D043 anisotropic sensitivity, Sigmund
+    filter, volume-constrained OC) at the current orientation field; (2) up to
+    ``n_orient_steps`` orientation steepest-descent steps (D054) at the updated
+    density. Records the thermal compliance after each full cycle; stops on
+    ``max|Δρ| < change_tol`` or ``n_outer``. With ``n_orient_steps=0`` it reduces
+    to a pure (anisotropic) density TO; with an isotropic base tensor (kxx==kyy)
+    the orientation step is a no-op (dC/dθ ≡ 0)."""
+    from structure_optimizer.core.thermal import orientation_field_to_tensors
+
+    opt = config.optimization
+    n_elem = mesh.elements.shape[0]
+    rho = _default_initial_density(config, mesh)
+    angles = np.zeros(n_elem) if init_angles is None else np.asarray(init_angles, dtype=float).reshape(-1).copy()
+    history: list[float] = []
+    converged = False
+
+    for _ in range(n_outer):
+        # (1) density step at fixed orientation
+        field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
+        sens = anisotropic_thermal_sensitivity(
+            config, mesh, rho, conductivity_tensor_field=field,
+            heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+        )
+        sens = density_filter(mesh, rho, sens, opt.filter_radius, opt.min_density)
+        prev_rho = rho.copy()
+        rho = _optimality_criteria_update(config, mesh, rho, sens)
+        rho = _apply_density_masks(config, mesh, rho)
+
+        # (2) orientation steepest descent at fixed density
+        for _s in range(n_orient_steps):
+            g = orientation_sensitivity(config, mesh, rho, angles, kxx, kyy, kxy, heat_sources, thermal_bcs)
+            gmax = float(np.max(np.abs(g)))
+            if gmax <= 0.0:
+                break
+            angles = angles - orient_step * (g / gmax)
+
+        field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
+        c = solve_thermal(
+            config, mesh, rho, conductivity=1.0,
+            heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+            conductivity_tensor_field=field,
+        ).thermal_compliance
+        history.append(float(c))
+        if float(np.max(np.abs(rho - prev_rho))) < change_tol:
+            converged = True
+            break
+
+    return CoupledThermalResult(densities=rho, angles=angles, compliance_history=history, converged=converged)
