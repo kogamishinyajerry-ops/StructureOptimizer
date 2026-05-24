@@ -1095,6 +1095,26 @@ Weibull/Gumbel 用同一积分，验证可迁移）；Weibull/Gumbel 矩与 roun
 新增 normal/lognormal/Weibull/Gumbel 四种；更多 marginal（GEV 等）只是 `Marginal` 扩展。
 n_nodes=24 对这些光滑被积函数足够（闭式 cross-check 3e-11）。D045 闭式路径不变（见 D053）。
 
+### 18.5 纤维转向热 TO（Wave YY，D054）
+
+v7（D043）的各向异性热场方向固定；v8 把**方向角本身作为设计变量**优化（纤维转向）。
+自伴随：dC/dθ_e = −scale_e·Tₑᵀ(∂ke_e/∂θ_e)Tₑ，∂ke/∂θ 由 dk/dθ=R'(θ)k₀R(θ)ᵀ+R(θ)k₀R'(θ)ᵀ：
+
+```python
+from structure_optimizer.core.thermal_simp import (
+    orientation_sensitivity, fibre_steering_thermal_to, load_thermal_benchmark)
+config, k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
+g = orientation_sensitivity(config, mesh, rho, angles, kxx=5.0, kyy=1.0,
+                            heat_sources=sources, thermal_bcs=bcs)   # dC/dθ
+res = fibre_steering_thermal_to(config, mesh, rho, 5.0, 1.0, n_steps=20,
+                                heat_sources=sources, thermal_bcs=bcs)
+# res.compliance_history 单调降 ~33%；res.angles = 优化后的方向场
+```
+
+**关键 / 诚实边界**：orientation 灵敏度对中心差分 rel 1e-5（实测 ~1e-9）；**各向同性基张量
+（kxx==kyy）灵敏度恒零**（旋转各向同性导体无效，精确解析检验）；最速下降使热柔度降 ~33% 单调。
+仅优化**方向场**（密度固定）；耦合密度+方向、角度场滤波/连续化是后续（见 D054）。
+
 ---
 
 ## 常见错误

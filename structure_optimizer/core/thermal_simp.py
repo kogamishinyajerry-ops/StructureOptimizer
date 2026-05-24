@@ -208,3 +208,130 @@ def anisotropic_thermal_sensitivity(
     active = np.where(mesh.void_mask, opt.min_density, densities)
     p = opt.penalty
     return -p * np.power(active, p - 1.0) * (1.0 - opt.min_density) * result.element_thermal_energy
+
+
+# --- Wave YY (v8, D054): fibre-steering thermal TO (orientation as design var) -
+#
+# D043 delivered the per-element anisotropic field + the density sensitivity, but
+# the orientation field itself was fixed. Its reopening criterion named the
+# upgrade: optimise the orientation field (fibre steering). The thermal problem
+# is self-adjoint, so for compliance C = TᵀK(θ)T the orientation sensitivity is
+#     dC/dθ_e = -scale_e · Tₑᵀ (∂ke_e/∂θ_e) Tₑ,
+# where ke_e is linear in the conductivity tensor k(θ) = R(θ)k₀R(θ)ᵀ, so
+# ∂ke_e/∂θ_e is the same element quadrature applied to dk/dθ.
+
+
+def _thermal_elem_from_tensor(k2x2: np.ndarray, thickness: float) -> np.ndarray:
+    """Element conductivity matrix ∫ Bᵀ k B for an arbitrary (possibly indefinite)
+    2×2 tensor — same quadrature as ``element_thermal_conductivity_tensor`` but
+    without the positive-definite check, so it accepts derivative tensors dk/dθ."""
+    from structure_optimizer.core.thermal import (
+        _GAUSS_PTS,
+        _NODE_ETA,
+        _NODE_XI,
+        _UNIT_SQUARE,
+    )
+
+    ke = np.zeros((4, 4))
+    for xi, eta in _GAUSS_PTS:
+        dn_dxi = 0.25 * _NODE_XI * (1.0 + _NODE_ETA * eta)
+        dn_deta = 0.25 * _NODE_ETA * (1.0 + _NODE_XI * xi)
+        dn_nat = np.column_stack([dn_dxi, dn_deta])
+        jac = dn_nat.T @ _UNIT_SQUARE
+        detj = np.linalg.det(jac)
+        dn_dx = dn_nat @ np.linalg.inv(jac).T
+        ke += dn_dx @ k2x2 @ dn_dx.T * detj * thickness
+    return ke
+
+
+def _dk_dtheta(kxx: float, kyy: float, kxy: float, theta: float) -> np.ndarray:
+    """d/dθ of R(θ)·k₀·R(θ)ᵀ where R is the 2-D rotation by θ."""
+    k0 = np.array([[kxx, kxy], [kxy, kyy]], dtype=float)
+    c, s = np.cos(theta), np.sin(theta)
+    rot = np.array([[c, -s], [s, c]])
+    drot = np.array([[-s, -c], [c, -s]])
+    return drot @ k0 @ rot.T + rot @ k0 @ drot.T
+
+
+@dataclass
+class FibreSteeringResult:
+    """Output of fibre-steering thermal TO (Wave YY)."""
+
+    angles: np.ndarray
+    compliance_history: list[float]
+    kxx: float
+    kyy: float
+
+
+def orientation_sensitivity(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    angles: np.ndarray,
+    kxx: float,
+    kyy: float,
+    kxy: float = 0.0,
+    heat_sources: list[dict[str, Any]] | None = None,
+    thermal_bcs: list[dict[str, Any]] | None = None,
+) -> np.ndarray:
+    """Thermal-compliance sensitivity w.r.t. each element's fibre angle θ_e
+    (Wave YY, D054): dC/dθ_e = -scale_e · Tₑᵀ (∂ke_e/∂θ_e) Tₑ."""
+    from structure_optimizer.core.thermal import orientation_field_to_tensors
+
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    angles = np.asarray(angles, dtype=float).reshape(-1)
+    field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
+    result = solve_thermal(
+        config, mesh, densities, conductivity=1.0,
+        heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+        conductivity_tensor_field=field,
+    )
+    temps = result.temperatures
+    opt = config.optimization
+    active = np.where(mesh.void_mask, opt.min_density, densities)
+    scale = opt.min_density + (active**opt.penalty) * (1.0 - opt.min_density)
+    dC = np.zeros(mesh.elements.shape[0])
+    for e, nodes in enumerate(mesh.elements):
+        te = temps[nodes]
+        dke = _thermal_elem_from_tensor(_dk_dtheta(kxx, kyy, kxy, float(angles[e])), config.thickness)
+        dC[e] = -scale[e] * float(te @ dke @ te)
+    return dC
+
+
+def fibre_steering_thermal_to(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    kxx: float,
+    kyy: float,
+    kxy: float = 0.0,
+    n_steps: int = 25,
+    step: float = 0.3,
+    init_angles: np.ndarray | None = None,
+    heat_sources: list[dict[str, Any]] | None = None,
+    thermal_bcs: list[dict[str, Any]] | None = None,
+) -> FibreSteeringResult:
+    """Steepest-descent optimisation of the per-element fibre angle to minimise
+    thermal compliance (Wave YY, D054), at fixed densities. Angles are periodic
+    (no box constraint). Records compliance each step.
+    """
+    from structure_optimizer.core.thermal import orientation_field_to_tensors
+
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    n_elem = mesh.elements.shape[0]
+    angles = np.zeros(n_elem) if init_angles is None else np.asarray(init_angles, dtype=float).reshape(-1).copy()
+    history: list[float] = []
+    for _ in range(n_steps + 1):
+        field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
+        r = solve_thermal(config, mesh, densities, conductivity=1.0,
+                          heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+                          conductivity_tensor_field=field)
+        history.append(float(r.thermal_compliance))
+        if len(history) > n_steps:
+            break
+        g = orientation_sensitivity(config, mesh, densities, angles, kxx, kyy, kxy, heat_sources, thermal_bcs)
+        gmax = float(np.max(np.abs(g)))
+        if gmax <= 0.0:
+            break
+        angles = angles - step * (g / gmax)
+    return FibreSteeringResult(angles=angles, compliance_history=history, kxx=float(kxx), kyy=float(kyy))
