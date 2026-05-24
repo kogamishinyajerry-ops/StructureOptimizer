@@ -390,3 +390,90 @@ def multi_load_case_to(
         rng_seed=rng_seed,
         seed_genomes=seed_genomes,
     )
+
+
+# ---------------------------------------------------------------------------
+# Wave UUU (v11, D076): reference-(front)-free quality indicators.
+#
+# D068's reopening criterion named "reference-free quality indicators
+# (hypervolume-only / R2)". IGD⁺ (D068) needs a *reference Pareto front* — which
+# in a real optimisation you do not have. The R2 indicator (Tchebycheff) needs
+# only a weight set and a utopia point (both derivable without a true front), and
+# hypervolume needs only a reference point (here auto-derived from the front).
+# Both are reference-front-free unary indicators.
+# ---------------------------------------------------------------------------
+
+
+def r2_indicator(
+    front: np.ndarray,
+    weights: np.ndarray | None = None,
+    ideal: np.ndarray | None = None,
+    n_divisions: int = 10,
+) -> float:
+    """Reference-(front)-free **R2** quality indicator (Tchebycheff), for
+    **minimisation** (Wave UUU, D076).
+
+    For a weight set ``W`` (rows on the unit simplex) and a utopia point ``z*``,
+
+        R2(A) = (1/|W|) · Σ_{λ∈W}  min_{a∈A}  max_j λ_j · (a_j − z*_j)
+
+    i.e. the mean over scalarisations of the best (smallest) achievable weighted
+    Tchebycheff utility. **Lower is better.** Unlike IGD⁺ this needs *no reference
+    front* — only weights and a utopia, both available without the true Pareto
+    set. It is weakly Pareto-compliant: adding a dominated solution never raises
+    R2, and a front that weakly dominates another scores ≤ it (under a shared
+    ``ideal``/``weights``).
+
+    ``weights`` defaults to Das-Dennis directions for the front's objective count;
+    ``ideal`` defaults to the front's component-wise minimum (note: **comparing
+    fronts requires a shared** ``ideal`` **and** ``weights``).
+    """
+    a = np.asarray(front, dtype=float)
+    if a.ndim != 2:
+        raise SolverError("r2_expects_2d_front")
+    if a.shape[0] == 0:
+        raise SolverError("r2_empty_front")
+    n_obj = a.shape[1]
+    if weights is None:
+        w = das_dennis_reference_points(n_obj, n_divisions)
+    else:
+        w = np.asarray(weights, dtype=float)
+        if w.ndim != 2 or w.shape[1] != n_obj:
+            raise SolverError("r2_weight_dim_mismatch")
+        if w.shape[0] == 0:
+            raise SolverError("r2_empty_weights")
+    z = a.min(axis=0) if ideal is None else np.asarray(ideal, dtype=float).reshape(-1)
+    if z.shape[0] != n_obj:
+        raise SolverError("r2_ideal_dim_mismatch")
+    shifted = a - z  # (m, n_obj)
+    total = 0.0
+    for lam in w:
+        # weighted Tchebycheff utility of every solution under this weight, then best
+        g = np.max(lam * shifted, axis=1)  # (m,)
+        total += float(g.min())
+    return total / w.shape[0]
+
+
+def reference_free_hypervolume(front: np.ndarray, margin: float = 0.1) -> float:
+    """Dominated hypervolume with the reference point **auto-derived** from the
+    front (Wave UUU, D076) — a reference-point-free convenience wrapper.
+
+    The reference is the front's nadir plus ``margin`` of its per-objective range
+    (``ref = max + margin·(max − min)``), so every non-dominated point contributes
+    positive volume and adding a non-dominated point strictly increases the
+    measure. Delegates to the exact :func:`hypervolume_2d` / :func:`hypervolume_nd`.
+    **Higher is better.**
+    """
+    a = np.asarray(front, dtype=float)
+    if a.ndim != 2:
+        raise SolverError("reference_free_hv_expects_2d_front")
+    if a.shape[0] == 0:
+        raise SolverError("reference_free_hv_empty_front")
+    if margin <= 0.0:
+        raise SolverError("reference_free_hv_nonpositive_margin")
+    lo = a.min(axis=0)
+    hi = a.max(axis=0)
+    rng = np.where(hi - lo <= 1e-12, 1.0, hi - lo)
+    ref = hi + margin * rng
+    hv = hypervolume_2d if a.shape[1] == 2 else hypervolume_nd
+    return hv(a, ref)

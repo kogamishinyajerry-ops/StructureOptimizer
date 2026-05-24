@@ -1516,6 +1516,30 @@ Rayleigh β；(2) **约束必须是频带不是单频**——单频约束会被"
 min-volume+单频 → 体积塌到 0.01、真峰炸到 2.6e9），故聚合多频 p-norm + 目标取柔度而非最小化材料。贪心二分非全局
 band-max 证明（双共振时次峰可能欠解析）；MMA 内每步用**固定** band_omegas（不在循环里重采样）——这些都进 D075 reopening。
 
+### 21.3 reference-free 多目标质量指标：R2 + 自动参考点 hypervolume（Wave UUU，D076）
+
+D068 的 IGD⁺ 需要一条**真 Pareto 前沿**做参考——但实际优化中你恰恰没有它（有了就不用优化了）。两个标准指标绕开参考
+前沿：**R2 指标**（Tchebycheff）只要权重集 + utopia 点；**hypervolume** 只要参考点。UUU 落地两者的 reference-front-free 版本。
+
+```python
+from structure_optimizer.core.multi_objective_to import r2_indicator, reference_free_hypervolume
+
+# R2（越小越好）：权重默认 Das-Dennis，ideal 默认前沿逐维 min（比较多前沿须传共享 ideal+weights）
+r2 = r2_indicator(front, weights=None, ideal=shared_ideal)   # (1/|W|)Σ_λ min_a max_j λ_j(a_j−z*_j)
+
+# 自动参考点 hypervolume（越大越好）：ref = max + margin·(max−min)，委托精确 hypervolume_2d/_nd
+hv = reference_free_hypervolume(front, margin=0.1)
+```
+
+**关键 / 定量锚点**：R2 闭式（单点前沿 {(1,1)}，权重 {(1,0),(0,1),(0.5,0.5)}，utopia (0,0) → 5/6，机器精度匹配）+ 弱
+Pareto 兼容（支配前沿 R2 严格更低；加入被支配解 R2 不变）+ **三指标排序一致**：4 条嵌套更优前沿上，R2/refHV/IGD⁺
+给出完全相同序 [3,2,1,0]——没有真前沿（用不了 IGD⁺）的人靠 R2/refHV 得到同样裁决 + 自动参考点 HV 加非支配点严格增。
+
+**诚实边界**：R2 **比较多前沿必须共享 ideal+weights**（默认用各自 min 比较无意义）；R2 收敛性只透过所选标量化方向感知，
+粗权重集会漏前沿间隙（非多样性指标替代品）；排序一致是**良构嵌套前沿上的经验等价非定理**——交叉权衡的不可比前沿会
+（正当地）分歧；refHV 的 margin 是**约定**（同 margin 下不影响排序，跨前沿比较仍首选共享显式参考点）。HV 算法本身仍是
+D068 的精确版，UUU 只加参考点推导便利。
+
 ---
 
 ## 常见错误
