@@ -1286,6 +1286,40 @@ info = write_stl_slit_free_holes(mesh, densities, "ring.stl")
 
 ---
 
+## 20. v10 — constraint-rich & manufacturable: 多约束优化器 + 一般 copula + 平滑水密几何
+
+### 20.1 多约束 MMA：应力 p-norm + 体积（Wave KKK，D066）
+
+v9 的 MMA（`mma_nonlinear_to`，D058）只接了**单约束**（体积），所以在 compliance-only 问题上只能
+**追平 OC**——D058 诚实声明 MMA 的真正价值是**额外约束**。v10 把它兑现到应力情形。卡点是代码库
+只有 **forward** p-norm von Mises 应力，**没有密度灵敏度**（v1.6 显式把"应力伴随"推迟到后续 ADR）。
+D066 补上这条伴随：
+
+```python
+from structure_optimizer.benchmarks.registry import load_benchmark
+from structure_optimizer.core.mesh import create_structured_mesh
+from structure_optimizer.core.nonlinear_simp import multi_constraint_mma
+from structure_optimizer.core.stress import stress_pnorm_sensitivity
+config = load_benchmark("cantilever", preset="smoke"); mesh = create_structured_mesh(config)
+sigma_pn, dsdrho = stress_pnorm_sensitivity(config, mesh, densities, p=8.0)  # 伴随灵敏度
+r = multi_constraint_mma(config, mesh, sigma_limit=4.6e3, p=8.0, max_iter=60)
+# r.stress_history / volume_history / compliance_history / densities / sigma_limit
+```
+
+应力 `σ_PN=(Σσ_e^p)^(1/p)`，每个 von Mises 应力是**线性于单元位移**的量的范数
+（`σ_e²=(S uₑ)ᵀ V (S uₑ)`，`S=D·B` 逐单元常量），原始材料应力**无显式 ρ 依赖** → 纯伴随项
+`dσ_PN/dρ_e = −dscale_e·(λₑᵀ kₑ uₑ)`，`K λ = ∂σ_PN/∂u`。两个不等式
+`g₁=σ_PN/σ_lim−1≤0`、`g₂=mean(ρ)−vf≤0` 交给 `mma_step`。
+
+**关键 / 诚实边界**：伴随灵敏度 vs 中心差分 rel-err ≤1e-4（实测 ~1e-7）+ 收敛时**两约束同时满足**
+（σ_PN≤lim ∧ 体积≤vf）+ 应力约束**绑定**（σ_lim=0.7×纯体积设计应力时，σ_PN 6.56e3→4.59e3 压到限值，
+体积守 0.450）。诚实声明：用的是**原始材料应力 p-norm，非 SIMP-松弛应力**（不处理应力奇异性，
+是 reopening 项）；von Mises 用 `_approx_element_stress` 单点有限差分应变（非高斯点 B 矩阵积分）；
+目标是**线性**柔度（非全 TL）；`converged` 标志在绑定点 `|Δx|` 抖动时可能读 False，测试断言可行性/绑定
+而非该标志。
+
+---
+
 ## 常见错误
 
 | 现象 | 原因 | 解决 |

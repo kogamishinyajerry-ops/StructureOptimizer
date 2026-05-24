@@ -59,7 +59,7 @@ v10 完成 = `python scripts/test_agent.py --rubric v10` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] KKK — 多约束 MMA（应力 p-norm + 体积）
+- [x] KKK — 多约束 MMA（应力 p-norm + 体积）
 - [ ] LLL — 目标频带放置（minimax around target）
 - [ ] MMM — 泛化 NSGA driver + IGD+ 指标
 - [ ] NNN — Archimedean copula Rosenblatt

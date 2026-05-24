@@ -336,3 +336,110 @@ def mma_nonlinear_to(
         converged=converged,
         mesh_shape=(mesh.nelx, mesh.nely),
     )
+
+
+@dataclass
+class MultiConstraintTOResult:
+    """Output of the multi-constraint MMA driver (Wave KKK, D066)."""
+
+    densities: np.ndarray
+    compliance_history: list[float]
+    volume_history: list[float]
+    stress_history: list[float]
+    sigma_limit: float
+    converged: bool
+    mesh_shape: tuple[int, int]
+
+
+def multi_constraint_mma(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    sigma_limit: float,
+    p: float = 8.0,
+    vf: float | None = None,
+    max_iter: int = 40,
+    change_tol: float = 1e-3,
+) -> MultiConstraintTOResult:
+    """Minimise (linear) compliance subject to **two** inequality constraints —
+    a p-norm von Mises stress limit *and* a volume fraction — via MMA (Wave KKK,
+    D066).
+
+    D058's reopening criterion: extend the single-constraint MMA-TL of
+    :func:`mma_nonlinear_to` to genuinely multi-constraint optimisation (stress
+    alongside volume), which is exactly where MMA earns its keep over OC. The two
+    inequalities, written for :func:`core.mma.mma_step` as ``g ≤ 0``, are
+
+        ``g₁(x) = σ_PN(x) / σ_lim − 1 ≤ 0``   (stress)
+        ``g₂(x) = mean(x) − vf ≤ 0``          (volume)
+
+    The objective gradient is the standard SIMP compliance sensitivity
+    ``dc/dρ_e = −dscale_e · (uₑᵀ kₑ uₑ)``; the stress-constraint gradient is the
+    adjoint :func:`core.stress.stress_pnorm_sensitivity`. Both are density-filtered
+    for consistency. Operates on the design-cell sub-vector (void/solid held by
+    the masks). Stops on ``max|Δx| < change_tol`` or ``max_iter``.
+    """
+    from structure_optimizer.core.fem2d import solve_linear_elastic
+    from structure_optimizer.core.mma import MMAState, mma_step
+    from structure_optimizer.core.stress import (
+        element_von_mises_stresses,
+        p_norm_stress,
+        stress_pnorm_sensitivity,
+    )
+
+    opt = config.optimization
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+    vf_target = float(opt.volume_fraction) if vf is None else float(vf)
+
+    rho = _default_initial_density(config, mesh)
+    x = rho[design].astype(float).copy()
+    xmin = np.full(n_design, opt.min_density)
+    xmax = np.ones(n_design)
+    state = MMAState()
+
+    compliance_history: list[float] = []
+    volume_history: list[float] = []
+    stress_history: list[float] = []
+    converged = False
+
+    for _ in range(max_iter):
+        rho[design] = x
+        rho = _apply_density_masks(config, mesh, rho)
+        res = solve_linear_elastic(config, mesh, rho)
+        active = np.where(mesh.void_mask, opt.min_density, rho)
+        dscale = opt.penalty * np.where(mesh.void_mask, 0.0, active ** (opt.penalty - 1.0)) * (1.0 - opt.min_density)
+        dc = -dscale * res.element_strain_energy
+        sens_c = density_filter(mesh, rho, dc, opt.filter_radius, opt.min_density)
+        sigma_pn, dspn = stress_pnorm_sensitivity(config, mesh, rho, p=p)
+        sens_s = density_filter(mesh, rho, dspn, opt.filter_radius, opt.min_density)
+
+        compliance_history.append(res.compliance)
+        volume_history.append(float(np.sum(rho[design]) / n_design))
+        stress_history.append(sigma_pn)
+
+        df0dx = sens_c[design]
+        fval = np.array([sigma_pn / sigma_limit - 1.0, float(np.mean(x) - vf_target)])
+        dfdx = np.vstack([sens_s[design] / sigma_limit, np.full(n_design, 1.0 / n_design)])
+        x_new, _lmbda = mma_step(x, df0dx, fval, dfdx, xmin, xmax, state)
+        change = float(np.max(np.abs(x_new - x)))
+        x = x_new
+        if change < change_tol:
+            converged = True
+            break
+
+    rho[design] = x
+    rho = _apply_density_masks(config, mesh, rho)
+    res = solve_linear_elastic(config, mesh, rho)
+    final_sigma = p_norm_stress(element_von_mises_stresses(config, mesh, res.displacements), p)
+    compliance_history.append(res.compliance)
+    volume_history.append(float(np.sum(rho[design]) / n_design))
+    stress_history.append(final_sigma)
+    return MultiConstraintTOResult(
+        densities=rho,
+        compliance_history=compliance_history,
+        volume_history=volume_history,
+        stress_history=stress_history,
+        sigma_limit=float(sigma_limit),
+        converged=converged,
+        mesh_shape=(mesh.nelx, mesh.nely),
+    )
