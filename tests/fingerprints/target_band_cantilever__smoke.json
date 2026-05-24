@@ -1,0 +1,16 @@
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "rubric_version": "v10.0-wave-LLL",
+  "kind": "target_band",
+  "w1": 36924.77623461906,
+  "band_factors": [
+    0.85,
+    1.15
+  ],
+  "band_n": 7,
+  "n_steps": 6,
+  "p": 12.0,
+  "densities_sha256": "sha256:ec70c78910c100f2fccab14614d7c04bd1231f758c544a707d917098b86d91a8",
+  "peak_final": 115175.1213722672
+}

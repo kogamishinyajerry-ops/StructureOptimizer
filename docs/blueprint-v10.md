@@ -52,10 +52,10 @@ copula / 块坐标 / 阶梯几何**。v10 = **把这些推到约束丰富 + 可�
 
 v10 完成 = `python scripts/test_agent.py --rubric v10` 报告：
 
-- [ ] v10 rubric total ≥ 99 / 100
-- [ ] v9/v8/v7/v6/v5/v4 regression = False（各 = 100）
-- [ ] **pytest gate green**（D033 — 0 failed / 0 errors）
-- [ ] 全红线保持
+- [x] v10 rubric total ≥ 99 / 100
+- [x] v9/v8/v7/v6/v5/v4 regression = False（各 = 100）
+- [x] **pytest gate green**（D033 — 0 failed / 0 errors）
+- [x] 全红线保持
 
 ## 进度（wave 勾选）
 
@@ -66,7 +66,7 @@ v10 完成 = `python scripts/test_agent.py --rubric v10` 报告：
 - [x] OOO — 同时 (ρ,θ) MMA 耦合
 - [x] PPP — 相关系统模态驱动 TO
 - [x] QQQ — 平滑且水密的带孔三角化
-- [ ] RRR — v10 收口（rubric ≥ 99）
+- [x] RRR — v10 收口（rubric ≥ 99）
 
 > 注：v10 需在 `docs/quality-rubric-v10.md` + `scripts/test_agent.py` 的 `CHECKS_V10`
 > 落地评分项后才能 `--rubric v10` 打分（与 v9 同构：6 section / 100 分 / D033 gate /

@@ -460,6 +460,74 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         ]
         return rho, ("densities_sha256", rec["densities_sha256"]), checks
 
+    if kind == "multi_constraint":
+        from structure_optimizer.core.nonlinear_simp import multi_constraint_mma
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        r = multi_constraint_mma(config, mesh, sigma_limit=rec["sigma_limit"], p=rec["p"], max_iter=rec["max_iter"])
+        checks = [
+            ("compliance_final", rec["compliance_final"], r.compliance_history[-1]),
+            ("stress_final", rec["stress_final"], r.stress_history[-1]),
+        ]
+        return np.asarray(r.densities), ("densities_sha256", rec["densities_sha256"]), checks
+
+    if kind == "target_band":
+        from structure_optimizer.core.freq_response import target_band_placement
+        from structure_optimizer.core.modal import solve_modal
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        rho0 = np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction)
+        w1 = float(np.sqrt(solve_modal(config, mesh, rho0, n_modes=1).omega_squared[0]))
+        lo, hi = rec["band_factors"]
+        band = np.linspace(lo * w1, hi * w1, rec["band_n"])
+        r = target_band_placement(config, mesh, band, beta=1e-4, n_steps=rec["n_steps"], p=rec["p"])
+        checks = [("peak_final", rec["peak_final"], r.peak_final)]
+        return np.asarray(r.densities), ("densities_sha256", rec["densities_sha256"]), checks
+
+    if kind == "copula_rosenblatt":
+        from structure_optimizer.core.reliability import Marginal, build_copula_rosenblatt, clayton_copula
+
+        marginals = [Marginal(k, a, b) for k, a, b in rec["marginals"]]
+        rb = build_copula_rosenblatt(marginals, clayton_copula(rec["theta"]))
+        u = rb.x_to_u(np.asarray(rec["x"]))
+        checks = [("u0", rec["u0"], u[0])]
+        return np.asarray(u), ("u_sha256", rec["u_sha256"]), checks
+
+    if kind == "simultaneous_coupled":
+        from structure_optimizer.core.thermal_simp import (
+            load_thermal_benchmark,
+            simultaneous_density_orientation_mma,
+        )
+
+        config, _k, sources, bcs = load_thermal_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        r = simultaneous_density_orientation_mma(
+            config, mesh, rec["kxx"], rec["kyy"], max_iter=rec["max_iter"],
+            heat_sources=sources, thermal_bcs=bcs)
+        checks = [("compliance_final", rec["compliance_final"], r.compliance_history[-1])]
+        return np.asarray(r.densities), ("densities_sha256", rec["densities_sha256"]), checks
+
+    if kind == "smooth_watertight":
+        import tempfile
+
+        from structure_optimizer.core.stl_export import write_stl_smooth_watertight_holes
+
+        n = 64
+        xs = np.linspace(0.0, 1.0, n)
+        ys = np.linspace(0.0, 1.0, n)
+        gx, gy = np.meshgrid(xs, ys, indexing="xy")
+        rr = np.sqrt((gx - 0.5) ** 2 + (gy - 0.5) ** 2)
+        field = ((rr >= 0.25) & (rr <= 0.45)).astype(float)
+        info = write_stl_smooth_watertight_holes(field, xs, ys, tempfile.mktemp(suffix=".stl"), n_samples=rec["n_samples"])
+        checks = [
+            ("n_triangles", rec["n_triangles"], info["n_triangles"]),
+            ("cross_section_area", rec["cross_section_area"], info["cross_section_area"]),
+            ("is_watertight", rec["is_watertight"], info["is_watertight"]),
+        ]
+        return field, ("field_sha256", rec["field_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -523,6 +591,12 @@ def test_multiphysics_fingerprint_set_present():
         "rosenblatt_trivariate",
         "coupled_thermal_heat_sink__smoke",
         "slit_free_annulus",
+        # v10 constraint-rich / manufacturable drivers (Wave RRR closure)
+        "multi_constraint_cantilever__smoke",
+        "target_band_cantilever__smoke",
+        "copula_rosenblatt_clayton",
+        "simultaneous_coupled_heat_sink__smoke",
+        "smooth_watertight_ring",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

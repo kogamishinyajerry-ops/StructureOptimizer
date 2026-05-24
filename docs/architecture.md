@@ -655,3 +655,49 @@ v8 把 v7 的灵敏度闭成 OC 环并把分布/几何一般化，但多处仍�
 - 系统可靠性模态视为**独立**；可靠性旋钮仍是体积分数；线性位移极限态（D063）。
 - slit-free 仅**边连通**区域水密（对角 pinch 非流形）；阶梯边界非平滑（D064）。
 - 详见 D058-D064 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 20. v10 — constraint-rich & manufacturable: 多约束优化器 + 一般 copula + 平滑水密几何
+
+v9 把 driver 升到二阶，但多处仍是**单约束 / 高斯 copula / 块坐标 / 阶梯几何**。v10 = **约束丰富 +
+可制造**：把这些推进到多约束优化器（stress constraint alongside volume）、一般 Archimedean copula、
+同时多场 MMA、平滑且水密的几何。每个 wave 都源自 v9（或更早）ADR 明列的 "Reopening criteria"——§19.2 的
+限制由此逐条解除：
+
+| v9 限制（§19.2） | v10 升级 | 模块 | ADR | 定量锚点 |
+|---|---|---|---|---|
+| MMA 仅体积约束 | **多约束 MMA**：应力 p-norm constraint + 体积 | `core/nonlinear_simp.py` + `core/stress.py` | D066 | 应力 p-norm 伴随灵敏度 vs FD ~1e-7 + 两约束同时满足 + 应力绑定 6.56e3→4.59e3 |
+| 频域仅带隙（推开特征值） | **目标频带放置**（minimax around target） | `core/freq_response.py` | D067 | 带内峰值灵敏度 vs FD ~1e-7 + 最坏响应 −84% + 体积守恒 |
+| 两个并行 NSGA 循环 | **泛化 nsga3_density_to** + IGD⁺ 指标 | `core/multi_objective_to.py` | D068 | 2/3-obj 委托**逐位一致** + IGD⁺ 解析前沿 δ→IGD⁺=δ |
+| Rosenblatt 仅 MVN | **Archimedean copula**（Clayton/Frank）Rosenblatt | `core/reliability.py` | D069 | 条件 CDF round-trip ≤1e-9 + θ→0 退化独立 + Kendall τ 闭式 |
+| 耦合是块坐标交替 | **同时 (ρ,θ) MMA** | `core/thermal_simp.py` | D070 | 合并灵敏度 vs FD ~1e-8 + 同时 ≤ 交替（−19%）+ 体积可行 |
+| 系统模态视为独立 | **相关系统模态**驱动 TO | `core/rbto.py` | D071 | ρ=0 退化独立 <1e-9 + 正相关升 β_sys + bivariate CDF Φ₂ |
+| slit-free 阶梯非平滑 | **平滑且水密**带孔三角化（annulus ribbon） | `core/stl_export.py` | D072 | 平滑环形孔水密=True + 面积≈外−内 ≤5e-3 + 每边恰 2 三角 |
+
+### 20.1 约束丰富 + 可制造原则
+
+- **多约束优化器**：D066 把 MMA 从单体积约束升到 stress-constrained（应力 p-norm 伴随 + 体积），
+  这是 MMA 相对 OC 的真正价值兑现；D070 把块坐标交替升成同时 (ρ,θ) MMA（联合步逃离坐标式驻点）。
+- **一般不确定性**：D069 用 Archimedean copula（Clayton/Frank）表达尾部相关（高斯 copula 不能），
+  D071 用 bivariate normal CDF 把系统可靠性从独立升到相关模态。
+- **可制造几何**：D072 用 annulus ribbon 把"平滑（MS 轮廓）"与"水密（边流形）"同时拿下（环形孔），
+  补上 D056（平滑非水密）与 D064（水密非平滑）的缺口。
+- **DRY 与保行为**：D068 把两个并行 NSGA 循环收成单个泛化 `nsga3_density_to`，并以**逐位一致** golden
+  baseline 证明重构不改行为。
+- **诚实优于吹嘘**：D066 是 raw 应力（非 SIMP-松弛，不处理应力奇异性）；D067 是平滑 minimax（非精确 max）；
+  D070 "≤交替"是经验非定理；D071 单标量等相关 + Ditlevsen 界中点；D072 仅 annulus（多孔需 CDT）。
+- **向后兼容**：v10 全部 API 附加在 v9 之上（`stress_pnorm_sensitivity` 复用 FEM 后端；`multi_objective_to`/
+  `multi_load_case_to` 委托 `nsga3_density_to`；`CopulaRosenblattTransform` 镜像 RosenblattTransform 接口；
+  `correlated_system_rbto_simp` 并行 `system_rbto_simp` 不改 HHH）；v4-v9 调用与 rubric 无回归。
+- **完成度门控**：`python scripts/test_agent.py --rubric v10` ≥99/100，v4-v9 无回归 + pytest gate
+  green（D033）+ 全永久红线保持。
+
+### 20.2 v10 已知限制（诚实范围）
+
+- 多约束 MMA 用 **raw von Mises p-norm**（非 SIMP-松弛），不解应力奇异性；目标是线性柔度非全 TL（D066）。
+- 目标频带是**平滑 minimax**（p-norm 非精确 max）+ 固定频带采样（不自适应跟踪移动共振）（D067）。
+- NSGA 重构是**保行为 DRY**（NSGA-III 本身不变，仍梯度自由）；IGD⁺ 需调用方提供参考前沿（D068）。
+- copula 仅**双变量** + 仅 Clayton/Frank（Gumbel 无闭式逆）；假设联合已知不拟合（D069）。
+- 同时 MMA 仅**热**柔度；θ 未滤波；"≤交替"经验非定理（D070）。
+- 相关系统仅**单标量等相关** + Ditlevsen 界中点（≥3 模态带界差）；ρ∈[0,1)（D071）。
+- 平滑水密仅 **annulus（单孔/区域）**；轮廓重采样（面积"≈"）；水密是拓扑（强偏心孔 rung 可能几何自交）（D072）。
+- 详见 D066-D072 各自 "Honest scope notes" + "Reopening criteria"。

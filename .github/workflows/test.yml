@@ -120,6 +120,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
         run: python scripts/test_agent.py --rubric v9 --strict
 
+      - name: v10 test agent — constraint-rich/manufacturable rubric scorecard
+        # v10 §4.7: v10 rubric scored after v9. The v10 run enforces the D033
+        # pytest-green no-regression gate and the v4-v9 regression checks.
+        # Strict once v10 reaches ≥99/100.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --rubric v10 --strict
+
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
     runs-on: ubuntu-latest

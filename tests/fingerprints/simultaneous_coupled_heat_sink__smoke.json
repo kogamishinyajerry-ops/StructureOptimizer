@@ -1,0 +1,11 @@
+{
+  "benchmark": "heat_sink",
+  "preset": "smoke",
+  "rubric_version": "v10.0-wave-OOO",
+  "kind": "simultaneous_coupled",
+  "kxx": 5.0,
+  "kyy": 1.0,
+  "max_iter": 6,
+  "densities_sha256": "sha256:834e90577d51df9aa370c9a669a5eb4a4be93c1bff3ca986f919f3dcae8dc111",
+  "compliance_final": 470594.0609877772
+}

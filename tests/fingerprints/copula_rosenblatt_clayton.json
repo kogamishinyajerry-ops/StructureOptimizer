@@ -1,0 +1,24 @@
+{
+  "benchmark": "clayton_bivariate",
+  "rubric_version": "v10.0-wave-NNN",
+  "kind": "copula_rosenblatt",
+  "marginals": [
+    [
+      "normal",
+      10.0,
+      2.0
+    ],
+    [
+      "lognormal",
+      0.5,
+      0.3
+    ]
+  ],
+  "theta": 4.0,
+  "x": [
+    11.5,
+    1.9
+  ],
+  "u_sha256": "sha256:269c88eaec47a1415b35408cd22108ac19700aa43a8c853c07f2e65ff107c9de",
+  "u0": 0.7500000000000001
+}

@@ -1,0 +1,11 @@
+{
+  "benchmark": "ring_64",
+  "preset": "smoke",
+  "rubric_version": "v10.0-wave-QQQ",
+  "kind": "smooth_watertight",
+  "n_samples": 96,
+  "field_sha256": "sha256:fd113a32f56f7e9a531242b832c4f5042608d0c64d59da999190df5af6ca2322",
+  "n_triangles": 768,
+  "cross_section_area": 0.4346374038438534,
+  "is_watertight": true
+}
