@@ -64,7 +64,7 @@ v10 完成 = `python scripts/test_agent.py --rubric v10` 报告：
 - [x] MMM — 泛化 NSGA driver + IGD+ 指标
 - [x] NNN — Archimedean copula Rosenblatt
 - [x] OOO — 同时 (ρ,θ) MMA 耦合
-- [ ] PPP — 相关系统模态驱动 TO
+- [x] PPP — 相关系统模态驱动 TO
 - [ ] QQQ — 平滑且水密的带孔三角化
 - [ ] RRR — v10 收口（rubric ≥ 99）
 

@@ -1412,6 +1412,27 @@ r = simultaneous_density_orientation_mma(config, mesh, kxx=5.0, kyy=1.0, max_ite
 诚实声明：**热**柔度（非弹性耦合）；"≤交替"是**本基准经验非定理**（MMA 是局部优化器，病态起点可能更差，测试留 1.001 容差）；
 θ **未滤波**（无 fibre-continuity 约束，角度场可局部粗糙）；单体积约束（与 D066 应力约束合并是 reopening 项）。
 
+### 20.6 相关系统模态驱动 TO（Wave PPP，D071）
+
+D063（`system_rbto_simp`）的系统 RBTO 把失效模态当**统计独立**（`P_f=1−∏(1−P_i)`）。真实模态共享载荷不确定性
+→ 相关。D063 的 reopening 项就是**相关系统模态 via `system_reliability_series(ρ)`**：
+
+```python
+from structure_optimizer.core.rbto import correlated_system_rbto_simp
+r = correlated_system_rbto_simp(config, mesh, d_allows=[1.3,1.5], beta_target=2.5,
+                                rho_modes=0.8, load_covs=[0.12,0.12])
+# r.beta_system / volume_fraction / per_mode_betas / feasible
+```
+
+按标量模态间相关 `ρ` 建等相关矩阵 `R=(1−ρ)I+ρ·11ᵀ`，喂 `system_reliability_series` 经**bivariate normal CDF Φ₂**
+算 Ditlevsen 二阶界，取界中点。**正相关降低并联失效概率**（模态一起失效而非独立）→ β_sys 升 → 所需体积降。
+`rho_modes=0` 时**精确退化**到 `system_rbto_simp`。
+
+**关键 / 诚实边界**：ρ=0 退化到独立（β/P_f/体积/densities 全 <1e-9）+ 方向正确（ρ:0→0.9 → β_sys 2.4764→2.4985 单调升）
++ 用 Φ₂（同 β_target 下 ρ=0.8 体积 ≤ ρ=0）。诚实声明：**单标量等相关**（非逐对矩阵）；P_f 取 **Ditlevsen 界中点**
+（2 模态精确，≥3 模态带界差）；ρ 是**建模输入**非 FORM MPP 方向余弦导出（标量限状态无 MPP 向量）；限 `ρ∈[0,1)`
+（排除负相关与 ρ→1 奇异）；并联 `system_rbto_simp` bisection（不改 HHH）。
+
 ---
 
 ## 常见错误
