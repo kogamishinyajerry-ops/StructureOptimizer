@@ -462,12 +462,18 @@ def _standard_normal_ppf(p: float) -> float:
     return float(x - u / (1.0 + 0.5 * x * u))
 
 
+_EULER_GAMMA = 0.5772156649015329
+
+
 @dataclass
 class Marginal:
-    """A 1-D marginal: ``normal`` (mean, std) or ``lognormal`` (log-mean λ, log-std ζ).
+    """A 1-D marginal distribution.
 
-    For lognormal, ``param_a`` = λ and ``param_b`` = ζ are the mean/std of the
-    *underlying normal* ``ln X``; the physical X = exp(λ + ζ·Z).
+    ``kind`` and (``param_a``, ``param_b``):
+      - ``normal``:    (mean μ, std σ)
+      - ``lognormal``: (log-mean λ, log-std ζ) of ``ln X``; X = exp(λ + ζ·Z)
+      - ``weibull``:   (shape k, scale λ); F(x) = 1 − exp(−(x/λ)^k), x ≥ 0
+      - ``gumbel``:    (location μ, scale β), max-type; F(x) = exp(−exp(−(x−μ)/β))
     """
 
     kind: str
@@ -475,27 +481,65 @@ class Marginal:
     param_b: float
 
     def __post_init__(self) -> None:
-        if self.kind not in ("normal", "lognormal"):
+        if self.kind not in ("normal", "lognormal", "weibull", "gumbel"):
             raise SolverError("nataf_unknown_marginal")
         if self.param_b <= 0:
+            raise SolverError("nataf_nonpositive_scale")
+        if self.kind == "weibull" and self.param_a <= 0:
             raise SolverError("nataf_nonpositive_scale")
 
     def to_standard_normal(self, x: float) -> float:
         """Z = Φ⁻¹(F(x)) — physical value → standard normal."""
         if self.kind == "normal":
             return (x - self.param_a) / self.param_b
-        if x <= 0:
-            raise SolverError("nataf_lognormal_nonpositive_x")
-        return (np.log(x) - self.param_a) / self.param_b
+        if self.kind == "lognormal":
+            if x <= 0:
+                raise SolverError("nataf_lognormal_nonpositive_x")
+            return (np.log(x) - self.param_a) / self.param_b
+        if self.kind == "weibull":
+            if x <= 0:
+                raise SolverError("nataf_weibull_nonpositive_x")
+            cdf = 1.0 - np.exp(-((x / self.param_b) ** self.param_a))
+            return _standard_normal_ppf(float(cdf))
+        # gumbel
+        cdf = np.exp(-np.exp(-(x - self.param_a) / self.param_b))
+        return _standard_normal_ppf(float(cdf))
 
     def from_standard_normal(self, z: float) -> float:
         """X = F⁻¹(Φ(z)) — standard normal → physical value."""
         if self.kind == "normal":
             return self.param_a + self.param_b * z
-        return float(np.exp(self.param_a + self.param_b * z))
+        if self.kind == "lognormal":
+            return float(np.exp(self.param_a + self.param_b * z))
+        p = _standard_normal_cdf(float(z))
+        p = min(max(p, 1e-15), 1.0 - 1e-15)
+        if self.kind == "weibull":
+            return float(self.param_b * (-np.log(1.0 - p)) ** (1.0 / self.param_a))
+        # gumbel
+        return float(self.param_a - self.param_b * np.log(-np.log(p)))
 
     def lognormal_zeta(self) -> float:
         return self.param_b
+
+    def moments(self) -> tuple[float, float]:
+        """(mean, std) of the marginal — used to standardise the Nataf integrand."""
+        if self.kind == "normal":
+            return self.param_a, self.param_b
+        if self.kind == "lognormal":
+            lam, zeta = self.param_a, self.param_b
+            mean = float(np.exp(lam + 0.5 * zeta * zeta))
+            std = float(mean * sqrt(np.exp(zeta * zeta) - 1.0))
+            return mean, std
+        if self.kind == "weibull":
+            from math import gamma
+
+            k, lam = self.param_a, self.param_b
+            mean = lam * gamma(1.0 + 1.0 / k)
+            var = lam * lam * (gamma(1.0 + 2.0 / k) - gamma(1.0 + 1.0 / k) ** 2)
+            return float(mean), float(sqrt(var))
+        # gumbel
+        mu, beta = self.param_a, self.param_b
+        return float(mu + beta * _EULER_GAMMA), float(beta * np.pi / sqrt(6.0))
 
 
 def _equivalent_normal_correlation(marginals: list[Marginal], rho_x: np.ndarray) -> np.ndarray:
@@ -606,3 +650,102 @@ def correlated_gaussian_reliability(
     marginals = [Marginal("normal", float(m), float(s)) for m, s in zip(mean, std, strict=True)]
     nataf = build_nataf(marginals, correlation)
     return form_hlrf(nataf.wrap_limit_state(limit_state_physical), n_vars=len(marginals), **form_kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Wave XX (v8, D053): general-marginal Nataf via Gauss-Hermite quadrature.
+#
+# D045's closed-form equivalent-correlation handled only normal/lognormal pairs.
+# For general marginals (Weibull, Gumbel, …) the equivalent normal correlation
+# ρ_z solves the Nataf integral
+#     ρ_x = E[η_i(Z_i) η_j(Z_j)],  (Z_i,Z_j) ~ bivariate-normal(ρ_z),
+# with η_k(z) = (F_k^{-1}(Φ(z)) − μ_k)/σ_k. We evaluate the expectation by 2-D
+# Gauss-Hermite quadrature and bisect on ρ_z. For lognormal–lognormal it
+# reproduces D045's closed form (the cross-check).
+# ---------------------------------------------------------------------------
+
+
+def nataf_correlation_gauss_hermite(
+    mi: Marginal,
+    mj: Marginal,
+    rho_x: float,
+    n_nodes: int = 24,
+    tol: float = 1e-10,
+    max_iter: int = 80,
+) -> float:
+    """Equivalent normal correlation ρ_z for marginals (mi, mj) at physical
+    correlation ρ_x, via the Gauss-Hermite Nataf integral + bisection."""
+    if not (-1.0 < rho_x < 1.0):
+        raise SolverError("nataf_integral_rho_out_of_range")
+    if rho_x == 0.0:
+        return 0.0
+    nodes, weights = np.polynomial.hermite.hermgauss(n_nodes)
+    z = np.sqrt(2.0) * nodes
+    w = weights / np.sqrt(np.pi)  # Σ w·f(z) ≈ E_φ[f]
+    mui, sigi = mi.moments()
+    muj, sigj = mj.moments()
+    eta_i = np.array([(mi.from_standard_normal(float(zz)) - mui) / sigi for zz in z])
+
+    def integral(rho: float) -> float:
+        s = np.sqrt(max(0.0, 1.0 - rho * rho))
+        total = 0.0
+        for a in range(z.size):
+            zj = rho * z[a] + s * z
+            etaj = np.array([(mj.from_standard_normal(float(v)) - muj) / sigj for v in zj])
+            total += w[a] * eta_i[a] * float(np.sum(w * etaj))
+        return total
+
+    # ρ_x→0 limit handled above; the integral is monotone increasing in ρ_z.
+    lo, hi = -0.999, 0.999
+    if (integral(lo) - rho_x) > 0 or (integral(hi) - rho_x) < 0:
+        raise SolverError("nataf_integral_infeasible_correlation")
+    for _ in range(max_iter):
+        mid = 0.5 * (lo + hi)
+        fm = integral(mid) - rho_x
+        if abs(fm) < tol or (hi - lo) < tol:
+            return float(mid)
+        if fm < 0:
+            lo = mid
+        else:
+            hi = mid
+    return float(0.5 * (lo + hi))
+
+
+def build_nataf_general(
+    marginals: list[Marginal],
+    correlation_x: np.ndarray | None = None,
+    n_nodes: int = 24,
+) -> NatafTransform:
+    """Construct a :class:`NatafTransform` for **general** marginals.
+
+    The equivalent normal correlation uses the closed form for normal–normal
+    pairs and the Gauss-Hermite Nataf integral
+    (:func:`nataf_correlation_gauss_hermite`) for every other pair (lognormal,
+    Weibull, Gumbel, mixed). Validity (positive-definiteness) is checked via
+    Cholesky.
+    """
+    n = len(marginals)
+    if n < 1:
+        raise SolverError("nataf_no_marginals")
+    rho = np.eye(n) if correlation_x is None else np.asarray(correlation_x, dtype=float)
+    if rho.shape != (n, n):
+        raise SolverError("nataf_correlation_shape_mismatch")
+    if not np.allclose(rho, rho.T, atol=1e-12):
+        raise SolverError("nataf_correlation_not_symmetric")
+    if not np.allclose(np.diag(rho), 1.0, atol=1e-12):
+        raise SolverError("nataf_correlation_not_unit_diagonal")
+    rz = np.eye(n)
+    for i in range(n):
+        for j in range(i + 1, n):
+            r = float(rho[i, j])
+            if r == 0.0:
+                continue
+            if marginals[i].kind == "normal" and marginals[j].kind == "normal":
+                rz[i, j] = rz[j, i] = r
+            else:
+                rz[i, j] = rz[j, i] = nataf_correlation_gauss_hermite(marginals[i], marginals[j], r, n_nodes)
+    try:
+        chol = np.linalg.cholesky(rz)
+    except np.linalg.LinAlgError as exc:
+        raise SolverError("nataf_correlation_not_positive_definite") from exc
+    return NatafTransform(marginals=marginals, correlation_x=rho, correlation_u=rz, chol=chol)

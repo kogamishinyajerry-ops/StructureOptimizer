@@ -1076,6 +1076,25 @@ res = gradient_seeded_multi_objective_to(config, mesh, n_generations=10, populat
 正反映梯度 SIMP 在单目标柔度上远胜梯度自由搜索。仍是双目标 smoke 网；≥3 目标 + 超体积-预算扫描
 是后续（见 D052）。
 
+### 18.4 一般 marginal Nataf（Gauss-Hermite，Wave XX，D053）
+
+v7（D045）的等效相关只有 normal/lognormal 闭式；v8 用 **Gauss-Hermite 积分**支持任意 marginal
+（新增 Weibull / Gumbel）：
+
+```python
+import numpy as np
+from structure_optimizer.core.reliability import (
+    Marginal, nataf_correlation_gauss_hermite, build_nataf_general)
+w, g = Marginal("weibull", 2.0, 3.0), Marginal("gumbel", 1.0, 0.5)
+rho_z = nataf_correlation_gauss_hermite(w, g, rho_x=0.6)   # 解 Nataf 积分
+nataf = build_nataf_general([w, g], np.array([[1, 0.6], [0.6, 1]]))   # 任意 marginal
+```
+
+**关键 / 诚实边界**：GH 积分对 lognormal-lognormal **复现闭式**到 3e-11（证明积分正确，
+Weibull/Gumbel 用同一积分，验证可迁移）；Weibull/Gumbel 矩与 round-trip 精确；ρ_x=0→0、单调。
+新增 normal/lognormal/Weibull/Gumbel 四种；更多 marginal（GEV 等）只是 `Marginal` 扩展。
+n_nodes=24 对这些光滑被积函数足够（闭式 cross-check 3e-11）。D045 闭式路径不变（见 D053）。
+
 ---
 
 ## 常见错误
