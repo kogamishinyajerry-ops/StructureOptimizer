@@ -1,0 +1,10 @@
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "rubric_version": "v7.0-wave-OO",
+  "kind": "tl_adjoint",
+  "n_load_steps": 3,
+  "sensitivity_sha256": "sha256:f2500c67d24df926ae10c48ba52e602215537cd932430417be6d280d9900de0d",
+  "compliance": 882.4849155696818,
+  "converged": true
+}

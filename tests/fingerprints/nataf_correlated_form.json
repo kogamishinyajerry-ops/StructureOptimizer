@@ -1,0 +1,42 @@
+{
+  "benchmark": "correlated_gaussian",
+  "rubric_version": "v7.0-wave-PP",
+  "kind": "nataf_correlated_form",
+  "mean": [
+    10.0,
+    8.0,
+    5.0
+  ],
+  "std": [
+    2.0,
+    1.5,
+    1.0
+  ],
+  "correlation": [
+    [
+      1.0,
+      0.5,
+      -0.3
+    ],
+    [
+      0.5,
+      1.0,
+      0.2
+    ],
+    [
+      -0.3,
+      0.2,
+      1.0
+    ]
+  ],
+  "a0": 40.0,
+  "a": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "mpp_sha256": "sha256:1398545ebaaafce17c5e6dfbaf6655b6c0b265f72a8c84a58386c07bd57f24ab",
+  "beta": 5.472493629827028,
+  "p_failure": 2.2187335746437498e-08,
+  "converged": true
+}

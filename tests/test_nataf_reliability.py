@@ -98,6 +98,24 @@ def test_identity_correlation_reduces_to_standardize():
     assert np.allclose(nataf.x_to_u(x), standardize_gaussian(x, mean, std), atol=1e-12)
 
 
+def test_property_nataf_roundtrip_preserves_x():
+    """Property: x → u → x is the identity for random correlated-Gaussian Natafs."""
+    rng = np.random.default_rng(2024)
+    for _ in range(25):
+        n = int(rng.integers(2, 5))
+        mean = rng.uniform(-5, 5, n)
+        std = rng.uniform(0.2, 3.0, n)
+        # build an SPD unit-diagonal correlation: normalise a random Gram matrix
+        a = rng.standard_normal((n, n))
+        cov = a @ a.T + n * np.eye(n)
+        d = np.sqrt(np.diag(cov))
+        corr = cov / np.outer(d, d)
+        m = [Marginal("normal", float(mu), float(s)) for mu, s in zip(mean, std, strict=True)]
+        nataf = build_nataf(m, corr)
+        x = mean + std * rng.standard_normal(n)
+        assert np.allclose(nataf.u_to_x(nataf.x_to_u(x)), x, atol=1e-9)
+
+
 def test_nataf_contracts():
     m = [Marginal("normal", 0.0, 1.0), Marginal("normal", 0.0, 1.0)]
     with pytest.raises(SolverError, match="shape_mismatch"):

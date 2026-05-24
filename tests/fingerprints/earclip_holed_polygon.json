@@ -1,0 +1,8 @@
+{
+  "benchmark": "L_shape_with_hole",
+  "rubric_version": "v7.0-wave-SS",
+  "kind": "earclip_polygon",
+  "vertices_sha256": "sha256:ac12df4d45445da1da41dac797addd72213347a5ef27ce7a578c6cdab7096e86",
+  "n_triangles": 10,
+  "cross_section_area": 60.0
+}

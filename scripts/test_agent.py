@@ -941,7 +941,7 @@ def check_v7_2_3_nsga3_density_field() -> tuple[int, str, str]:
 def check_v7_3_1_nataf() -> tuple[int, str, str]:
     """§3.1 Nataf transform for correlated Gaussians (4 pts)."""
     return _mod_and_test(
-        "structure_optimizer/core/reliability.py", r"def nataf|nataf_transform|correlation_matrix|cholesky.*correl",
+        "structure_optimizer/core/reliability.py", r"NatafTransform|build_nataf|correlated_gaussian_reliability|_equivalent_normal_correlation",
         r"nataf|correlated.*gaussian|correlation.*reliab", 4, "Nataf in module, no test", "Nataf transform + correlated mapping test")
 
 

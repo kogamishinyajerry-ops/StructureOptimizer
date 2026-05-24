@@ -97,6 +97,23 @@ def test_extruded_holed_prism_is_watertight_and_area_exact(tmp_path):
     assert info["cross_section_area"] == pytest.approx(84.0, abs=1e-12)
 
 
+def test_property_earclip_area_conservation():
+    """Property: ear clipping conserves area for random simple (convex) polygons."""
+    rng = np.random.default_rng(99)
+    for _ in range(25):
+        n = int(rng.integers(3, 9))
+        pts = rng.uniform(-5, 5, size=(n, 2))
+        # sort by angle about the centroid → a simple (convex) polygon
+        cen = pts.mean(axis=0)
+        order = np.argsort(np.arctan2(pts[:, 1] - cen[1], pts[:, 0] - cen[0]))
+        loop = [tuple(p) for p in pts[order]]
+        true_area = polygon_area([np.asarray(p, float) for p in loop])
+        if true_area < 1e-6:
+            continue
+        e_pts, tris = ear_clipping_triangulate(loop)
+        assert _tri_sum(e_pts, tris) == pytest.approx(true_area, abs=1e-12)
+
+
 def test_contracts(tmp_path):
     with pytest.raises(SolverError, match="degenerate_polygon"):
         ear_clipping_triangulate([(0.0, 0.0), (1.0, 1.0)])

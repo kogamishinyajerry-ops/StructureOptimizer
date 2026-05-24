@@ -263,6 +263,74 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         ]
         return pts, ("contour_sha256", rec["contour_sha256"]), checks
 
+    if kind == "tl_adjoint":
+        from structure_optimizer.core.nonlinear_simp import tl_adjoint_compliance_sensitivity
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        densities = np.full(mesh.elements.shape[0], 0.6)
+        r = tl_adjoint_compliance_sensitivity(config, mesh, densities, n_load_steps=rec["n_load_steps"])
+        checks = [
+            ("compliance", rec["compliance"], r.compliance),
+            ("converged", rec["converged"], r.converged),
+        ]
+        return np.asarray(r.sensitivity), ("sensitivity_sha256", rec["sensitivity_sha256"]), checks
+
+    if kind == "nataf_correlated_form":
+        from structure_optimizer.core.reliability import correlated_gaussian_reliability
+
+        a0, a = rec["a0"], np.asarray(rec["a"])
+        r = correlated_gaussian_reliability(rec["mean"], rec["std"], rec["correlation"], lambda x: a0 - a @ x)
+        checks = [
+            ("beta", rec["beta"], r.beta),
+            ("p_failure", rec["p_failure"], r.p_failure),
+            ("converged", rec["converged"], r.converged),
+        ]
+        return np.asarray(r.mpp), ("mpp_sha256", rec["mpp_sha256"]), checks
+
+    if kind == "dynamic_compliance":
+        from structure_optimizer.core.freq_response import dynamic_compliance_sensitivity
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        densities = np.full(mesh.elements.shape[0], 0.6)
+        r = dynamic_compliance_sensitivity(config, mesh, densities, omega=rec["omega"], alpha=rec["alpha"], beta=rec["beta"])
+        checks = [
+            ("objective", rec["objective"], r.objective),
+            ("c_real", rec["c_real"], r.dynamic_compliance.real),
+            ("c_imag", rec["c_imag"], r.dynamic_compliance.imag),
+        ]
+        return np.asarray(r.sensitivity), ("sensitivity_sha256", rec["sensitivity_sha256"]), checks
+
+    if kind == "anisotropic_thermal_field":
+        from structure_optimizer.core.thermal import orientation_field_to_tensors, solve_thermal
+        from structure_optimizer.core.thermal_simp import load_thermal_benchmark
+
+        config, k_scalar, sources, bcs = load_thermal_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        n_elem = mesh.elements.shape[0]
+        densities = np.full(n_elem, 1.0)
+        field = orientation_field_to_tensors(rec["kxx"], rec["kyy"], np.linspace(0.0, np.pi / 2, n_elem))
+        r = solve_thermal(config, mesh, densities, k_scalar, sources, bcs, conductivity_tensor_field=field)
+        checks = [
+            ("thermal_compliance", rec["thermal_compliance"], r.thermal_compliance),
+            ("max_temperature", rec["max_temperature"], r.max_temperature),
+        ]
+        return np.asarray(r.temperatures), ("temperatures_sha256", rec["temperatures_sha256"]), checks
+
+    if kind == "earclip_polygon":
+        from structure_optimizer.core.stl_export import _tri_area, triangulate_with_holes
+
+        outer = [(0.0, 0.0), (10.0, 0.0), (10.0, 4.0), (4.0, 4.0), (4.0, 10.0), (0.0, 10.0)]
+        hole = [(1.0, 1.0), (3.0, 1.0), (3.0, 3.0), (1.0, 3.0)]
+        pts, tris = triangulate_with_holes(outer, [hole])
+        area = sum(_tri_area(pts[i], pts[j], pts[k]) for i, j, k in tris)
+        checks = [
+            ("n_triangles", rec["n_triangles"], len(tris)),
+            ("cross_section_area", rec["cross_section_area"], area),
+        ]
+        return np.asarray(pts), ("vertices_sha256", rec["vertices_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -308,6 +376,12 @@ def test_multiphysics_fingerprint_set_present():
         "anisotropic_thermal_heat_sink__smoke",
         "form_linear_limit_state",
         "marching_squares_disk",
+        # v7 production drivers (Wave TT closure)
+        "tl_adjoint_cantilever__smoke",
+        "nataf_correlated_form",
+        "dynamic_compliance_cantilever__smoke",
+        "anisotropic_thermal_field_heat_sink__smoke",
+        "earclip_holed_polygon",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

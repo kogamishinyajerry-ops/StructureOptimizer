@@ -51,12 +51,12 @@ reopening criterion，不是数字追逐**。
 
 v7 完成 = `python scripts/test_agent.py --rubric v7` 报告：
 
-- [ ] v7 rubric total ≥ 99 / 100
-- [ ] v6 regression = False（v6 = 100）
-- [ ] v5 regression = False（v5 = 100）
-- [ ] v4 regression = False（v4 = 100）
-- [ ] **pytest gate green**（D033 — 0 failed / 0 errors）
-- [ ] 全红线保持
+- [x] v7 rubric total ≥ 99 / 100 — **100/100**
+- [x] v6 regression = False（v6 = 100）
+- [x] v5 regression = False（v5 = 100）
+- [x] v4 regression = False（v4 = 100）
+- [x] **pytest gate green**（D033 — 0 failed / 0 errors）
+- [x] 全红线保持
 
 ## 进度（wave 勾选）
 
@@ -67,7 +67,7 @@ v7 完成 = `python scripts/test_agent.py --rubric v7` 报告：
 - [x] QQ — NSGA-III 直接优化密度场（D046 · 6 tests green · 2D 超体积精确解析 + 累积存档超体积单调 + 真密度场柔度/体积 Pareto + 梯度自由前沿不支配梯度 SIMP）
 - [x] RR — 阻尼频响 TO（D047 · 5 tests green · 动柔度自伴随灵敏度 vs 中心差分 rel 1e-5 + 无阻尼退化实数 + 体积守恒下降使峰值幅值 2.60→0.97）
 - [x] SS — Ear-clipping 通用多边形 STL + 孔洞（D048 · 8 tests green · 凹/非 star-convex 面积守恒 1e-12 + 双孔 even-odd 72−8−4 + 挤出水密 + 形心扇区在 L 形给错 11 vs 真 7）
-- [ ] TT — v7 收口（rubric ≥ 99）
+- [x] TT — v7 收口（rubric 100/100 · D049 · demos + fingerprints 35 + CI + property 40 · v4/v5/v6 无回归 + pytest gate green）
 
 > 注：v7 需在 `docs/quality-rubric-v7.md` + `scripts/test_agent.py` 的 `CHECKS_V7` 落地
 > 评分项后才能 `--rubric v7` 打分（与 v6 同构：6 section / 100 分 / D033 gate / v4-v6 回归门）。

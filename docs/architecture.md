@@ -531,3 +531,41 @@ v6 把 v5 **有意简化**的 7 处公式升级为严格、可解析校验的 pr
   截面需 ear-clipping。
 - Reverse-mode AD 仅 + - * / ** neg 标量算子，未端到端微分 SIMP 目标。
 - 详见 D034-D040 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 17. v7 — production drivers & field-level fidelity
+
+v7 把 v6 的**严格正向求解器接入优化驱动器**，并把残留的"全局/均匀"简化提升到**逐单元
+场级保真**。每个 wave 都源自 v6（或 v5）ADR 明列的 "Reopening criteria"——§16.2 的限制
+由此逐条解除：
+
+| v6 限制（§16.2） | v7 driver / 升级 | 模块 | ADR | 定量锚点 |
+|---|---|---|---|---|
+| FORM 未接 TO 驱动器 | Reliability-based TO（FORM→SIMP 体积二分） | `core/rbto.py` | D042 | 线性极限态 β=(d_allow−d_nom)/(cov·d_nom) 解析 |
+| 张量热是 global k；各向异性热 TO 未接 | 逐单元各向异性热场 + 各向异性热 TO 灵敏度 | `core/thermal.py` / `thermal_simp.py` | D043 | uniform 场==global 1e-12 + 灵敏度 vs FD 1e-4 |
+| 完整 TL 仅正向 | 几何非线性 TO（完整 TL 伴随灵敏度） | `core/nonlinear_simp.py` | D044 | TL 伴随 vs 中心差分 rel 2e-4（自伴随线性极限） |
+| FORM 假设独立高斯 | Nataf 变换（相关 / 非高斯） | `core/reliability.py` | D045 | 相关高斯 β=(a₀−aᵀμ)/√(aᵀΣa) 1e-6 + 对数正态闭式 |
+| NSGA 仅 proxy / 后处理 | NSGA-III 直接优化密度场 | `core/multi_objective_to.py` | D046 | 2D 超体积解析 + 累积存档单调 + 不支配梯度 SIMP |
+| 阻尼频响仅正向 | 阻尼频响 TO（最小化动柔度） | `core/freq_response.py` | D047 | 动柔度自伴随灵敏度 vs FD 1e-5 + 削峰 |
+| caps 是 centroid-fan（仅 star-convex） | Ear-clipping 通用多边形 STL + 孔洞 | `core/stl_export.py` | D048 | 凹/双孔面积守恒 1e-12 + 挤出水密 |
+
+### 17.1 driver 层原则
+
+- **driver = 正向求解器 + 解析灵敏度 + 约束更新**。v7 的可验证贡献集中在**灵敏度正确性**
+  （全部 vs 中心差分或解析闭式），而非"造一个更强的优化器"——多处显式标注"这是灵敏度/
+  能力，不是生产级 MMA/OC 优化器"（如 D044/D047）。
+- **诚实优于吹嘘**：NSGA-III 密度场（D046）显式断言"梯度自由前沿不支配梯度 SIMP"，不假装
+  超越；TL/动态 driver 用紧凑投影梯度而非完整 MMA，并在 ADR 写明边界。
+- **向后兼容**：v7 全部 API 附加在 v6 之上（局部 import 复用 TL 内核、`solve_thermal` 场路径
+  默认 None、`write_stl_marching_squares` 不动）；v4/v5/v6 调用与 rubric 无回归。
+- **完成度门控**：`python scripts/test_agent.py --rubric v7` ≥99/100，v4/v5/v6 无回归 +
+  pytest gate green（D033）+ 全永久红线保持。
+
+### 17.2 v7 已知限制（诚实范围）
+
+- RBTO 的可靠性旋钮是**体积分数**（compliance-min 拓扑对载荷尺度不变）；非线性极限态 RBTO
+  是后续。
+- TL / 动态 TO driver 是**紧凑投影梯度**（无密度滤波，非 MMA/OC），验证灵敏度驱动目标下降。
+- Nataf 仅 normal / lognormal（有闭式等效相关）；混合相关直接拒绝；其余 marginal 需积分。
+- NSGA-III 密度场是**梯度自由**能力，前沿粗糙，不与梯度 SIMP 竞速。
+- Ear-clipping 是 O(n²) + 暴力可见性桥；`write_stl_marching_squares` 仍用 fan（凸 contour）。
+- 详见 D042-D048 各自 "Honest scope notes" + "Reopening criteria"。
