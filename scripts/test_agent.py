@@ -68,6 +68,7 @@ class Scorecard:
     v4_check: dict = field(default_factory=dict)
     v5_check: dict = field(default_factory=dict)
     v6_check: dict = field(default_factory=dict)
+    v7_check: dict = field(default_factory=dict)
     pytest_check: dict = field(default_factory=dict)
 
     @property
@@ -1339,6 +1340,225 @@ CHECKS_V7 = [
 ]
 
 
+# === v8 rubric (closing the loop: gradient drivers + general distributions) ===
+# Grep-based presence + quantitative-test checks (same pattern as CHECKS_V7).
+# Each maps to a v7 (or earlier) ADR reopening criterion; see docs/blueprint-v8.md.
+
+
+def check_v8_1_1_nonlinear_oc() -> tuple[int, str, str]:
+    """§1.1 geometric-nonlinear TO full OC loop (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/nonlinear_simp.py",
+        r"nonlinear_to_oc|geometric_nonlinear_optimize|tl_simp_optimize|def .*nonlinear.*optimize",
+        r"nonlinear.*oc|nonlinear.*loop|large_deformation.*topolog|nonlinear_to_optimize",
+        8, "nonlinear OC loop in module, no test", "nonlinear TO OC loop + large-deformation-vs-linear test")
+
+
+def check_v8_1_2_dynamic_oc() -> tuple[int, str, str]:
+    """§1.2 filtered dynamic-compliance TO loop (multi-ω) (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/freq_response.py",
+        r"dynamic_compliance_to|band_dynamic|multi_omega|def .*dynamic.*optimize",
+        r"dynamic.*to.*loop|band.*dynamic|multi_omega|dynamic_compliance_to",
+        8, "dynamic OC loop in module, no test", "filtered multi-ω dynamic-compliance TO loop + test")
+
+
+def check_v8_1_3_seeded_nsga3() -> tuple[int, str, str]:
+    """§1.3 gradient-seeded NSGA-III density field (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/multi_objective_to.py",
+        r"seed.*simp|warm_start|gradient_seed|seeded_pareto",
+        r"seed.*nsga|warm_start|gradient_seed|seeded.*hypervolume",
+        8, "seeded NSGA-III in module, no test", "gradient-seeded NSGA-III + HV-vs-budget test")
+
+
+def check_v8_2_1_general_nataf() -> tuple[int, str, str]:
+    """§2.1 general-marginal Nataf via Gauss-Hermite (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"gauss_hermite|nataf_integral|def .*weibull|def .*gumbel|equivalent_correlation_integral",
+        r"gauss_hermite|weibull|gumbel|nataf.*integral",
+        8, "general-marginal Nataf in module, no test", "Gauss-Hermite Nataf + Weibull/Gumbel test")
+
+
+def check_v8_2_2_system_reliability() -> tuple[int, str, str]:
+    """§2.2 system reliability (series/parallel, Ditlevsen bounds) (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"system_reliability|ditlevsen|series_system|parallel_system",
+        r"system_reliability|ditlevsen|series.*system|parallel.*system",
+        8, "system reliability in module, no test", "system reliability + Ditlevsen-bounds test")
+
+
+def check_v8_3_1_fibre_steering() -> tuple[int, str, str]:
+    """§3.1 fibre-steering thermal TO (orientation field optimisation) (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/thermal_simp.py",
+        r"fibre_steer|orientation_sensitivity|optimize_orientation|steer.*thermal",
+        r"fibre_steer|orientation.*sensitivity|steer.*thermal|orientation.*fd",
+        8, "fibre-steering in module, no test", "fibre-steering orientation sensitivity + FD test")
+
+
+def check_v8_3_2_ms_nesting() -> tuple[int, str, str]:
+    """§3.2 marching-squares nested-loop hole detection → ear-clipping caps (7 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/stl_export.py",
+        r"nested.*loop|detect.*hole|even_odd.*loop|classify_loops|write_stl_smooth_holes",
+        r"nested.*loop|ms.*hole|smooth.*hole|nesting.*stl",
+        7, "MS nesting in module, no test", "MS nested-loop detection + holed-STL area test")
+
+
+def check_v8_4_1_test_count_920() -> tuple[int, str, str]:
+    """§4.1 ≥ 920 tests (4 pts)."""
+    n = _pytest_collect_count()
+    return (4, "PASS", f"{n} tests collected") if n >= 920 else (0, "FAIL", f"{n} (need ≥920)")
+
+
+def check_v8_4_2_core_coverage_95() -> tuple[int, str, str]:
+    """§4.2 core coverage ≥ 95% incl. v8 (4 pts)."""
+    pct = _pytest_coverage("structure_optimizer/core")
+    return (4, "PASS", f"{pct}% coverage") if pct >= 95.0 else (0, "FAIL", f"{pct}% (need ≥95%)")
+
+
+def check_v8_4_3_property_tests_42() -> tuple[int, str, str]:
+    """§4.3 property tests ≥ 42 (3 pts)."""
+    n = _grep_count(r"^def test_property_", "tests/**/*.py")
+    return (3, "PASS", f"{n} property tests") if n >= 42 else (0, "FAIL", f"{n} (need ≥42)")
+
+
+def check_v8_4_4_mutation_75() -> tuple[int, str, str]:
+    """§4.4 mutation kill rate ≥ 75% (3 pts)."""
+    report = REPO_ROOT / "tests/mutation_report.json"
+    if not report.exists():
+        return 0, "FAIL", "mutation_report missing"
+    data = json.loads(report.read_text())
+    rate = data.get("aggregate_kill_rate", data.get("kill_rate", 0.0))
+    return (3, "PASS", f"{rate * 100:.1f}% kill rate") if rate >= 0.75 else (0, "FAIL", f"{rate * 100:.1f}%")
+
+
+def check_v8_4_5_fingerprints_40() -> tuple[int, str, str]:
+    """§4.5 fingerprint DB ≥ 40 (2 pts)."""
+    n = len(list((REPO_ROOT / "tests/fingerprints").glob("*.json")))
+    return (2, "PASS", f"{n} fingerprints") if n >= 40 else (0, "FAIL", f"{n} (need ≥40)")
+
+
+def check_v8_4_6_pytest_gate() -> tuple[int, str, str]:
+    """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
+    has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
+    has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
+    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+
+
+def check_v8_4_7_v8_in_agent_ci() -> tuple[int, str, str]:
+    """§4.7 v8 rubric referenced in agent + CI (2 pts)."""
+    me = (REPO_ROOT / "scripts/test_agent.py").read_text()
+    in_agent = "CHECKS_V8" in me
+    ci = REPO_ROOT / ".github/workflows/test.yml"
+    in_ci = ci.exists() and "v8" in ci.read_text().lower()
+    if in_agent and in_ci:
+        return 2, "PASS", "v8 in agent + CI"
+    if in_agent:
+        return 1, "PARTIAL", "v8 in agent, not CI"
+    return 0, "FAIL", "v8 not wired"
+
+
+def check_v8_5_1_nonlinear_dynamic_demo() -> tuple[int, str, str]:
+    """§5.1 nonlinear / dynamic OC-loop demo (3 pts)."""
+    n = _grep_count(r"nonlinear_oc_demo|dynamic_oc_demo|nonlinear_loop_demo|render.*nonlinear.*loop", "**/*.py")
+    return (3, "PASS", f"{n} nonlinear/dynamic-loop demo refs") if n >= 1 else (0, "FAIL", "no nonlinear/dynamic-loop demo")
+
+
+def check_v8_5_2_seeded_nsga_demo() -> tuple[int, str, str]:
+    """§5.2 seeded NSGA-III demo (3 pts)."""
+    n = _grep_count(r"seeded_nsga_demo|warm_start_demo|seeded.*pareto.*demo|render.*seeded", "**/*.py")
+    return (3, "PASS", f"{n} seeded-NSGA demo refs") if n >= 1 else (0, "FAIL", "no seeded-NSGA demo")
+
+
+def check_v8_5_3_reliability_demo() -> tuple[int, str, str]:
+    """§5.3 general-distribution / system-reliability demo (2 pts)."""
+    n = _grep_count(r"system_reliability_demo|general_marginal_demo|weibull_demo|ditlevsen_demo", "**/*.py")
+    return (2, "PASS", f"{n} reliability-demo refs") if n >= 1 else (0, "FAIL", "no reliability demo")
+
+
+def check_v8_5_4_geometry_demo() -> tuple[int, str, str]:
+    """§5.4 fibre-steering / holed-STL demo (2 pts)."""
+    n = _grep_count(r"fibre_steer_demo|holed_stl_demo|nesting_demo|orientation_demo", "**/*.py")
+    return (2, "PASS", f"{n} geometry-demo refs") if n >= 1 else (0, "FAIL", "no geometry demo")
+
+
+def check_v8_6_1_blueprint_v8() -> tuple[int, str, str]:
+    """§6.1 blueprint-v8 ≥6 wave ticks (3 pts)."""
+    p = REPO_ROOT / "docs/blueprint-v8.md"
+    if not p.exists():
+        return 0, "FAIL", "blueprint-v8.md missing"
+    ticks = p.read_text().count("[x]")
+    return (3, "PASS", f"{ticks} ticks") if ticks >= 6 else (0, "PARTIAL", f"{ticks} ticks (need ≥6)")
+
+
+def check_v8_6_2_tutorial_v8() -> tuple[int, str, str]:
+    """§6.2 tutorial v8 ≥4 new sections (3 pts)."""
+    p = REPO_ROOT / "docs/tutorial.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    n = len(re.findall(r"^### 18\.\d", p.read_text(), re.MULTILINE))
+    return (3, "PASS", f"{n} v8 subsections") if n >= 4 else (0, "PARTIAL", f"{n} (need ≥4)")
+
+
+def check_v8_6_3_arch_v8() -> tuple[int, str, str]:
+    """§6.3 architecture v8 section (3 pts)."""
+    p = REPO_ROOT / "docs/architecture.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    txt = p.read_text().lower()
+    return (3, "PASS", "v8 section present") if ("## 18." in p.read_text() and "loop" in txt) else (0, "FAIL", "no v8 section")
+
+
+def check_v8_6_4_adrs_v8() -> tuple[int, str, str]:
+    """§6.4 ADRs D050+ ≥ 7 (3 pts)."""
+    files = list((REPO_ROOT / "docs/decisions").glob("D05*.md"))
+    new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 50]
+    return (3, "PASS", f"{len(new_adrs)} v8 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+
+
+def check_v8_6_5_anchors_documented() -> tuple[int, str, str]:
+    """§6.5 v8 quantitative anchors present in tests (3 pts)."""
+    n = _grep_count(r"large_deformation|gauss_hermite|ditlevsen|fibre_steer|hypervolume.*budget|nested.*loop", "tests/**/*.py")
+    return (3, "PASS", f"{n} v8-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
+
+
+CHECKS_V8 = [
+    # §1 driver 闭环 (24 pts)
+    ("§1", "1.1", "几何非线性 TO 完整 OC 环", 8, check_v8_1_1_nonlinear_oc),
+    ("§1", "1.2", "滤波动态柔度 TO 环 (多频)", 8, check_v8_1_2_dynamic_oc),
+    ("§1", "1.3", "梯度种子 NSGA-III", 8, check_v8_1_3_seeded_nsga3),
+    # §2 不确定性 (16 pts)
+    ("§2", "2.1", "一般 marginal Nataf (Gauss-Hermite)", 8, check_v8_2_1_general_nataf),
+    ("§2", "2.2", "系统可靠性 (串/并联)", 8, check_v8_2_2_system_reliability),
+    # §3 几何 + 场 (15 pts)
+    ("§3", "3.1", "纤维转向热 TO", 8, check_v8_3_1_fibre_steering),
+    ("§3", "3.2", "MS 嵌套环 → ear-clipping 封顶", 7, check_v8_3_2_ms_nesting),
+    # §4 测试基础设施 (20 pts)
+    ("§4", "4.1", "Test count ≥ 920", 4, check_v8_4_1_test_count_920),
+    ("§4", "4.2", "Core coverage ≥ 95% (含 v8)", 4, check_v8_4_2_core_coverage_95),
+    ("§4", "4.3", "Property tests ≥ 42", 3, check_v8_4_3_property_tests_42),
+    ("§4", "4.4", "Mutation kill rate ≥ 75%", 3, check_v8_4_4_mutation_75),
+    ("§4", "4.5", "Fingerprint DB ≥ 40", 2, check_v8_4_5_fingerprints_40),
+    ("§4", "4.6", "pytest gate green (D033)", 2, check_v8_4_6_pytest_gate),
+    ("§4", "4.7", "v8 rubric 写入 agent + CI", 2, check_v8_4_7_v8_in_agent_ci),
+    # §5 用户面 demos (10 pts)
+    ("§5", "5.1", "非线性/动态 OC-loop demo", 3, check_v8_5_1_nonlinear_dynamic_demo),
+    ("§5", "5.2", "梯度种子 NSGA demo", 3, check_v8_5_2_seeded_nsga_demo),
+    ("§5", "5.3", "系统/一般分布可靠性 demo", 2, check_v8_5_3_reliability_demo),
+    ("§5", "5.4", "纤维转向/带孔 STL demo", 2, check_v8_5_4_geometry_demo),
+    # §6 文档 (15 pts)
+    ("§6", "6.1", "blueprint-v8 ≥6 ticks", 3, check_v8_6_1_blueprint_v8),
+    ("§6", "6.2", "tutorial v8 ≥4 new sections", 3, check_v8_6_2_tutorial_v8),
+    ("§6", "6.3", "architecture v8 section", 3, check_v8_6_3_arch_v8),
+    ("§6", "6.4", "ADRs D050+ ≥ 7", 3, check_v8_6_4_adrs_v8),
+    ("§6", "6.5", "v8 quantitative anchors documented", 3, check_v8_6_5_anchors_documented),
+]
+
+
 def _score(checks: list, section_filter: str | None = None) -> list[RubricItem]:
     items: list[RubricItem] = []
     for section, code, title, max_pts, fn in checks:
@@ -1384,9 +1604,16 @@ def run_v6(section_filter: str | None = None) -> Scorecard:
 
 
 def run_v7(section_filter: str | None = None) -> Scorecard:
-    """Score the v7 rubric in-process."""
+    """Score the v7 rubric in-process. Used for v8's no-regression gate."""
     sc = Scorecard(version="v7.0.0")
     sc.items = _score(CHECKS_V7, section_filter)
+    return sc
+
+
+def run_v8(section_filter: str | None = None) -> Scorecard:
+    """Score the v8 rubric in-process."""
+    sc = Scorecard(version="v8.0.0")
+    sc.items = _score(CHECKS_V8, section_filter)
     return sc
 
 
@@ -1397,6 +1624,16 @@ def check_v6_no_regression() -> dict:
         "score": sc_v6.total_earned,
         "max": sc_v6.total_max,
         "regression": sc_v6.total_earned < 100,
+    }
+
+
+def check_v7_no_regression() -> dict:
+    """v7 must remain 100/100 for a v8 release (true in-process re-score)."""
+    sc_v7 = run_v7()
+    return {
+        "score": sc_v7.total_earned,
+        "max": sc_v7.total_max,
+        "regression": sc_v7.total_earned < 100,
     }
 
 
@@ -1413,17 +1650,21 @@ def run_all(section_filter: str | None = None, rubric: str = "v5", run_pytest_ga
         sc = run_v5(section_filter)
     elif rubric == "v6":
         sc = run_v6(section_filter)
-    else:  # v7
+    elif rubric == "v7":
         sc = run_v7(section_filter)
+    else:  # v8
+        sc = run_v8(section_filter)
     sc.v1_check = check_v1_no_regression()
     sc.v2_check = check_v2_no_regression()
     sc.v3_check = check_v3_no_regression()
-    if rubric in ("v5", "v6", "v7"):
+    if rubric in ("v5", "v6", "v7", "v8"):
         sc.v4_check = check_v4_no_regression()
-    if rubric in ("v6", "v7"):
+    if rubric in ("v6", "v7", "v8"):
         sc.v5_check = check_v5_no_regression()
-    if rubric == "v7":
+    if rubric in ("v7", "v8"):
         sc.v6_check = check_v6_no_regression()
+    if rubric == "v8":
+        sc.v7_check = check_v7_no_regression()
     if run_pytest_gate:
         sc.pytest_check = check_pytest_green()
     return sc
@@ -1457,6 +1698,10 @@ def print_summary(sc: Scorecard) -> None:
         print(f"  v4 rubric  : {sc.v4_check.get('score')}/{sc.v4_check.get('max', 100)}  regression={sc.v4_check.get('regression')}")
     if sc.v5_check:
         print(f"  v5 rubric  : {sc.v5_check.get('score')}/{sc.v5_check.get('max', 100)}  regression={sc.v5_check.get('regression')}")
+    if sc.v6_check:
+        print(f"  v6 rubric  : {sc.v6_check.get('score')}/{sc.v6_check.get('max', 100)}  regression={sc.v6_check.get('regression')}")
+    if sc.v7_check:
+        print(f"  v7 rubric  : {sc.v7_check.get('score')}/{sc.v7_check.get('max', 100)}  regression={sc.v7_check.get('regression')}")
     if sc.pytest_check:
         pc = sc.pytest_check
         marker = "✓" if pc.get("green") else "✗"
@@ -1471,6 +1716,8 @@ def print_summary(sc: Scorecard) -> None:
         sc.v3_check.get("regression"),
         sc.v4_check.get("regression") if sc.v4_check else False,
         sc.v5_check.get("regression") if sc.v5_check else False,
+        sc.v6_check.get("regression") if sc.v6_check else False,
+        sc.v7_check.get("regression") if sc.v7_check else False,
         sc.pytest_check.get("regression") if sc.pytest_check else False,
     ]
     if sc.total_earned >= 99 and not any(regressions):
@@ -1488,9 +1735,9 @@ def main() -> int:
     parser.add_argument("--strict", action="store_true", help="exit 1 if total < 99 or any regression")
     parser.add_argument(
         "--rubric",
-        choices=["v4", "v5", "v6", "v7"],
+        choices=["v4", "v5", "v6", "v7", "v8"],
         default="v5",
-        help="which rubric to score (default v5; v4-v6 scorable for regression checks)",
+        help="which rubric to score (default v5; v4-v7 scorable for regression checks)",
     )
     parser.add_argument(
         "--output",
@@ -1527,6 +1774,8 @@ def main() -> int:
         payload["v5_check"] = sc.v5_check
     if sc.v6_check:
         payload["v6_check"] = sc.v6_check
+    if sc.v7_check:
+        payload["v7_check"] = sc.v7_check
     if sc.pytest_check:
         payload["pytest_check"] = sc.pytest_check
     out_path.write_text(json.dumps(payload, indent=2) + "\n")
@@ -1542,6 +1791,7 @@ def main() -> int:
                 sc.v4_check.get("regression") if sc.v4_check else False,
                 sc.v5_check.get("regression") if sc.v5_check else False,
                 sc.v6_check.get("regression") if sc.v6_check else False,
+                sc.v7_check.get("regression") if sc.v7_check else False,
                 sc.pytest_check.get("regression") if sc.pytest_check else False,
             ]
         )
