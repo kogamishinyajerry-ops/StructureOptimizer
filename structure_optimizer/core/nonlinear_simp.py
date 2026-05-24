@@ -443,3 +443,102 @@ def multi_constraint_mma(
         converged=converged,
         mesh_shape=(mesh.nelx, mesh.nely),
     )
+
+
+def qp_stress_constrained_mma(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    sigma_limit: float,
+    p: float = 8.0,
+    q: float = 2.5,
+    vf: float | None = None,
+    max_iter: int = 40,
+    change_tol: float = 1e-3,
+) -> MultiConstraintTOResult:
+    """Minimise compliance subject to a **qp-relaxed** p-norm von Mises stress
+    limit and a volume fraction, via MMA (Wave SSS, D074).
+
+    D066's reopening criterion: the raw-stress multi-constraint MMA suffers the
+    classical **stress singularity** (vanishing-density elements keep finite raw
+    stress → degenerate feasible spikes). This driver uses the qp-relaxed measure
+    ``σ̃_PN`` (:func:`core.stress.qp_relaxed_stress_pnorm_sensitivity`) so void
+    elements contribute vanishing stress and the constraint set is regular. The
+    two inequalities for :func:`core.mma.mma_step` are
+
+        ``g₁(x) = σ̃_PN(x) / σ_lim − 1 ≤ 0``   (relaxed stress)
+        ``g₂(x) = mean(x) − vf ≤ 0``          (volume)
+
+    The objective gradient is the standard SIMP compliance sensitivity; the stress
+    gradient is the qp-relaxed adjoint (explicit ``ρ^q`` term + implicit adjoint).
+    ``stress_history`` records the relaxed ``σ̃_PN``. Same structure as
+    :func:`multi_constraint_mma` (D066) with the relaxed sensitivity swapped in.
+    """
+    from structure_optimizer.core.fem2d import solve_linear_elastic
+    from structure_optimizer.core.mma import MMAState, mma_step
+    from structure_optimizer.core.stress import (
+        element_von_mises_stresses,
+        p_norm_stress,
+        qp_relaxed_stress_pnorm_sensitivity,
+    )
+
+    opt = config.optimization
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+    vf_target = float(opt.volume_fraction) if vf is None else float(vf)
+
+    rho = _default_initial_density(config, mesh)
+    x = rho[design].astype(float).copy()
+    xmin = np.full(n_design, opt.min_density)
+    xmax = np.ones(n_design)
+    state = MMAState()
+
+    compliance_history: list[float] = []
+    volume_history: list[float] = []
+    stress_history: list[float] = []
+    converged = False
+
+    def _relaxed_pn(rho_v: np.ndarray) -> float:
+        res = solve_linear_elastic(config, mesh, rho_v)
+        raw = element_von_mises_stresses(config, mesh, res.displacements)
+        return p_norm_stress(np.power(np.clip(rho_v, 0.0, None), q) * raw, p)
+
+    for _ in range(max_iter):
+        rho[design] = x
+        rho = _apply_density_masks(config, mesh, rho)
+        res = solve_linear_elastic(config, mesh, rho)
+        active = np.where(mesh.void_mask, opt.min_density, rho)
+        dscale = opt.penalty * np.where(mesh.void_mask, 0.0, active ** (opt.penalty - 1.0)) * (1.0 - opt.min_density)
+        dc = -dscale * res.element_strain_energy
+        sens_c = density_filter(mesh, rho, dc, opt.filter_radius, opt.min_density)
+        sigma_pn, dspn = qp_relaxed_stress_pnorm_sensitivity(config, mesh, rho, p=p, q=q)
+        sens_s = density_filter(mesh, rho, dspn, opt.filter_radius, opt.min_density)
+
+        compliance_history.append(res.compliance)
+        volume_history.append(float(np.sum(rho[design]) / n_design))
+        stress_history.append(sigma_pn)
+
+        df0dx = sens_c[design]
+        fval = np.array([sigma_pn / sigma_limit - 1.0, float(np.mean(x) - vf_target)])
+        dfdx = np.vstack([sens_s[design] / sigma_limit, np.full(n_design, 1.0 / n_design)])
+        x_new, _lmbda = mma_step(x, df0dx, fval, dfdx, xmin, xmax, state)
+        change = float(np.max(np.abs(x_new - x)))
+        x = x_new
+        if change < change_tol:
+            converged = True
+            break
+
+    rho[design] = x
+    rho = _apply_density_masks(config, mesh, rho)
+    res = solve_linear_elastic(config, mesh, rho)
+    compliance_history.append(res.compliance)
+    volume_history.append(float(np.sum(rho[design]) / n_design))
+    stress_history.append(_relaxed_pn(rho))
+    return MultiConstraintTOResult(
+        densities=rho,
+        compliance_history=compliance_history,
+        volume_history=volume_history,
+        stress_history=stress_history,
+        sigma_limit=float(sigma_limit),
+        converged=converged,
+        mesh_shape=(mesh.nelx, mesh.nely),
+    )

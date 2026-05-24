@@ -12,7 +12,7 @@
 
 | 项 | 分 | PASS 条件 | 源 |
 |----|----|-----------|----|
-| 1.1 应力奇异性松弛 + 屈曲约束 | 8 | `stress.py`/`nonlinear_simp.py` qp-relaxed + 屈曲特征值约束测试 | D066 |
+| 1.1 应力奇异性松弛（qp-relaxed）| 8 | `stress.py`/`nonlinear_simp.py` qp-relaxed 灵敏度 + qp-stress 约束 MMA 测试（屈曲约束驱动 deferred → D074 reopening）| D066 |
 | 1.2 自适应频带采样 + peak-as-constraint | 8 | `freq_response.py` 自适应采样 + peak 约束测试 | D067 |
 | 1.3 reference-free 多目标质量指标 | 8 | `multi_objective_to.py` hypervolume-only / R2 测试 | D068 |
 

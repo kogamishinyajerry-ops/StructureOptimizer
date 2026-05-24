@@ -1456,6 +1456,39 @@ quad 条带拓扑**构造即边流形**（每根 rung 被 2 个 cap 三角共享
 
 ---
 
+## 21. v11 — exact & robust：应力奇异性松弛 + 一般 copula + 精确系统积分 + 约束 Delaunay
+
+### 21.1 qp-relaxed 应力：消除应力奇异性（Wave SSS，D074）
+
+D066 的多约束 MMA 用**原始** von Mises p-norm 应力——它不处理经典的**应力奇异性**：当 ρ_e→0 时材料应力
+σ_vm,e(u) 仍**有限**（只依赖状态 u，不依赖 ρ），于是可行域在孔洞角落长出梯度法逃不出的细尖刺。D066 的第一条
+reopening 就是 **qp-relaxed / ε-relaxed 应力**。SSS 落地标准的 **qp 松弛**（Bruggi）：约束应力换成
+`σ̃_e = ρ_e^q · σ_vm,e(u)`，松弛指数 `q < p_simp`，使低密度单元贡献**趋零**应力，尖刺消失。
+
+```python
+from structure_optimizer.core.stress import qp_relaxed_stress_pnorm_sensitivity
+from structure_optimizer.core.nonlinear_simp import qp_stress_constrained_mma
+
+# 灵敏度：显式 ρ^q 项 + 隐式 adjoint（合起来 vs central-FD ≤1e-4）
+sigma_pn, dsdrho = qp_relaxed_stress_pnorm_sensitivity(config, mesh, densities, p=8.0, q=2.5)
+
+# 最小柔度 s.t. 松弛应力 ≤ 限值 且 体积 ≤ vf（双约束 MMA）
+r = qp_stress_constrained_mma(config, mesh, sigma_limit=lim, p=8.0, q=2.5, vf=vf, max_iter=120)
+# r.stress_history 记录松弛 σ̃_PN；r.densities / volume_history / converged
+```
+
+聚合量 `σ̃_PN = (Σ_e (ρ_e^q·σ_e)^p)^(1/p)`。因为 `σ̃_e` 同时含**显式** ρ^q 因子和**隐式**状态依赖，总导数干净拆成
+显式项 `w_e·q·ρ_e^(q−1)·σ_e` + 隐式 adjoint 项 `−dscale_e·(λₑᵀkₑuₑ)`（`w_e=(σ̃_e/σ̃_PN)^(p−1)`，`Kλ=∂σ̃_PN/∂u`）。
+显式项正是 D066 纯隐式 adjoint 所没有的部分——所以测试锚点 1 专门用 central-FD 验证它（≈1e-7）。
+
+**关键 / 诚实边界**：qp 灵敏度 vs central-FD ≤1e-4（验证显式项）+ 松弛按 ρ^q 抑制奇异性（ρ≈0.2 → ρ^2.5≈0.018，>50×
+抑制）+ qp 约束 MMA 双约束同时生效（探针 120 迭代：基线 σ̃_PN 2321 → 约束 1625.2 ≤ 限 1625.0，体积守 0.450）。
+**屈曲约束驱动 deferred**：仓内 `buckling_sensitivity`（v4）是**分析级非设计级**——忽略 ∂u/∂ρ + 无 void-mode 松弛；
+探针显示定容 λ_crit ascent **反而**把 λ_crit 从 20.1 拉到 8.1（灵敏度指错方向），所以 SSS 重新限定为**仅 qp 应力**，
+屈曲驱动连同探针证据移入 D074 reopening（绝不谎称屈曲可用）。松弛指数 q=2.5/p=8 非自调；底层仍是 `_approx_` 单元中心应力。
+
+---
+
 ## 常见错误
 
 | 现象 | 原因 | 解决 |

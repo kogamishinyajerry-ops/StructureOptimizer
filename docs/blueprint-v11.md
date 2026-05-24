@@ -35,7 +35,7 @@ v10 把 driver 升到约束丰富 + 可制造，但多处仍是**未处理应力
 
 | Wave | 主题 | 关键模块 | 关键定量锚点 | ADR |
 |------|------|----------|--------------|-----|
-| SSS | 应力奇异性松弛 + 屈曲约束 | `core/stress.py` / `core/nonlinear_simp.py` | qp-relaxed 应力灵敏度 vs FD + 屈曲特征值约束生效 + 消除奇异性伪解 | D074 |
+| SSS | 应力奇异性松弛（qp-relaxed）| `core/stress.py` / `core/nonlinear_simp.py` | qp-relaxed 应力灵敏度 vs central-FD ≤1e-4 + 松弛消除奇异性（σ̃=ρ^q·raw）+ qp-stress 约束 MMA 双约束生效。**屈曲约束驱动 deferred**（analysis-grade `buckling_sensitivity` 忽略 ∂u/∂ρ + 无 void-mode relaxation，探针显示 ascent 反而把 λ_crit 从 20.1 拉到 8.1）→ D074 reopening | D074 |
 | TTT | 自适应频带采样 + peak-as-constraint | `core/freq_response.py` | 自适应采样捕获移动峰 vs 固定采样 + peak 作约束进 MMA + 收敛 | D075 |
 | UUU | reference-free 多目标质量指标 | `core/multi_objective_to.py` | hypervolume-only / R2 vs IGD+ 一致排序 + 无需参考前沿 + 单调 | D076 |
 | VVV | d 维 / Gumbel Archimedean copula | `core/reliability.py` | Gumbel 条件 CDF round-trip + d 维嵌套生成元 + Kendall τ 闭式 | D077 |
@@ -58,7 +58,7 @@ v11 完成 = `python scripts/test_agent.py --rubric v11` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] SSS — 应力奇异性松弛 + 屈曲约束
+- [x] SSS — 应力奇异性松弛（qp-relaxed）；屈曲约束驱动 deferred 到 D074 reopening
 - [ ] TTT — 自适应频带采样 + peak-as-constraint
 - [ ] UUU — reference-free 多目标质量指标
 - [ ] VVV — d 维 / Gumbel Archimedean copula

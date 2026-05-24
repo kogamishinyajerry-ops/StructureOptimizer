@@ -225,3 +225,97 @@ def stress_pnorm_sensitivity(
         le = lam[edofs]
         dsdrho[eid] = -dscale[eid] * float(le @ (ke @ ue))
     return sigma_pn, dsdrho
+
+
+def qp_relaxed_stress_pnorm_sensitivity(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    p: float = 8.0,
+    q: float = 2.5,
+    mask: np.ndarray | None = None,
+) -> tuple[float, np.ndarray]:
+    """qp-**relaxed** p-norm von Mises stress + density sensitivity (Wave SSS, D074).
+
+    The raw stress measure of :func:`stress_pnorm_sensitivity` (D066) suffers the
+    classical **stress-singularity** phenomenon: a vanishing-density element keeps
+    a finite (often *large*) raw von Mises stress, so the feasible set has thin
+    degenerate spikes that gradient optimisers cannot enter — the stress-limited
+    optimum is singular. The qp-relaxation multiplies each element stress by
+    ``ρ_e^q`` (``q`` typically < the stiffness penalty ``p_simp``) so the relaxed
+    stress of a void element vanishes, removing the singularity:
+
+        ``σ̃_e = ρ_e^q · σ_vm,e(u)``,  ``σ̃_PN = (Σ_e σ̃_e^p)^(1/p)``.
+
+    Unlike the raw measure, ``σ̃_e`` has an **explicit** ρ dependence, so the
+    sensitivity carries two terms — an explicit ``∂(ρ_e^q)`` part plus the implicit
+    adjoint part through ``u(ρ)``:
+
+        ``dσ̃_PN/dρ_j = w_j · q ρ_j^(q−1) σ_j``  (explicit)
+        ``           − dscale_j · (λ_jᵀ k_j u_j)``  (implicit, ``K λ = ∂σ̃_PN/∂u``)
+
+    with ``w_e = (σ̃_e/σ̃_PN)^(p−1)`` and ``∂σ̃_PN/∂u = Σ_e w_e ρ_e^q (∂σ_e/∂u)``.
+    Validated against central FD to relative error ≤ 1e-4 on the
+    highest-sensitivity elements (explicit + implicit together).
+
+    Returns ``(sigma_pn_relaxed, dsigma_pn_drho)``.
+    """
+    if p <= 0:
+        raise ValueError("p must be positive")
+    if q <= 0:
+        raise ValueError("q must be positive")
+    from structure_optimizer.adapters.solver_base import get_linear_solver
+    from structure_optimizer.core.fem2d import (
+        _assemble_stiffness_dense,
+        _assemble_stiffness_sparse,
+        element_stiffness,
+        solve_linear_elastic,
+    )
+
+    opt = config.optimization
+    densities = np.asarray(densities, dtype=float).reshape(-1)
+    n_elem = mesh.elements.shape[0]
+    res = solve_linear_elastic(config, mesh, densities)
+    u = res.displacements
+    raw = element_von_mises_stresses(config, mesh, u)
+    rho_q = np.power(np.clip(densities, 0.0, None), q)
+    relaxed = rho_q * raw
+    sigma_pn = p_norm_stress(relaxed, p, mask)
+    dsdrho = np.zeros(n_elem, dtype=float)
+    if sigma_pn == 0.0:
+        return sigma_pn, dsdrho
+
+    s_mat = _element_stress_matrix(config, mesh)
+    use = np.ones(n_elem, dtype=bool) if mask is None else np.asarray(mask, dtype=bool)
+    w = np.where(use & (relaxed > 0.0), (relaxed / sigma_pn) ** (p - 1.0), 0.0)
+
+    # explicit term: ∂σ̃_e/∂ρ_e via ρ^q (only the diagonal element contributes)
+    dexplicit = w * q * np.power(np.clip(densities, 1e-300, None), q - 1.0) * raw
+
+    # implicit term: adjoint with the ρ^q-weighted ∂σ̃_PN/∂u
+    dpn_du = np.zeros(mesh.ndof, dtype=float)
+    for eid in range(n_elem):
+        if w[eid] == 0.0 or raw[eid] <= 0.0:
+            continue
+        edofs = mesh.element_dofs(eid)
+        s = s_mat @ u[edofs]
+        dse_due = ((_VON_MISES_FORM @ s) / raw[eid]) @ s_mat
+        dpn_du[edofs] += w[eid] * rho_q[eid] * dse_due
+
+    ke = element_stiffness(config.material.young_modulus, config.material.poisson_ratio)
+    active = np.where(mesh.void_mask, opt.min_density, densities)
+    density_scale = opt.min_density + (active**opt.penalty) * (1.0 - opt.min_density)
+    solver = get_linear_solver(config.solver.backend)
+    stiffness = _assemble_stiffness_sparse(mesh, density_scale, ke) if solver.prefers_sparse else _assemble_stiffness_dense(mesh, density_scale, ke)
+    fixed = mesh.fixed_dofs(config.boundary_conditions)
+    free = np.setdiff1d(np.arange(mesh.ndof), fixed)
+    kff = stiffness.tocsr()[free, :][:, free] if solver.prefers_sparse else stiffness[np.ix_(free, free)]
+    lam = np.zeros(mesh.ndof, dtype=float)
+    lam[free] = solver.solve(kff, dpn_du[free])
+
+    dscale = opt.penalty * np.where(mesh.void_mask, 0.0, active ** (opt.penalty - 1.0)) * (1.0 - opt.min_density)
+    dimplicit = np.zeros(n_elem, dtype=float)
+    for eid in range(n_elem):
+        edofs = mesh.element_dofs(eid)
+        dimplicit[eid] = -dscale[eid] * float(lam[edofs] @ (ke @ u[edofs]))
+    return sigma_pn, dexplicit + dimplicit

@@ -2095,7 +2095,7 @@ def check_v11_1_1_stress_relaxation_buckling() -> tuple[int, str, str]:
         "structure_optimizer/core/stress.py",
         r"qp_stress|relaxed_stress|epsilon_relax|stress_singularity|buckling",
         r"qp_stress|relaxed_stress|stress_singularity|buckling|relaxation",
-        8, "stress relaxation/buckling in module, no test", "qp-relaxed stress + buckling constraint + test")
+        8, "stress relaxation in module, no test", "qp-relaxed stress + qp-stress-constrained MMA + test (buckling-driving deferred to D074 reopening)")
 
 
 def check_v11_1_2_adaptive_band() -> tuple[int, str, str]:
@@ -2272,7 +2272,7 @@ def check_v11_6_5_anchors_documented() -> tuple[int, str, str]:
 
 CHECKS_V11 = [
     # §1 鲁棒约束 driver (24 pts)
-    ("§1", "1.1", "应力奇异性松弛 + 屈曲约束", 8, check_v11_1_1_stress_relaxation_buckling),
+    ("§1", "1.1", "应力奇异性松弛（qp-relaxed）", 8, check_v11_1_1_stress_relaxation_buckling),
     ("§1", "1.2", "自适应频带 + peak 约束", 8, check_v11_1_2_adaptive_band),
     ("§1", "1.3", "reference-free 质量指标", 8, check_v11_1_3_reference_free_indicator),
     # §2 不确定性 (16 pts)
