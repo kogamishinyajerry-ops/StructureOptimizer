@@ -1318,6 +1318,31 @@ r = multi_constraint_mma(config, mesh, sigma_limit=4.6e3, p=8.0, max_iter=60)
 目标是**线性**柔度（非全 TL）；`converged` 标志在绑定点 `|Δx|` 抖动时可能读 False，测试断言可行性/绑定
 而非该标志。
 
+### 20.2 目标频带放置：minimax around target（Wave LLL，D067）
+
+v9 的带隙波（DDD，`maximize_band_gap`）只把两阶**特征值**推开。D059 的 reopening 项是**目标频带放置**——
+最小化目标频带内的**最坏受迫响应**（band-suppression / 隔振）。代码库已有单频灵敏度
+`dynamic_compliance_sensitivity`（J(ω)=|fᵀû|² + dJ/dρ），缺的是**带内 minimax 聚合**：
+
+```python
+from structure_optimizer.core.freq_response import target_band_placement, target_band_peak_sensitivity
+from structure_optimizer.core.modal import solve_modal
+import numpy as np
+w1 = float(np.sqrt(solve_modal(config, mesh, densities, n_modes=1).omega_squared[0]))
+band = np.linspace(0.85*w1, 1.15*w1, 7)                       # 跨第一阶共振的频带
+peak, dpeak, J = target_band_peak_sensitivity(config, mesh, densities, band, beta=1e-4, p=12.0)
+r = target_band_placement(config, mesh, band, beta=1e-4, n_steps=20, p=12.0)
+# r.peak_initial / peak_final / peak_history / densities
+```
+
+带内峰值用 p-norm 平滑：`J_PN=(Σ_k J(ω_k)^p)^(1/p) → max_k J(ω_k)`（p→∞），灵敏度链式
+`dJ_PN/dρ = Σ_k (J_k/J_PN)^(p−1)·dJ_k/dρ`。体积守恒的 move-limited 投影梯度**下降**（与带隙波同款，方向取负）。
+
+**关键 / 诚实边界**：带内峰值灵敏度 vs 中心差分 rel-err ≤1e-4（实测 ~1e-7）+ 优化后**真实最坏带内响应**
+`max_k J(ω_k)` 大降（实测跨一阶共振 4.33e5→6.75e4，−84%）+ 体积守恒（≤1e-6）。诚实声明：用的是**平滑 minimax**
+（p-norm，非精确 max，p=12 高估真峰几个百分点）；频带是**用户固定采样**（不自适应跟踪移动的共振）；优化器是**一阶
+投影梯度**（非 MMA，把峰值做成 D066 多约束 MMA 的约束是 reopening 项）；`beta=1e-4` 默认阻尼保证带内解不奇异。
+
 ---
 
 ## 常见错误

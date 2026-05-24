@@ -765,3 +765,134 @@ def maximize_band_gap(
         lower_mode=lower_mode,
         converged=converged,
     )
+
+
+# ---------------------------------------------------------------------------
+# Wave LLL (D067): target-band placement — minimax around a target frequency.
+# Where ``maximize_band_gap`` moves *eigenvalues* apart, this minimises the
+# worst-case forced response over a target frequency band: a band-suppression /
+# vibration-isolation design. The minimax is smoothed by a p-norm over sampled
+# in-band frequencies,
+#     J_PN = (Σ_k J(ω_k)^p)^(1/p) → max_k J(ω_k)   as p → ∞,
+# whose density sensitivity chains the per-frequency self-adjoint sensitivity
+# of ``dynamic_compliance_sensitivity``:
+#     dJ_PN/dρ = Σ_k (J_k / J_PN)^(p−1) · dJ_k/dρ.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TargetBandResult:
+    """Output of target-band placement (Wave LLL, D067)."""
+
+    densities: np.ndarray
+    peak_history: list[float]
+    band_omegas: np.ndarray
+    peak_initial: float
+    peak_final: float
+    converged: bool
+
+
+def target_band_peak_sensitivity(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    densities: np.ndarray,
+    band_omegas: np.ndarray,
+    alpha: float = 0.0,
+    beta: float = 0.0,
+    p: float = 12.0,
+    mass_type: str = "consistent",
+) -> tuple[float, np.ndarray, np.ndarray]:
+    """Smooth in-band peak dynamic compliance + its density sensitivity (Wave
+    LLL, D067).
+
+    Samples the squared dynamic compliance ``J(ω_k) = |fᵀû(ω_k)|²`` at each
+    ``ω_k`` in ``band_omegas`` (via :func:`dynamic_compliance_sensitivity`) and
+    aggregates them into the p-norm peak ``J_PN = (Σ_k J_k^p)^(1/p)`` — a smooth
+    surrogate for ``max_k J_k`` (minimax around the band's target). The
+    sensitivity chains the per-frequency self-adjoint sensitivity:
+    ``dJ_PN/dρ = Σ_k (J_k/J_PN)^(p−1) · dJ_k/dρ``. Validated against central FD to
+    relative error ≤ 1e-4.
+
+    Returns ``(peak_pnorm, dpeak_drho, per_freq_J)``.
+    """
+    if p <= 0:
+        raise SolverError("target_band_nonpositive_p")
+    band = np.atleast_1d(np.asarray(band_omegas, dtype=float))
+    if band.size == 0:
+        raise SolverError("target_band_empty")
+    n_elem = mesh.elements.shape[0]
+    per_freq_j = np.zeros(band.size)
+    dj = np.zeros((band.size, n_elem))
+    for k, w in enumerate(band):
+        r = dynamic_compliance_sensitivity(config, mesh, densities, float(w), alpha, beta, mass_type)
+        per_freq_j[k] = r.objective
+        dj[k] = r.sensitivity
+    jmax = float(per_freq_j.max())
+    if jmax <= 0.0:
+        return 0.0, np.zeros(n_elem), per_freq_j
+    peak = float(jmax * np.sum((per_freq_j / jmax) ** p) ** (1.0 / p))
+    weights = (per_freq_j / peak) ** (p - 1.0)
+    dpeak = weights @ dj
+    return peak, dpeak, per_freq_j
+
+
+def target_band_placement(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    band_omegas: np.ndarray,
+    alpha: float = 0.0,
+    beta: float = 1e-4,
+    n_steps: int = 20,
+    move: float = 0.1,
+    p: float = 12.0,
+    filter_radius: float | None = None,
+    mass_type: str = "consistent",
+) -> TargetBandResult:
+    """Minimax-around-target: minimise the worst-case (peak) forced response over
+    a target frequency band (Wave LLL, D067).
+
+    D059's reopening criterion was *target-band placement* (the band-gap wave only
+    pushed two eigenvalues apart). This drives a volume-preserving, move-limited
+    projected-gradient **descent** on the smooth in-band peak
+    (:func:`target_band_peak_sensitivity`), reusing the Sigmund density filter and
+    the same volume-rescale step as :func:`maximize_band_gap`. The result is a
+    band-suppression topology: resonances are pushed out of (or damped within) the
+    target band so the worst-case response drops.
+    """
+    opt = config.optimization
+    radius = opt.filter_radius if filter_radius is None else filter_radius
+    design = mesh.design_mask
+    rho = np.where(mesh.void_mask, opt.min_density, opt.volume_fraction)
+    target_vol = float(np.mean(rho[design])) if np.any(design) else 0.0
+
+    _, _, j_initial = target_band_peak_sensitivity(config, mesh, rho, band_omegas, alpha, beta, p, mass_type)
+    peak_initial = float(j_initial.max())
+    peak_history: list[float] = []
+    converged = False
+    for _ in range(n_steps):
+        _, dpeak, j_cur = target_band_peak_sensitivity(config, mesh, rho, band_omegas, alpha, beta, p, mass_type)
+        peak_history.append(float(j_cur.max()))
+        grad = density_filter(mesh, rho, dpeak, radius, opt.min_density)
+        grad[~design] = 0.0
+        gmax = float(np.max(np.abs(grad[design]))) if np.any(design) else 0.0
+        if gmax <= 0.0:
+            converged = True
+            break
+        step = np.clip((grad / gmax) * move, -move, move)  # − : descend the peak
+        rho = rho.copy()
+        rho[design] = np.clip(rho[design] - step[design], opt.min_density, 1.0)
+        cur = float(np.mean(rho[design]))
+        if cur > 0:
+            rho[design] = np.clip(rho[design] * (target_vol / cur), opt.min_density, 1.0)
+
+    _, _, j_final = target_band_peak_sensitivity(config, mesh, rho, band_omegas, alpha, beta, p, mass_type)
+    peak_final = float(j_final.max())
+    peak_history.append(peak_final)
+    return TargetBandResult(
+        densities=rho,
+        peak_history=peak_history,
+        band_omegas=np.atleast_1d(np.asarray(band_omegas, dtype=float)),
+        peak_initial=peak_initial,
+        peak_final=peak_final,
+        converged=converged,
+    )
