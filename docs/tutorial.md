@@ -912,6 +912,37 @@ out = tl_adjoint_compliance_sensitivity(config, mesh, rho, n_load_steps=4)
 本 wave 交付的是**灵敏度**（可验证的难点），把它喂进 `_optimality_criteria_update` 即得
 完整 TL-in-the-loop 优化器——后者更慢且不增新解析锚点，故推迟（见 D044 reopening）。
 
+### 17.4 相关 / 非高斯不确定性的 Nataf 变换（Wave PP，D045）
+
+v6（D038）的 FORM/SORM 假设物理变量是**独立高斯**。v7 用 **Nataf 变换**把"相关 +
+非高斯"映射到独立标准正态 U，从而沿用同一套 HL-RF。对线性极限态 g(x)=a₀−aᵀx、
+X~N(μ,Σ)，精确闭式 β=(a₀−aᵀμ)/√(aᵀΣa)：
+
+```python
+import numpy as np
+from structure_optimizer.core.reliability import correlated_gaussian_reliability
+
+mean = np.array([10.0, 8.0, 5.0]); std = np.array([2.0, 1.5, 1.0])
+corr = np.array([[1, 0.5, -0.3], [0.5, 1, 0.2], [-0.3, 0.2, 1]], float)
+a0, a = 40.0, np.array([1.0, 1.0, 1.0])
+res = correlated_gaussian_reliability(mean, std, corr, lambda x: a0 - a @ x)
+# res.beta == (a0 - a@mean)/sqrt(a @ (diag(std)@corr@diag(std)) @ a)
+```
+
+非高斯走 `Marginal` + `build_nataf`：支持 **normal / lognormal**（两者等效正态相关有
+**闭式**修正 ρ_z = ln(1+ρ_x·c)/(ζ_iζ_j)，故每个相关情形都有解析锚点）。
+
+```python
+from structure_optimizer.core.reliability import Marginal, build_nataf
+m = [Marginal("lognormal", 1.0, 0.3), Marginal("lognormal", 0.5, 0.4)]
+nataf = build_nataf(m, np.array([[1.0, 0.6], [0.6, 1.0]]))
+g_u = nataf.wrap_limit_state(lambda x: 5.0 - x.sum())   # 喂给 form_hlrf
+```
+
+**诚实边界**：仅 normal/lognormal（有闭式等效相关，可解析验证）；**混合** normal/lognormal
+且相关≠0 直接**拒绝**（无闭式，不静默近似）；其余 marginal（Weibull/Gumbel）需 Nataf
+积分，推迟（见 D045 reopening）。独立情形精确退化为 `standardize_gaussian`。
+
 ---
 
 ## 常见错误

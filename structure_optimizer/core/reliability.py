@@ -410,3 +410,199 @@ def importance_sampling(
 reliability_index = form_hlrf
 first_order_reliability = form_hlrf
 second_order_reliability = sorm_breitung
+
+
+# ---------------------------------------------------------------------------
+# Wave PP (v7, D045): Nataf transform — correlated / non-Gaussian uncertainty.
+#
+# FORM/SORM (D038) assume the physical variables are *independent Gaussians*.
+# The Nataf model lifts that: given marginal distributions Fᵢ and a physical
+# correlation matrix Rₓ, it maps the physical vector X to independent
+# standard-normal U so the existing HL-RF machinery applies unchanged.
+# ---------------------------------------------------------------------------
+
+
+def _standard_normal_ppf(p: float) -> float:
+    """Inverse standard-normal CDF Φ⁻¹ (numpy/stdlib only).
+
+    Acklam's rational approximation, refined with one Halley step against the
+    erf-based Φ so the result is accurate to ~1e-12 across (0, 1).
+    """
+    if not (0.0 < p < 1.0):
+        if p == 0.0:
+            return -np.inf
+        if p == 1.0:
+            return np.inf
+        raise SolverError("ppf_out_of_range")
+    a = (-3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2,
+         1.383577518672690e2, -3.066479806614716e1, 2.506628277459239e0)
+    b = (-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2,
+         6.680131188771972e1, -1.328068155288572e1)
+    c = (-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838e0,
+         -2.549732539343734e0, 4.374664141464968e0, 2.938163982698783e0)
+    d = (7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996e0,
+         3.754408661907416e0)
+    plow, phigh = 0.02425, 1.0 - 0.02425
+    if p < plow:
+        q = sqrt(-2.0 * np.log(p))
+        x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / \
+            ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+    elif p <= phigh:
+        q = p - 0.5
+        r = q * q
+        x = (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / \
+            (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+    else:
+        q = sqrt(-2.0 * np.log(1.0 - p))
+        x = -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / \
+            ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+    # One Halley refinement: e = Φ(x) − p, u = e·√(2π)·e^{x²/2}.
+    e = _standard_normal_cdf(x) - p
+    u = e * sqrt(2.0 * np.pi) * np.exp(0.5 * x * x)
+    return float(x - u / (1.0 + 0.5 * x * u))
+
+
+@dataclass
+class Marginal:
+    """A 1-D marginal: ``normal`` (mean, std) or ``lognormal`` (log-mean λ, log-std ζ).
+
+    For lognormal, ``param_a`` = λ and ``param_b`` = ζ are the mean/std of the
+    *underlying normal* ``ln X``; the physical X = exp(λ + ζ·Z).
+    """
+
+    kind: str
+    param_a: float
+    param_b: float
+
+    def __post_init__(self) -> None:
+        if self.kind not in ("normal", "lognormal"):
+            raise SolverError("nataf_unknown_marginal")
+        if self.param_b <= 0:
+            raise SolverError("nataf_nonpositive_scale")
+
+    def to_standard_normal(self, x: float) -> float:
+        """Z = Φ⁻¹(F(x)) — physical value → standard normal."""
+        if self.kind == "normal":
+            return (x - self.param_a) / self.param_b
+        if x <= 0:
+            raise SolverError("nataf_lognormal_nonpositive_x")
+        return (np.log(x) - self.param_a) / self.param_b
+
+    def from_standard_normal(self, z: float) -> float:
+        """X = F⁻¹(Φ(z)) — standard normal → physical value."""
+        if self.kind == "normal":
+            return self.param_a + self.param_b * z
+        return float(np.exp(self.param_a + self.param_b * z))
+
+    def lognormal_zeta(self) -> float:
+        return self.param_b
+
+
+def _equivalent_normal_correlation(marginals: list[Marginal], rho_x: np.ndarray) -> np.ndarray:
+    """Nataf equivalent standard-normal correlation Rᵤ from physical Rₓ.
+
+    Exact closed forms are used for the pairs this engine supports:
+      - normal–normal:        ρ_z = ρ_x  (no distortion).
+      - lognormal–lognormal:  ρ_z = ln(1 + ρ_x·c) / (ζ_i·ζ_j), with
+                              c = √((e^{ζ_i²}−1)(e^{ζ_j²}−1)).
+    Mixed normal/lognormal pairs with ρ_x ≠ 0 are rejected (no closed form
+    here); set those off-diagonals to 0 or use same-family marginals.
+    """
+    n = len(marginals)
+    rz = np.array(rho_x, dtype=float, copy=True)
+    for i in range(n):
+        for j in range(i + 1, n):
+            r = rho_x[i, j]
+            ki, kj = marginals[i].kind, marginals[j].kind
+            if r == 0.0:
+                continue
+            if ki == "normal" and kj == "normal":
+                pass  # ρ_z = ρ_x
+            elif ki == "lognormal" and kj == "lognormal":
+                zi, zj = marginals[i].lognormal_zeta(), marginals[j].lognormal_zeta()
+                c = sqrt((np.exp(zi * zi) - 1.0) * (np.exp(zj * zj) - 1.0))
+                arg = 1.0 + r * c
+                if arg <= 0:
+                    raise SolverError("nataf_lognormal_correlation_infeasible")
+                rz[i, j] = rz[j, i] = float(np.log(arg) / (zi * zj))
+            else:
+                raise SolverError("nataf_mixed_marginal_correlation_unsupported")
+    return rz
+
+
+@dataclass
+class NatafTransform:
+    """Map between physical X (correlated, possibly non-Gaussian) and independent U.
+
+    ``u_to_x``: Z = L·U (correlated std-normals), Xᵢ = Fᵢ⁻¹(Φ(Zᵢ)).
+    ``x_to_u``: Zᵢ = Φ⁻¹(Fᵢ(Xᵢ)), U = L⁻¹·Z.
+    where Rᵤ = L·Lᵀ is the equivalent normal correlation (Cholesky).
+    """
+
+    marginals: list[Marginal]
+    correlation_x: np.ndarray
+    correlation_u: np.ndarray
+    chol: np.ndarray
+
+    @property
+    def n_vars(self) -> int:
+        return len(self.marginals)
+
+    def u_to_x(self, u: np.ndarray) -> np.ndarray:
+        z = self.chol @ np.asarray(u, dtype=float)
+        return np.array([m.from_standard_normal(zi) for m, zi in zip(self.marginals, z, strict=True)])
+
+    def x_to_u(self, x: np.ndarray) -> np.ndarray:
+        z = np.array(
+            [m.to_standard_normal(xi) for m, xi in zip(self.marginals, np.asarray(x, dtype=float), strict=True)]
+        )
+        return np.linalg.solve(self.chol, z)
+
+    def wrap_limit_state(self, g_physical: Callable[[np.ndarray], float]) -> Callable[[np.ndarray], float]:
+        """Turn a physical-space limit state g(x) into a U-space g(u) for ``form_hlrf``."""
+        return lambda u: g_physical(self.u_to_x(u))
+
+
+def build_nataf(marginals: list[Marginal], correlation_x: np.ndarray | None = None) -> NatafTransform:
+    """Construct a :class:`NatafTransform` from marginals + physical correlation.
+
+    ``correlation_x`` defaults to the identity (independent variables). It must be
+    square, symmetric, unit-diagonal and positive-definite (after the equivalent
+    normal correction).
+    """
+    n = len(marginals)
+    if n < 1:
+        raise SolverError("nataf_no_marginals")
+    rho = np.eye(n) if correlation_x is None else np.asarray(correlation_x, dtype=float)
+    if rho.shape != (n, n):
+        raise SolverError("nataf_correlation_shape_mismatch")
+    if not np.allclose(rho, rho.T, atol=1e-12):
+        raise SolverError("nataf_correlation_not_symmetric")
+    if not np.allclose(np.diag(rho), 1.0, atol=1e-12):
+        raise SolverError("nataf_correlation_not_unit_diagonal")
+    rz = _equivalent_normal_correlation(marginals, rho)
+    try:
+        chol = np.linalg.cholesky(rz)
+    except np.linalg.LinAlgError as exc:
+        raise SolverError("nataf_correlation_not_positive_definite") from exc
+    return NatafTransform(marginals=marginals, correlation_x=rho, correlation_u=rz, chol=chol)
+
+
+def correlated_gaussian_reliability(
+    mean: np.ndarray,
+    std: np.ndarray,
+    correlation: np.ndarray,
+    limit_state_physical: Callable[[np.ndarray], float],
+    **form_kwargs: Any,
+) -> ReliabilityResult:
+    """FORM for a limit state over **correlated Gaussian** physical variables.
+
+    For a linear limit state g(x) = a₀ − aᵀx with X ~ N(μ, Σ), Σ = DₛRDₛ
+    (Dₛ = diag(std)), this is exact and reproduces the closed form
+    β = (a₀ − aᵀμ) / √(aᵀΣa).
+    """
+    mean = np.asarray(mean, dtype=float)
+    std = np.asarray(std, dtype=float)
+    marginals = [Marginal("normal", float(m), float(s)) for m, s in zip(mean, std, strict=True)]
+    nataf = build_nataf(marginals, correlation)
+    return form_hlrf(nataf.wrap_limit_state(limit_state_physical), n_vars=len(marginals), **form_kwargs)
