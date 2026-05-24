@@ -1157,6 +1157,30 @@ info = write_stl_smooth_holes(mesh, densities, "holed.stl")
 
 ---
 
+## 19. v9 — second-order drivers: constrained optimisers & coupled fields
+
+### 19.1 MMA 驱动 TL 非线性 TO（Wave CCC，D058）
+
+v8 的几何非线性 TO（`nonlinear_to_oc`）用**单移动极限 OC** 更新——只能处理一个约束（体积）。
+v9 用 **MMA（移动渐近线法）** 驱动同一个 D044 TL 伴随灵敏度，把体积约束写成显式不等式
+`g(x)=mean(x)−vf≤0`：
+
+```python
+from structure_optimizer.benchmarks.registry import load_benchmark
+from structure_optimizer.core.mesh import create_structured_mesh
+from structure_optimizer.core.nonlinear_simp import mma_nonlinear_to, nonlinear_to_oc
+config = load_benchmark("cantilever", preset="smoke"); mesh = create_structured_mesh(config)
+mma = mma_nonlinear_to(config, mesh, n_load_steps=3, max_iter=30)
+# mma.compliance_history / volume_history / densities / converged
+```
+
+**关键 / 诚实边界**：全 TL 端柔度大幅下降（2066→553，3.7×）+ 体积可行（≤vf+0.02）+ **MMA 与
+OC 竞争**（同体积下柔度在 OC 的 5% 以内，实测比值 0.946 即 MMA 比 OC 低 5.4%）。诚实声明：
+在 **compliance-only** 问题上 MMA ≈ OC（不是碾压）；MMA 的真正价值是**额外约束**（应力/屈曲），
+这是 reopening 项。体积约束是唯一接入的约束，`mma_step` 的多约束能力尚未使用（见 D058）。
+
+---
+
 ## 常见错误
 
 | 现象 | 原因 | 解决 |

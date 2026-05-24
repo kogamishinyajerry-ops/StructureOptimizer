@@ -64,7 +64,7 @@ v9 完成 = `python scripts/test_agent.py --rubric v9` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] CCC — MMA 驱动 TL 非线性 TO
+- [x] CCC — MMA 驱动 TL 非线性 TO（D058 · 4 tests green · 全 TL 端柔度 2066→553（3.7× 降）+ 体积可行 0.4497≤0.45 + MMA/OC 比 0.946（MMA 比 OC 低 5.4%）+ 确定性 + 体积尾部贴约束；诚实：compliance-only 上 MMA≈OC，多约束才是真优势，是 reopening 项）
 - [ ] DDD — 特征频率带隙 / minimax 频带目标
 - [ ] EEE — ≥3 目标多载况 NSGA-III + 种子
 - [ ] FFF — Rosenblatt 变换（已知联合分布）

@@ -266,3 +266,73 @@ def nonlinear_to_oc(
         converged=converged,
         mesh_shape=(mesh.nelx, mesh.nely),
     )
+
+
+def mma_nonlinear_to(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    n_load_steps: int = 4,
+    max_iter: int = 30,
+    change_tol: float = 1e-3,
+) -> NonlinearTOResult:
+    """MMA-driven topology optimisation of the **full Total-Lagrangian**
+    end-compliance (Wave CCC, D058).
+
+    D050's reopening criterion: replace the single-move-limit OC update of
+    :func:`nonlinear_to_oc` with a proper constrained optimiser (MMA, the Method
+    of Moving Asymptotes). The objective + sensitivity are the same D044 TL
+    adjoint; the volume constraint is written as the explicit inequality
+    ``g(x) = mean(x) − vf ≤ 0`` and handled by :func:`core.mma.mma_step` (which
+    returns KKT multipliers). MMA's payoff over OC is *additional* constraints
+    (stress, buckling, …) — on this compliance-only problem it is competitive
+    with OC, which is the honest claim verified by the test.
+
+    Operates on the design-cell sub-vector; void/solid cells are held by the
+    masks. Stops on ``max|Δx| < change_tol`` or ``max_iter``.
+    """
+    from structure_optimizer.core.mma import MMAState, mma_step
+
+    opt = config.optimization
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+    vf = float(opt.volume_fraction)
+
+    rho = _default_initial_density(config, mesh)
+    x = rho[design].astype(float).copy()
+    xmin = np.full(n_design, opt.min_density)
+    xmax = np.ones(n_design)
+    dfdx = np.full((1, n_design), 1.0 / n_design)  # ∂g/∂x_e = 1/n (mean volume)
+    state = MMAState()
+
+    compliance_history: list[float] = []
+    volume_history: list[float] = []
+    converged = False
+
+    for _ in range(max_iter):
+        rho[design] = x
+        rho = _apply_density_masks(config, mesh, rho)
+        out = tl_adjoint_compliance_sensitivity(config, mesh, rho, n_load_steps=n_load_steps)
+        compliance_history.append(out.compliance)
+        volume_history.append(float(np.sum(rho[design]) / n_design))
+        sens = density_filter(mesh, rho, out.sensitivity, opt.filter_radius, opt.min_density)
+        df0dx = sens[design]
+        fval = np.array([float(np.mean(x) - vf)])
+        x_new, _lmbda = mma_step(x, df0dx, fval, dfdx, xmin, xmax, state)
+        change = float(np.max(np.abs(x_new - x)))
+        x = x_new
+        if change < change_tol:
+            converged = True
+            break
+
+    rho[design] = x
+    rho = _apply_density_masks(config, mesh, rho)
+    final = tl_adjoint_compliance_sensitivity(config, mesh, rho, n_load_steps=n_load_steps)
+    compliance_history.append(final.compliance)
+    volume_history.append(float(np.sum(rho[design]) / n_design))
+    return NonlinearTOResult(
+        densities=rho,
+        compliance_history=compliance_history,
+        volume_history=volume_history,
+        converged=converged,
+        mesh_shape=(mesh.nelx, mesh.nely),
+    )
