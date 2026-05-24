@@ -358,3 +358,241 @@ def write_stl_marching_squares(
         "cross_section_area": float(total_area),
         "out_path": str(out_path),
     }
+
+
+# --- Wave SS (v7, D048): ear-clipping general-polygon triangulation + holes ---
+#
+# D039's reopening criterion named the upgrade: the marching-squares caps use a
+# centroid fan, which is only valid for star-convex loops and cannot represent
+# holes. Ear clipping triangulates an arbitrary simple polygon (concave,
+# non-star-convex), and a visibility bridge merges holes (even-odd nesting) into
+# a single simple polygon before clipping. The verifiable invariant is exact
+# area conservation: Σ triangle areas == polygon area − Σ hole areas.
+
+
+def _signed_area(pts: np.ndarray) -> float:
+    """Signed shoelace area of an open vertex ring (CCW > 0)."""
+    x, y = pts[:, 0], pts[:, 1]
+    return 0.5 * float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+
+
+def _tri_area(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
+    return 0.5 * abs(float((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])))
+
+
+def _point_strictly_in_tri(p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> bool:
+    """True if p is strictly inside triangle abc (barycentric, small tolerance)."""
+    d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1])
+    if abs(d) < 1e-300:
+        return False
+    s = ((b[1] - c[1]) * (p[0] - c[0]) + (c[0] - b[0]) * (p[1] - c[1])) / d
+    t = ((c[1] - a[1]) * (p[0] - c[0]) + (a[0] - c[0]) * (p[1] - c[1])) / d
+    eps = 1e-12
+    return s > eps and t > eps and (s + t) < 1.0 - eps
+
+
+def _dedupe_ring(loop) -> np.ndarray:
+    """Drop a repeated closing vertex; return (n, 2) open ring."""
+    pts = np.asarray(loop, dtype=float)
+    if pts.shape[0] >= 2 and np.allclose(pts[0], pts[-1]):
+        pts = pts[:-1]
+    return pts
+
+
+def ear_clipping_triangulate(loop) -> tuple[np.ndarray, list[tuple[int, int, int]]]:
+    """Triangulate a simple polygon (concave OK) by ear clipping.
+
+    Returns ``(pts, triangles)`` where ``pts`` is the (n, 2) CCW vertex ring and
+    ``triangles`` is a list of index triples into ``pts``. The triangulation
+    conserves area exactly (Σ triangle areas == |polygon area|).
+    """
+    pts = _dedupe_ring(loop)
+    n = pts.shape[0]
+    if n < 3:
+        raise SolverError("ear_clipping_degenerate_polygon")
+    if _signed_area(pts) < 0:  # force CCW
+        pts = pts[::-1].copy()
+    idx = list(range(pts.shape[0]))
+    tris: list[tuple[int, int, int]] = []
+    guard = 0
+    max_guard = pts.shape[0] ** 2 + 1
+    while len(idx) > 3 and guard < max_guard:
+        guard += 1
+        m = len(idx)
+        clipped = False
+        for ii in range(m):
+            i0, i1, i2 = idx[(ii - 1) % m], idx[ii], idx[(ii + 1) % m]
+            a, b, c = pts[i0], pts[i1], pts[i2]
+            # convex (CCW left turn) ?
+            cross = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])
+            if cross <= 1e-12:
+                continue
+            if any(
+                _point_strictly_in_tri(pts[j], a, b, c)
+                for j in idx
+                if j not in (i0, i1, i2)
+            ):
+                continue
+            tris.append((i0, i1, i2))
+            del idx[ii]
+            clipped = True
+            break
+        if not clipped:
+            raise SolverError("ear_clipping_no_ear_found")
+    if len(idx) == 3:
+        tris.append((idx[0], idx[1], idx[2]))
+    return pts, tris
+
+
+def _segment_intersects(p1, p2, q1, q2) -> bool:
+    """Proper segment intersection test (shared endpoints do not count)."""
+    def orient(a, b, c):
+        v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+        if abs(v) < 1e-12:
+            return 0
+        return 1 if v > 0 else -1
+
+    if np.allclose(p1, q1) or np.allclose(p1, q2) or np.allclose(p2, q1) or np.allclose(p2, q2):
+        return False
+    o1, o2 = orient(p1, p2, q1), orient(p1, p2, q2)
+    o3, o4 = orient(q1, q2, p1), orient(q1, q2, p2)
+    return o1 != o2 and o3 != o4
+
+
+def _bridge_visible(outer: np.ndarray, hole: np.ndarray, all_rings: list[np.ndarray]):
+    """Find a bridge (outer index, hole index) whose segment crosses no edge."""
+    for oi in range(outer.shape[0]):
+        for hi in range(hole.shape[0]):
+            a, b = outer[oi], hole[hi]
+            blocked = False
+            for ring in all_rings:
+                rn = ring.shape[0]
+                for k in range(rn):
+                    if _segment_intersects(a, b, ring[k], ring[(k + 1) % rn]):
+                        blocked = True
+                        break
+                if blocked:
+                    break
+            if not blocked:
+                return oi, hi
+    raise SolverError("polygon_hole_no_visible_bridge")
+
+
+def triangulate_with_holes(outer_loop, holes=None) -> tuple[np.ndarray, list[tuple[int, int, int]]]:
+    """Triangulate a polygon with optional holes (even-odd nesting).
+
+    Each hole is bridged into the outer polygon (a mutually-visible vertex pair,
+    zero-width slit) to form one simple polygon, then ear-clipped. Conserves
+    area exactly: Σ triangle areas == outer area − Σ hole areas.
+    """
+    outer = _dedupe_ring(outer_loop)
+    if _signed_area(outer) < 0:
+        outer = outer[::-1].copy()
+    holes = holes or []
+    hole_rings = []
+    for h in holes:
+        hr = _dedupe_ring(h)
+        if _signed_area(hr) > 0:  # holes traversed opposite to outer
+            hr = hr[::-1].copy()
+        hole_rings.append(hr)
+    # Process holes by descending rightmost-x (Eberly's ordering).
+    hole_rings.sort(key=lambda r: -float(r[:, 0].max()))
+
+    merged = outer.copy()
+    for k, hr in enumerate(hole_rings):
+        # The bridge must cross neither the current merged polygon nor any hole
+        # not yet merged in.
+        all_rings = [merged, hr, *hole_rings[k + 1:]]
+        oi, hi = _bridge_visible(merged, hr, all_rings)
+        # Insert the slit: merged[..oi], hole[hi..wrap..hi], merged[oi..].
+        hole_seq = np.vstack([np.roll(hr, -hi, axis=0), hr[hi][None, :]])
+        merged = np.vstack([merged[: oi + 1], hole_seq, merged[oi:][:]])
+    return ear_clipping_triangulate(merged)
+
+
+def write_stl_polygon(
+    outer_loop,
+    out_path: str | Path,
+    holes=None,
+    z_thickness: float = 1.0,
+    solid_name: str = "polygon_extruded",
+) -> dict:
+    """Extrude a general (concave, holed) polygon to a watertight STL prism.
+
+    Caps are ear-clipped (valid for non-star-convex sections + holes); side walls
+    are built for the outer ring and every hole ring. Returns a dict with
+    ``n_triangles``, ``cross_section_area``, ``is_watertight``, ``out_path``.
+    """
+    if z_thickness <= 0:
+        raise SolverError("stl_export_nonpositive_thickness")
+    pts, tris = triangulate_with_holes(outer_loop, holes)
+    cross_section_area = sum(_tri_area(pts[i], pts[j], pts[k]) for i, j, k in tris)
+
+    triangles: list[str] = []
+
+    def emit(a3, b3, c3, n):
+        triangles.append(_format_triangle(a3, b3, c3, n))
+
+    # Caps: bottom (−z, reversed winding) and top (+z).
+    for i, j, k in tris:
+        a, b, c = pts[i], pts[j], pts[k]
+        a_lo, b_lo, c_lo = (np.array([p[0], p[1], 0.0]) for p in (a, b, c))
+        a_hi, b_hi, c_hi = (np.array([p[0], p[1], z_thickness]) for p in (a, b, c))
+        emit(a_lo, c_lo, b_lo, np.array([0.0, 0.0, -1.0]))
+        emit(a_hi, b_hi, c_hi, np.array([0.0, 0.0, 1.0]))
+
+    # Side walls for outer ring + each hole ring (orientation from the ring).
+    outer = _dedupe_ring(outer_loop)
+    if _signed_area(outer) < 0:
+        outer = outer[::-1].copy()
+    rings = [outer]
+    for h in holes or []:
+        hr = _dedupe_ring(h)
+        if _signed_area(hr) > 0:
+            hr = hr[::-1].copy()
+        rings.append(hr)
+    for ring in rings:
+        rn = ring.shape[0]
+        for kk in range(rn):
+            a, b = ring[kk], ring[(kk + 1) % rn]
+            a_lo = np.array([a[0], a[1], 0.0])
+            b_lo = np.array([b[0], b[1], 0.0])
+            a_hi = np.array([a[0], a[1], z_thickness])
+            b_hi = np.array([b[0], b[1], z_thickness])
+            edge = b - a
+            wall_n = np.array([edge[1], -edge[0], 0.0])
+            nrm = np.linalg.norm(wall_n)
+            wall_n = wall_n / nrm if nrm > 1e-300 else np.array([1.0, 0.0, 0.0])
+            emit(a_lo, b_lo, b_hi, wall_n)
+            emit(a_lo, b_hi, a_hi, wall_n)
+
+    out_path = Path(out_path)
+    with open(out_path, "w") as f:
+        f.write(f"solid {solid_name[:80]}\n")
+        for tri in triangles:
+            f.write(tri)
+        f.write(f"endsolid {solid_name[:80]}\n")
+
+    return {
+        "n_triangles": len(triangles),
+        "cross_section_area": float(cross_section_area),
+        "is_watertight": stl_is_watertight(triangles),
+        "out_path": str(out_path),
+    }
+
+
+def stl_is_watertight(triangle_blocks: list[str]) -> bool:
+    """True if every undirected edge of the facet set is shared by exactly two facets."""
+    edges: dict[tuple, int] = defaultdict(int)
+    for block in triangle_blocks:
+        verts = []
+        for line in block.splitlines():
+            line = line.strip()
+            if line.startswith("vertex"):
+                parts = line.split()
+                verts.append((round(float(parts[1]), 9), round(float(parts[2]), 9), round(float(parts[3]), 9)))
+        if len(verts) != 3:
+            return False
+        for a, b in ((verts[0], verts[1]), (verts[1], verts[2]), (verts[2], verts[0])):
+            edges[tuple(sorted((a, b)))] += 1
+    return all(count == 2 for count in edges.values())

@@ -989,6 +989,30 @@ res = minimize_dynamic_compliance(config, mesh, omega=50.0, alpha=0.5, beta=1e-4
 目标 + **紧凑投影梯度**（无滤波，非 MMA/OC 生产优化器）——验证的是"解析灵敏度能把 J 推下去
 并削峰"，不是生产级动态 TO（见 D047 reopening）。
 
+### 17.7 Ear-clipping 通用多边形 STL + 孔洞（Wave SS，D048）
+
+v6（D039）的 marching-squares 用**形心扇区**封顶，只对 star-convex 环有效、不能表示孔洞。
+v7 用 **ear clipping** 三角化任意简单多边形（凹/非 star-convex），并用可见性桥把孔洞
+（even-odd 嵌套）并入外环后再切：
+
+```python
+from structure_optimizer.core.stl_export import (
+    ear_clipping_triangulate, triangulate_with_holes, write_stl_polygon)
+
+L = [(0,0),(4,0),(4,1),(1,1),(1,4),(0,4)]              # 凹 L 形
+pts, tris = ear_clipping_triangulate(L)                # 面积守恒到 1e-12
+outer = [(0,0),(10,0),(10,10),(0,10)]; hole = [(3,3),(7,3),(7,7),(3,7)]
+pts, tris = triangulate_with_holes(outer, [hole])      # 面积 = 100−16 = 84
+info = write_stl_polygon(outer, "part.stl", holes=[hole], z_thickness=2.0)
+# info["is_watertight"] == True；info["cross_section_area"] == 84.0
+```
+
+**关键 / 诚实边界**：凹多边形 + 星形 + 双孔面积守恒均到 **1e-12**；挤出棱柱**水密**（每条边
+恰被 2 个面共享）。对比：形心扇区在 L 形给 **11**（真值 7）——这正是需要 ear-clipping 的原因。
+边界：O(n²)（截面环规模够用，非百万顶点）；孔桥用**暴力可见性**（慢但易验证正确）；
+`write_stl_marching_squares` **未改**（凸 iso-contour 仍用扇区），把 MS 嵌套环接入 ear-clipping
+是后续（见 D048 reopening）。
+
 ---
 
 ## 常见错误
