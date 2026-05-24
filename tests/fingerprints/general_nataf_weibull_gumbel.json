@@ -1,0 +1,17 @@
+{
+  "benchmark": "weibull_gumbel_pair",
+  "rubric_version": "v8.0-wave-XX",
+  "kind": "general_nataf",
+  "correlation_x": [
+    [
+      1.0,
+      0.5
+    ],
+    [
+      0.5,
+      1.0
+    ]
+  ],
+  "correlation_u_sha256": "sha256:6aced9a8a9c306c0fde89eec4b047aacb3c57d80d33f0d8f83d873c3a8edfd19",
+  "rho_u_01": 0.521237354648765
+}

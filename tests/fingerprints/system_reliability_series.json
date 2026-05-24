@@ -1,0 +1,13 @@
+{
+  "benchmark": "series_system",
+  "rubric_version": "v8.0-wave-ZZ",
+  "kind": "system_reliability",
+  "betas": [
+    2.0,
+    2.5,
+    3.0
+  ],
+  "bounds_sha256": "sha256:5e742df349919ade71b797bddf4142100765cb0508ed3a0df0cf8cae29565351",
+  "p_failure_lower": 0.03012933182673351,
+  "p_failure_upper": 0.030137714241733858
+}

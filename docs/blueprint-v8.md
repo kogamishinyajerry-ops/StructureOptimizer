@@ -68,7 +68,7 @@ v8 完成 = `python scripts/test_agent.py --rubric v8` 报告：
 - [x] YY — 纤维转向热 TO（D054 · 3 tests green · orientation 灵敏度 vs FD 1e-9 + 各向同性基张量灵敏度恒零 + 转向使热柔度降 33% 单调）
 - [x] ZZ — 系统可靠性（多极限态串/并联）（D055 · 6 tests green · 二元正态 CDF 三个精确特例 + 单模式=Φ(−β) + 独立串联在 Ditlevsen 界内且比简单界紧 + 正相关降串联失效）
 - [x] AAA — MS 嵌套环 → ear-clipping 封顶（D056 · 4 tests green · 偶奇嵌套检测精确（嵌套→1组1孔 / 不相交→2组 / 三层嵌套→外环带孔+实心岛）+ 面积守恒=外环−内环 1e-9（矩形孔 & 环形孔）+ 矩形孔水密；诚实标注：曲线孔零宽桥缝非流形，水密仅断言洁净直角孔，D049 既有 write_stl_polygon 同样限制）
-- [ ] BBB — v8 收口（rubric ≥ 99）
+- [x] BBB — v8 收口（D057 · rubric 100/100 · pytest gate 945 passed/0 failed · v4/v5/v6/v7 全无回归 · 5 真实 demo（scripts/v8_demos.py）+ 5 指纹（DB 35→40）+ architecture §18 + tutorial §18.1-18.7 + 2 property test（40→42）+ v8 写入 CI）
 
 > 注：v8 需在 `docs/quality-rubric-v8.md` + `scripts/test_agent.py` 的 `CHECKS_V8` 落地
 > 评分项后才能 `--rubric v8` 打分（与 v7 同构：6 section / 100 分 / D033 gate / v4-v7 回归门）。

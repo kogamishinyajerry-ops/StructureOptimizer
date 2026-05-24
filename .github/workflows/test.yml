@@ -106,6 +106,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
         run: python scripts/test_agent.py --rubric v7
 
+      - name: v8 test agent — closing-the-loop rubric scorecard
+        # v8 §4.7: v8 rubric scored after v7. The v8 run enforces the D033
+        # pytest-green no-regression gate and the v4/v5/v6/v7 regression checks.
+        # Strict once v8 reaches ≥99/100.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --rubric v8 --strict
+
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
     runs-on: ubuntu-latest

@@ -569,3 +569,47 @@ v7 把 v6 的**严格正向求解器接入优化驱动器**，并把残留的"�
 - NSGA-III 密度场是**梯度自由**能力，前沿粗糙，不与梯度 SIMP 竞速。
 - Ear-clipping 是 O(n²) + 暴力可见性桥；`write_stl_marching_squares` 仍用 fan（凸 contour）。
 - 详见 D042-D048 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 18. v8 — closing the loop: gradient drivers & general distributions
+
+v7 把 v6 的严格正向求解器**接成了 driver**，但多处刻意停在"灵敏度正确 + 紧凑投影梯度"
+而非完整闭环优化器，且分布/几何仍有简化。v8 = **把这些半成品 driver 闭成完整环**，并把
+不确定性 / 几何提升到一般情形。每个 wave 都源自 v7（或更早）ADR 明列的 "Reopening
+criteria"——§17.2 的限制由此逐条解除：
+
+| v7 限制（§17.2） | v8 升级 | 模块 | ADR | 定量锚点 |
+|---|---|---|---|---|
+| TL TO 仅紧凑投影梯度 | 几何非线性 TO **完整 OC 环**（TL 伴随驱动 + 密度滤波） | `core/nonlinear_simp.py` | D050 | TL 端柔度单调下降 + 体积守恒 + TL-aware 比线性优化在 TL 柔度下更低 |
+| 动态 TO 仅投影梯度、单 ω | 滤波**多频带** 动柔度 OC 环 | `core/freq_response.py` | D051 | 带平均 J 单调降 + 全带峰值下降 + Sigmund 滤波抑制 checkerboard |
+| NSGA 随机初始、前沿粗 | **梯度种子** NSGA-III（warm-start） | `core/multi_objective_to.py` | D052 | 种子前沿超体积 > 随机（同预算）+ 梯度质量端点 |
+| Nataf 仅 normal/lognormal | **一般 marginal** Nataf（Gauss-Hermite 积分） | `core/reliability.py` | D053 | GH 积分 vs 对数正态闭式 3e-11 + Weibull/Gumbel 矩与 round-trip |
+| 各向异性热场固定 orientation | **纤维转向**热 TO（优化 orientation 场） | `core/thermal_simp.py` | D054 | orientation 灵敏度 vs FD 1e-9 + 各向同性基张量灵敏度恒零 + 转向降柔度 |
+| FORM 仅单极限态 | **系统可靠性**（串/并联 Ditlevsen 界） | `core/reliability.py` | D055 | 二元正态 CDF 三精确特例 + 独立串联在界内且比简单界紧 + 正相关降串联失效 |
+| caps 仅单环、无孔嵌套 | **MS 嵌套环 → ear-clipping 带孔封顶** | `core/stl_export.py` | D056 | 偶奇嵌套检测精确 + 面积=外环−内环 1e-9 + 洁净直角孔水密 |
+
+### 18.1 闭环原则
+
+- **driver 闭成环**：v8 把 v7 的"灵敏度 + 紧凑投影梯度"升级为**带密度滤波的 OC 环**
+  （UU/VV），用单调下降 + 体积守恒 + 与基线对比的可量化差异作为锚点，而非只验灵敏度。
+- **一般化优于特例**：分布从 normal/lognormal 闭式扩到任意 marginal 的 Gauss-Hermite Nataf
+  积分（XX），可靠性从单极限态扩到系统串/并联 Ditlevsen 界（ZZ）。
+- **诚实优于吹嘘**：系统可靠性显式标注 ρ=1 不精确退化（残差 ~2%）+ 并联仅 2 模式；
+  带孔 STL 显式标注曲线孔零宽桥缝**非流形**、水密仅对洁净直角孔断言（D049 既有 polygon
+  writer 同样限制，非 v8 引入的回归）。
+- **向后兼容**：v8 全部 API 附加在 v7 之上（`nonlinear_to_oc` 复用 TL 伴随 + OC update +
+  滤波；`build_nataf_general` 对 normal-normal 走闭式、其余走 GH；`write_stl_smooth_holes`
+  不动既有 `write_stl_marching_squares` / `write_stl_polygon`）；v4/v5/v6/v7 调用与 rubric 无回归。
+- **完成度门控**：`python scripts/test_agent.py --rubric v8` ≥99/100，v4/v5/v6/v7 无回归 +
+  pytest gate green（D033）+ 全永久红线保持。
+
+### 18.2 v8 已知限制（诚实范围）
+
+- 几何非线性 OC 环用单一移动极限 OC update（与线性 SIMP 同款），未上 MMA；大变形与线性
+  拓扑的差异在默认载荷 + 充分迭代下稳健，截断环可能反号（见 D050）。
+- 多频带动态 TO 在共振附近灵敏度可变号，用投影梯度而非 OC（D051）。
+- 梯度种子 NSGA-III 仍是梯度自由细化，端点由种子的梯度质量决定，不与梯度 SIMP 竞速（D052）。
+- 一般 Nataf 用 24 节点 Gauss-Hermite + 二分求等效相关；极端尾部相关可能需更多节点（D053）。
+- 系统可靠性：串联任意 m，**并联仅 2 模式**（m>2 需多元正态 CDF）；ρ 钳到 0.999999（D055）。
+- 带孔 STL：曲线（多顶点）孔零宽桥缝非流形，水密仅断言洁净直角孔；slit-free 约束 Delaunay
+  是 reopening 项（D056）。
+- 详见 D050-D056 各自 "Honest scope notes" + "Reopening criteria"。

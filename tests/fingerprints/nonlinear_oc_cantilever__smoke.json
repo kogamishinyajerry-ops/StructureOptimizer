@@ -1,0 +1,11 @@
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "rubric_version": "v8.0-wave-UU",
+  "kind": "nonlinear_oc",
+  "n_load_steps": 3,
+  "max_iter": 6,
+  "densities_sha256": "sha256:bd02a62eed3766ed0f9b5055afc68f2676ca226e89c9730c54ed7b29d19041e9",
+  "compliance_final": 665.3629697726599,
+  "converged": false
+}

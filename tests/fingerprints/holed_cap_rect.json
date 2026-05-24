@@ -1,0 +1,8 @@
+{
+  "benchmark": "rect_with_rect_hole",
+  "rubric_version": "v8.0-wave-AAA",
+  "kind": "holed_cap",
+  "vertices_sha256": "sha256:c6138cb774db176315c532926c65c02fcb5c4aac11462179a660720228716761",
+  "n_triangles": 8,
+  "cross_section_area": 684.0
+}

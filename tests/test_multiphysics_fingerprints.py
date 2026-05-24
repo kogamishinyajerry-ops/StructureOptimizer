@@ -331,6 +331,69 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         ]
         return np.asarray(pts), ("vertices_sha256", rec["vertices_sha256"]), checks
 
+    if kind == "nonlinear_oc":
+        from structure_optimizer.core.nonlinear_simp import nonlinear_to_oc
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        r = nonlinear_to_oc(config, mesh, n_load_steps=rec["n_load_steps"], max_iter=rec["max_iter"])
+        checks = [
+            ("compliance_final", rec["compliance_final"], r.compliance_history[-1]),
+            ("converged", rec["converged"], r.converged),
+        ]
+        return np.asarray(r.densities), ("densities_sha256", rec["densities_sha256"]), checks
+
+    if kind == "general_nataf":
+        from structure_optimizer.core.reliability import Marginal, build_nataf_general
+
+        marginals = [Marginal("weibull", 5.0, 130.0), Marginal("gumbel", 70.0, 12.0)]
+        nataf = build_nataf_general(marginals, np.asarray(rec["correlation_x"]))
+        checks = [("rho_u_01", rec["rho_u_01"], nataf.correlation_u[0, 1])]
+        return np.asarray(nataf.correlation_u), ("correlation_u_sha256", rec["correlation_u_sha256"]), checks
+
+    if kind == "system_reliability":
+        from structure_optimizer.core.reliability import system_reliability_series
+
+        r = system_reliability_series(rec["betas"])
+        bounds = np.array([r["p_failure_lower"], r["p_failure_upper"],
+                           r["simple_lower"], r["simple_upper"]])
+        checks = [
+            ("p_failure_lower", rec["p_failure_lower"], r["p_failure_lower"]),
+            ("p_failure_upper", rec["p_failure_upper"], r["p_failure_upper"]),
+        ]
+        return bounds, ("bounds_sha256", rec["bounds_sha256"]), checks
+
+    if kind == "fibre_steering":
+        from structure_optimizer.core.thermal_simp import (
+            fibre_steering_thermal_to,
+            load_thermal_benchmark,
+        )
+
+        config, _k, sources, bcs = load_thermal_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        rho = np.full(mesh.elements.shape[0], 1.0)
+        r = fibre_steering_thermal_to(config, mesh, rho, rec["kxx"], rec["kyy"],
+                                      n_steps=rec["n_steps"], step=rec["step"],
+                                      heat_sources=sources, thermal_bcs=bcs)
+        checks = [
+            ("compliance_initial", rec["compliance_initial"], r.compliance_history[0]),
+            ("compliance_final", rec["compliance_final"], r.compliance_history[-1]),
+        ]
+        return np.asarray(r.angles), ("angles_sha256", rec["angles_sha256"]), checks
+
+    if kind == "holed_cap":
+        from structure_optimizer.core.stl_export import _tri_area, triangulate_with_holes
+
+        outer = [(6.0, 6.0), (34.0, 6.0), (34.0, 34.0), (6.0, 34.0)]
+        hole = [(15.0, 15.0), (25.0, 15.0), (25.0, 25.0), (15.0, 25.0)]
+        pts, tris = triangulate_with_holes(outer, [hole])
+        area = sum(_tri_area(pts[i], pts[j], pts[k]) for i, j, k in tris)
+        checks = [
+            ("n_triangles", rec["n_triangles"], len(tris)),
+            ("cross_section_area", rec["cross_section_area"], area),
+        ]
+        return np.asarray(pts), ("vertices_sha256", rec["vertices_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -382,6 +445,12 @@ def test_multiphysics_fingerprint_set_present():
         "dynamic_compliance_cantilever__smoke",
         "anisotropic_thermal_field_heat_sink__smoke",
         "earclip_holed_polygon",
+        # v8 closing-the-loop drivers (Wave BBB closure)
+        "nonlinear_oc_cantilever__smoke",
+        "general_nataf_weibull_gumbel",
+        "system_reliability_series",
+        "fibre_steering_heat_sink__smoke",
+        "holed_cap_rect",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

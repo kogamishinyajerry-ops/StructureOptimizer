@@ -1,0 +1,13 @@
+{
+  "benchmark": "heat_sink",
+  "preset": "smoke",
+  "rubric_version": "v8.0-wave-YY",
+  "kind": "fibre_steering",
+  "kxx": 5.0,
+  "kyy": 1.0,
+  "n_steps": 10,
+  "step": 0.3,
+  "angles_sha256": "sha256:4a558538ea415511dfa23bb8cdbc095be2805ef331f6efb36830b8e8d3a20e7c",
+  "compliance_initial": 431693.3460531726,
+  "compliance_final": 313186.28543309355
+}
