@@ -66,7 +66,7 @@ v9 完成 = `python scripts/test_agent.py --rubric v9` 报告：
 
 - [x] CCC — MMA 驱动 TL 非线性 TO（D058 · 4 tests green · 全 TL 端柔度 2066→553（3.7× 降）+ 体积可行 0.4497≤0.45 + MMA/OC 比 0.946（MMA 比 OC 低 5.4%）+ 确定性 + 体积尾部贴约束；诚实：compliance-only 上 MMA≈OC，多约束才是真优势，是 reopening 项）
 - [x] DDD — 特征频率带隙 / minimax 频带目标（D059 · 5 tests green · 带隙灵敏度 dg/dρ vs 中心 FD rel 1.76e-6（mass-normalized 模态特征值灵敏度精确）+ 体积守恒爬升使带隙加宽 2.2× + 模态被推开 + 确定性 + 契约；诚实：假设非重根、投影梯度爬升非 MMA、未做目标频带放置）
-- [ ] EEE — ≥3 目标多载况 NSGA-III + 种子
+- [x] EEE — ≥3 目标多载况 NSGA-III + 种子（D060 · 6 tests green · 精确 n-D 超体积 HSO（vs 2D 公式 + 已知 3D 盒 + 容斥）+ Das-Dennis 3 目标精确组合数 C(d+2,2)=15/28/45 + 三目标前沿单调 HV + 载况真冲突（LC1 最优在 LC2 下更差）+ 梯度种子提升 HV 1.51e9→1.93e9 且端点锐化 8.4×；诚实：仍梯度自由、种子注入非 GA 发现、HSO 不适合多目标大前沿）
 - [ ] FFF — Rosenblatt 变换（已知联合分布）
 - [ ] GGG — 耦合密度 + orientation 热 TO
 - [ ] HHH — 系统可靠性驱动 TO

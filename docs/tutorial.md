@@ -1196,6 +1196,24 @@ res = maximize_band_gap(config, mesh, lower_mode=0, n_steps=20, move=0.1)
 诚实声明：假设**非重根**（重根处灵敏度是次梯度集，对称设计模态合并会失效）；驱动是**投影梯度
 爬升**非 MMA；只做相邻模态带隙，未做**目标频带放置**或 minimax 频带（reopening 项，见 D059）。
 
+### 19.3 ≥3 目标多载况 NSGA-III（Wave EEE，D060）
+
+v7/v8 的密度场 NSGA-III 是 2 目标（柔度+体积）。v9 扩到 **≥3 目标多载况**：在多个**载荷工况**
+下分别最小化柔度，再加体积。需要精确的 n 维超体积（HSO 切片算法）：
+
+```python
+from structure_optimizer.core.multi_objective_to import multi_load_case_to, hypervolume_nd
+# 默认 2 工况（原载荷 + fx/fy 互换的水平载荷）+ 体积 = 3 目标
+res = multi_load_case_to(config, mesh, n_generations=12, population_size=16)
+# res.front_objectives (n_front, 3) / hv_history（累积存档单调）
+# 可传 seed_genomes 做梯度 SIMP 暖启动
+```
+
+**关键 / 诚实边界**：精确 n-D 超体积 HSO（与 2D 公式一致 + 已知 3D 盒 + 容斥 0.375）+ Das-Dennis
+3 目标精确组合数 `C(d+2,2)` + 三目标前沿单调 HV + **载况真冲突**（LC1 最优设计在 LC2 下更差）+
+梯度种子暖启动提升 HV（1.51e9→1.93e9）且单目标端点锐化 8.4×。诚实声明：仍是**梯度自由**搜索
+（种子是**注入**梯度端点，非 GA 自己发现）；HSO 是 `O(k^{n−1})`，不适合多目标大前沿（见 D060）。
+
 ---
 
 ## 常见错误

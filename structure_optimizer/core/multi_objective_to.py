@@ -100,6 +100,40 @@ def _nondominated(objs: np.ndarray) -> np.ndarray:
     return keep
 
 
+def hypervolume_nd(points: np.ndarray, reference: np.ndarray) -> float:
+    """Exact dominated hypervolume of an n-objective **minimisation** set, via
+    Hypervolume by Slicing Objectives (HSO).
+
+    Reduces to ``hypervolume_2d`` at n=2 and to ``ref₀ − min`` at n=1. Only points
+    strictly dominating ``reference`` contribute. HSO slices along the last
+    objective: in each slab between consecutive slice levels, the points reaching
+    that depth contribute the (n−1)-D hypervolume of their projection times the
+    slab thickness — recursing until the 2-D base case (Wave EEE, D060).
+    """
+    ref = np.asarray(reference, dtype=float).reshape(-1)
+    d = ref.shape[0]
+    pts = np.asarray(points, dtype=float).reshape(-1, d)
+    if pts.shape[0] == 0:
+        return 0.0
+    inside = pts[np.all(pts < ref, axis=1)]
+    if inside.shape[0] == 0:
+        return 0.0
+    if d == 1:
+        return float(ref[0] - inside[:, 0].min())
+    if d == 2:
+        return hypervolume_2d(inside, ref)
+    inside = inside[_nondominated(inside)]
+    inside = inside[np.argsort(inside[:, -1])]
+    levels = [*inside[:, -1].tolist(), float(ref[-1])]
+    vol = 0.0
+    for j in range(inside.shape[0]):
+        depth = levels[j + 1] - levels[j]
+        if depth <= 0:
+            continue
+        vol += depth * hypervolume_nd(inside[: j + 1, :-1], ref[:-1])
+    return float(vol)
+
+
 def multi_objective_to(
     config: BenchmarkConfig,
     mesh: StructuredMesh,
@@ -232,3 +266,120 @@ def gradient_seeded_multi_objective_to(
         cfg = replace(config, optimization=replace(config.optimization, volume_fraction=float(vf)))
         seeds.append(run_simp(cfg, mesh).densities[design])
     return multi_objective_to(config, mesh, seed_genomes=seeds, **kwargs)
+
+
+def multi_load_case_to(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    load_cases: list[list[dict]] | None = None,
+    n_generations: int = 12,
+    population_size: int = 16,
+    n_divisions: int = 8,
+    crossover_eta: float = 15.0,
+    mutation_prob: float | None = None,
+    rng_seed: int = 0,
+    seed_genomes: list[np.ndarray] | None = None,
+) -> MultiObjectiveTOResult:
+    """≥3-objective NSGA-III over density fields: minimise compliance under each
+    of several **load cases** plus the volume fraction (Wave EEE, D060).
+
+    D052's reopening criterion named "≥3 objectives (multi-load-case) with seeded
+    warm-start". With ``L`` load cases the objective is
+    ``(C_1, …, C_L, volume)`` (``n_obj = L + 1``). ``load_cases`` is a list of
+    ``config.loads``-style lists; the default is the original loads plus a
+    horizontal variant (fx/fy swapped), which genuinely conflict — a design tuned
+    for one load is sub-optimal for the other. Reuses the same NSGA-III machinery
+    (Das-Dennis reference directions, non-dominated sort, niching) as
+    ``multi_objective_to`` and the exact n-D ``hypervolume_nd`` archive.
+    """
+    from dataclasses import replace
+
+    if n_generations < 1:
+        raise SolverError("mo_to_n_generations_must_be_positive")
+    if population_size < 4:
+        raise SolverError("mo_to_population_too_small")
+    if load_cases is None:
+        load_cases = [
+            list(config.loads),
+            [{**ld, "fx": ld.get("fy", 0.0), "fy": ld.get("fx", 0.0)} for ld in config.loads],
+        ]
+    if len(load_cases) < 1:
+        raise SolverError("mlc_to_no_load_cases")
+
+    design = mesh.design_mask
+    n_design = int(np.count_nonzero(design))
+    if n_design < 1:
+        raise SolverError("mo_to_no_design_elements")
+    n_elem = mesh.elements.shape[0]
+    n_obj = len(load_cases) + 1
+    if mutation_prob is None:
+        mutation_prob = 1.0 / n_design
+    configs = [replace(config, loads=lc) for lc in load_cases]
+
+    def _full_density(genome: np.ndarray) -> np.ndarray:
+        rho = np.zeros(n_elem)
+        rho[design] = np.clip(genome, 0.0, 1.0)
+        return rho
+
+    def eval_fn(genome: np.ndarray) -> tuple[float, ...]:
+        rho = _full_density(genome)
+        comps = [float(solve_linear_elastic(cfg, mesh, rho).compliance) for cfg in configs]
+        vol = float(np.mean(np.clip(genome, 0.0, 1.0)))
+        return (*comps, vol)
+
+    rng = np.random.default_rng(rng_seed)
+    bl, bu = np.zeros(n_design), np.ones(n_design)
+    pop = rng.uniform(bl, bu, size=(population_size, n_design))
+    if seed_genomes:
+        for k, g in enumerate(seed_genomes[:population_size]):
+            g = np.asarray(g, dtype=float).reshape(-1)
+            if g.size != n_design:
+                raise SolverError("mo_to_seed_genome_shape_mismatch")
+            pop[k] = np.clip(g, 0.0, 1.0)
+    objs = np.array([eval_fn(x) for x in pop])
+
+    worst = _full_density(np.zeros(n_design))
+    c_worst = [float(solve_linear_elastic(cfg, mesh, worst).compliance) for cfg in configs]
+    reference = np.array([*[c * 1.05 for c in c_worst], 1.05])
+
+    ref_dirs = das_dennis_reference_points(n_obj, n_divisions)
+    archive_objs = objs[_nondominated(objs)]
+    hv_history = [hypervolume_nd(archive_objs, reference)]
+
+    for _gen in range(n_generations):
+        offspring = _generate_offspring(pop, bl, bu, crossover_eta, mutation_prob, rng)
+        off_objs = np.array([eval_fn(x) for x in offspring])
+        combined = np.vstack([pop, offspring])
+        combined_objs = np.vstack([objs, off_objs])
+
+        fronts = _non_dominated_sort(combined_objs)
+        selected: list[int] = []
+        for front in fronts:
+            if len(selected) + len(front) <= population_size:
+                selected.extend(front.tolist())
+                continue
+            n_needed = population_size - len(selected)
+            picked = _niching_select(front, np.array(selected, dtype=int), combined_objs, ref_dirs, n_needed, rng)
+            selected.extend(picked)
+            break
+        sel = np.array(selected, dtype=int)
+        pop = combined[sel]
+        objs = combined_objs[sel]
+
+        merged = np.vstack([archive_objs, objs])
+        archive_objs = merged[_nondominated(merged)]
+        hv_history.append(hypervolume_nd(archive_objs, reference))
+
+    final_mask = _non_dominated_sort(objs)[0]
+    front_obj = objs[final_mask]
+    order = np.argsort(front_obj[:, 0])
+    front_obj = front_obj[order]
+    front_dec = pop[final_mask][order]
+    front_dens = np.array([_full_density(g) for g in front_dec])
+    return MultiObjectiveTOResult(
+        front_objectives=front_obj,
+        front_densities=front_dens,
+        hv_history=hv_history,
+        reference_point=reference,
+        n_front=front_obj.shape[0],
+    )
