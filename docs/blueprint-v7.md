@@ -60,7 +60,7 @@ v7 完成 = `python scripts/test_agent.py --rubric v7` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] MM — Reliability-based TO（FORM→SIMP）
+- [x] MM — Reliability-based TO（FORM→SIMP）（D042 · 9 tests green · 线性极限态 FORM β==解析闭式 + 高 β_target 需更多材料）
 - [ ] NN — 逐单元各向异性热场 + 各向异性热 TO
 - [ ] OO — 几何非线性 TO（TL 伴随）
 - [ ] PP — 相关 / 非高斯不确定性（Nataf）

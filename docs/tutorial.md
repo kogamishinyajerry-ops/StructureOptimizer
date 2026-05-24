@@ -823,6 +823,38 @@ g = reverse_grad(lambda v: 100*(v[1]-v[0]**2)**2 + (1-v[0])**2, np.array([0.7, -
 遍历，2 万深的链也不会撞 Python 递归上限。仅支持 + - * / ** neg（灵敏度验证工具，
 非 JAX/PyTorch 替代）。
 
+## 17. v7 — production drivers & field-level fidelity
+
+v7 把 v6 的严格**正向求解器**接入**优化驱动器**，并把残留的全局/均匀简化提升到
+**逐单元场级保真**。每个升级源自一条 v5/v6 ADR 的 reopening criterion。
+
+### 17.1 Reliability-based TO（Wave MM，D042）
+
+v6 的 FORM（D038）只能**评估**给定结构的失效概率；v7 把它接进 SIMP **驱动器**：在
+载荷幅值不确定（乘性因子 `s ~ N(1, cov)`）下，对**可靠度约束** β ≥ β_target 求最轻设计。
+线性弹性位移随载荷线性变化，故位移极限态 `g(s)=d_allow − s·d_nom` 在标准正态空间线性，
+FORM 精确：`β = (d_allow − d_nom)/(cov·d_nom)`。
+
+```python
+import numpy as np
+from structure_optimizer.benchmarks.registry import load_benchmark
+from structure_optimizer.core.mesh import create_structured_mesh
+from structure_optimizer.core.rbto import displacement_reliability, rbto_simp
+
+config = load_benchmark("cantilever", preset="smoke")
+mesh = create_structured_mesh(config)
+# 评估某设计在 cov=0.15 下的可靠度指标 β（FORM，对线性极限态精确）
+res = displacement_reliability(d_nominal=0.8, d_allow=1.0, load_cov=0.15)
+print(res.beta, res.p_failure)          # β = (1−0.8)/(0.15·0.8) = 1.667
+# 求满足 β ≥ 2.0 的最轻 min-compliance 设计（对体积分数二分）
+out = rbto_simp(config, mesh, d_allow=1.2, beta_target=2.0, load_cov=0.15)
+print(out.feasible, out.volume_fraction, out.beta)
+```
+
+**关键升级**：FORM β 与解析闭式**机器精度一致**（1e-7）；因 min-compliance 拓扑对载荷
+均匀缩放不变，可靠度旋钮是**体积分数**——更多材料 → d_nom 下降 → β 上升。更苛刻的
+β_target 需要 ≥ 同等的材料量（RBTO vs 确定性设计的差异，可量化）。仍 numpy-only / 2D。
+
 ---
 
 ## 常见错误
