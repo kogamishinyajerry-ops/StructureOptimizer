@@ -1540,6 +1540,30 @@ Pareto 兼容（支配前沿 R2 严格更低；加入被支配解 R2 不变）+ 
 （正当地）分歧；refHV 的 margin 是**约定**（同 margin 下不影响排序，跨前沿比较仍首选共享显式参考点）。HV 算法本身仍是
 D068 的精确版，UUU 只加参考点推导便利。
 
+### 21.4 Gumbel copula + d 维交换 Clayton（Wave VVV，D077）
+
+D069 给了双变量 Clayton/Frank（下尾/无尾相依），但缺**上尾相依的 Gumbel**，且 Rosenblatt 变换写死 2 变量。VVV 两个都补。
+
+```python
+from structure_optimizer.core.reliability import gumbel_copula, build_clayton_rosenblatt, Marginal
+
+g = gumbel_copula(2.3)                 # θ≥1，上尾相依
+w = g.conditional_cdf(u1, u2)          # C_{2|1}=∂C/∂u1（闭式）；逆用二分（无闭式）
+tau = g.kendall_tau()                  # 1 − 1/θ
+
+# d 维交换 Clayton 的 Rosenblatt 变换（闭式生成元导数 → 全闭式 sequential）
+T = build_clayton_rosenblatt([Marginal('normal',0,1)]*4, theta=1.7)
+z = T.x_to_u(x); x_back = T.u_to_x(z)  # form_hlrf 直接复用 T.wrap_limit_state
+```
+
+d 维交换 Clayton 用生成元 `φ(u)=u^{-θ}−1`、逆 `ψ(s)=(1+s)^{-1/θ}`。因为 `ψ^{(j)}` 的常数因子和符号在条件比值里**抵消**，
+条件 CDF 是闭式 `C_{k|1..k-1}=(T_k/T_{k-1})^{-(1/θ+k−1)}`（`T_j=Σ_{i≤j}u_i^{-θ}−(j−1)`），逆也闭式——所以任意维全解析。
+
+**关键 / 定量锚点**：Gumbel 条件 CDF vs 数值 ∂C/∂u1 ≤1e-6 + 二分逆 round-trip ≤1e-9 + τ=1−1/θ；d 维 Clayton 条件 CDF
+**对上混合偏导比值**（真 Rosenblatt 定义）≤1e-5（实测 4e-7）+ z→x→z round-trip ≤1e-9（d=3,4）+ 3000 样本经验 τ 还原
+θ/(θ+2)（±0.04）。**诚实边界**：Gumbel 逆是**二分非闭式**；d 维仅**交换 Clayton**（单 θ 全对称）——非嵌套/分层、非 d 维
+Gumbel/Frank（后者生成元导数需 Bell 多项式/数值微分，deferred）；marginal 仍走正态映射不在此改进；未暴露尾相依系数。
+
 ---
 
 ## 常见错误

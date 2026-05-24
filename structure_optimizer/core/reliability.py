@@ -783,18 +783,23 @@ class ArchimedeanCopula:
     theta: float
 
     def __post_init__(self) -> None:
-        if self.family not in ("clayton", "frank"):
+        if self.family not in ("clayton", "frank", "gumbel"):
             raise SolverError("copula_unknown_family")
         if self.family == "clayton" and self.theta <= 0.0:
             raise SolverError("copula_clayton_nonpositive_theta")
         if self.family == "frank" and self.theta == 0.0:
             raise SolverError("copula_frank_zero_theta")
+        if self.family == "gumbel" and self.theta < 1.0:
+            raise SolverError("copula_gumbel_theta_below_one")
 
     def cdf(self, u1: float, u2: float) -> float:
         """The copula CDF ``C(u₁,u₂)``."""
         th = self.theta
         if self.family == "clayton":
             return float((u1 ** (-th) + u2 ** (-th) - 1.0) ** (-1.0 / th))
+        if self.family == "gumbel":
+            a = (-np.log(u1)) ** th + (-np.log(u2)) ** th
+            return float(np.exp(-(a ** (1.0 / th))))
         a = np.expm1(-th)  # e^{-θ}−1
         return float(-1.0 / th * np.log1p(np.expm1(-th * u1) * np.expm1(-th * u2) / a))
 
@@ -803,6 +808,10 @@ class ArchimedeanCopula:
         th = self.theta
         if self.family == "clayton":
             return float(u1 ** (-th - 1.0) * (u1 ** (-th) + u2 ** (-th) - 1.0) ** (-1.0 / th - 1.0))
+        if self.family == "gumbel":
+            a = (-np.log(u1)) ** th + (-np.log(u2)) ** th
+            cval = np.exp(-(a ** (1.0 / th)))
+            return float(cval * a ** (1.0 / th - 1.0) * (-np.log(u1)) ** (th - 1.0) / u1)
         a = np.expm1(-th)
         p = np.exp(-th * u1)
         qm = np.expm1(-th * u2)  # e^{-θu₂}−1
@@ -810,19 +819,32 @@ class ArchimedeanCopula:
 
     def conditional_ppf(self, u1: float, w: float) -> float:
         """Inverse of :meth:`conditional_cdf` in ``u₂``: returns ``u₂`` with
-        ``C_{2|1}(u₂|u₁) = w``. Closed form for both families."""
+        ``C_{2|1}(u₂|u₁) = w``. Closed form for Clayton/Frank; bisection for Gumbel
+        (no closed form — the conditional is monotone in ``u₂``)."""
         th = self.theta
         if self.family == "clayton":
             return float((u1 ** (-th) * (w ** (-th / (th + 1.0)) - 1.0) + 1.0) ** (-1.0 / th))
+        if self.family == "gumbel":
+            lo, hi = 1e-12, 1.0 - 1e-12
+            for _ in range(100):
+                mid = 0.5 * (lo + hi)
+                if self.conditional_cdf(u1, mid) < w:
+                    lo = mid
+                else:
+                    hi = mid
+            return float(0.5 * (lo + hi))
         a = np.expm1(-th)
         p = np.exp(-th * u1)
         return float(-1.0 / th * np.log1p(w * a / (p * (1.0 - w) + w)))
 
     def kendall_tau(self) -> float:
-        """Closed-form Kendall's τ: Clayton ``θ/(θ+2)``; Frank ``1 − 4/θ(1 − D₁(θ))``."""
+        """Closed-form Kendall's τ: Clayton ``θ/(θ+2)``; Frank ``1 − 4/θ(1 − D₁(θ))``;
+        Gumbel ``1 − 1/θ``."""
         th = self.theta
         if self.family == "clayton":
             return float(th / (th + 2.0))
+        if self.family == "gumbel":
+            return float(1.0 - 1.0 / th)
         return float(1.0 - 4.0 / th * (1.0 - _debye1(th)))
 
 
@@ -834,6 +856,11 @@ def clayton_copula(theta: float) -> ArchimedeanCopula:
 def frank_copula(theta: float) -> ArchimedeanCopula:
     """Frank copula (symmetric, no tail dependence), ``θ ≠ 0``."""
     return ArchimedeanCopula(family="frank", theta=float(theta))
+
+
+def gumbel_copula(theta: float) -> ArchimedeanCopula:
+    """Gumbel copula (upper-tail dependence), ``θ ≥ 1`` (Wave VVV, D077)."""
+    return ArchimedeanCopula(family="gumbel", theta=float(theta))
 
 
 def _marginal_cdf(m: Marginal, x: float) -> float:
@@ -893,6 +920,132 @@ def build_copula_rosenblatt(marginals: list[Marginal], copula: ArchimedeanCopula
     if len(marginals) != 2:
         raise SolverError("copula_rosenblatt_requires_two_marginals")
     return CopulaRosenblattTransform(marginals=list(marginals), copula=copula)
+
+
+@dataclass
+class ExchangeableClaytonCopula:
+    """``d``-variate **exchangeable Clayton** copula via the Archimedean generator
+    (Wave VVV, D077).
+
+    Generator ``φ(u) = u^{-θ} − 1`` with inverse ``ψ(s) = (1+s)^{-1/θ}``, so
+
+        C(u₁,…,u_d) = ψ( Σ_i φ(u_i) ) = ( Σ_i u_i^{-θ} − (d−1) )^{-1/θ}.
+
+    Because ``ψ^{(j)}(s) = (−1)^j [Π_{l<j}(1/θ+l)] (1+s)^{-1/θ-j}``, the sequential
+    Rosenblatt **conditional CDF** (the constant Π and sign cancel in the ratio) is
+    the closed form
+
+        C_{k|1..k-1}(u_k | u_{<k}) = (T_k / T_{k-1})^{-(1/θ + k − 1)},
+        T_j = Σ_{i≤j} u_i^{-θ} − (j−1),
+
+    and the conditional inverse is closed form too — so a ``d``-dim Clayton
+    Rosenblatt transform is fully analytic (validated against numerical mixed
+    partials of the copula CDF to ≈ 1e-7). Pairwise Kendall's τ = ``θ/(θ+2)``.
+    """
+
+    dim: int
+    theta: float
+
+    def __post_init__(self) -> None:
+        if self.dim < 2:
+            raise SolverError("clayton_d_copula_dim_too_small")
+        if self.theta <= 0.0:
+            raise SolverError("copula_clayton_nonpositive_theta")
+
+    def _t(self, u: np.ndarray, j: int) -> float:
+        """``T_j = Σ_{i<j} u_i^{-θ} − (j−1)`` over the first ``j`` components."""
+        th = self.theta
+        return float(np.sum(np.asarray(u[:j], dtype=float) ** (-th)) - (j - 1))
+
+    def cdf(self, u: np.ndarray) -> float:
+        """The ``d``-variate copula CDF ``C(u)``."""
+        u = np.asarray(u, dtype=float)
+        if u.shape[0] != self.dim:
+            raise SolverError("clayton_d_copula_dim_mismatch")
+        th = self.theta
+        return float((np.sum(u ** (-th)) - (self.dim - 1)) ** (-1.0 / th))
+
+    def conditional_cdf(self, u_upto_k: np.ndarray) -> float:
+        """``C_{k|1..k-1}(u_k | u_{<k})`` where ``k = len(u_upto_k)`` (k ≥ 2)."""
+        u = np.asarray(u_upto_k, dtype=float)
+        k = u.shape[0]
+        if k < 2 or k > self.dim:
+            raise SolverError("clayton_d_conditional_bad_k")
+        th = self.theta
+        return float((self._t(u, k) / self._t(u, k - 1)) ** (-(1.0 / th + (k - 1))))
+
+    def conditional_ppf(self, u_prev: np.ndarray, w: float, k: int) -> float:
+        """Inverse of :meth:`conditional_cdf` in ``u_k``: return ``u_k`` with
+        ``C_{k|1..k-1}(u_k | u_prev) = w`` (``u_prev`` has the first ``k−1`` comps)."""
+        u_prev = np.asarray(u_prev, dtype=float)
+        if k < 2 or k > self.dim or u_prev.shape[0] != k - 1:
+            raise SolverError("clayton_d_conditional_bad_k")
+        th = self.theta
+        e_k = 1.0 / th + (k - 1)
+        t_km1 = self._t(u_prev, k - 1)
+        uk_pow = t_km1 * (w ** (-1.0 / e_k) - 1.0) + 1.0
+        return float(uk_pow ** (-1.0 / th))
+
+    def kendall_tau(self) -> float:
+        """Pairwise Kendall's τ = ``θ/(θ+2)`` (exchangeable)."""
+        return float(self.theta / (self.theta + 2.0))
+
+
+def clayton_d_copula(dim: int, theta: float) -> ExchangeableClaytonCopula:
+    """``d``-variate exchangeable Clayton copula (``θ > 0``)."""
+    return ExchangeableClaytonCopula(dim=int(dim), theta=float(theta))
+
+
+@dataclass
+class ClaytonRosenblattTransform:
+    """Rosenblatt transform of a ``d``-variate joint distribution: ``d`` marginals
+    coupled by an exchangeable Clayton copula (Wave VVV, D077).
+
+    Sequential map ``x → u``: ``u_i = F_i(x_i)``; ``w_1 = u_1``,
+    ``w_k = C_{k|1..k-1}(u_k | u_{<k})``; ``z = Φ⁻¹(w)``. ``u_to_x`` is the
+    sequential inverse. Mirrors :class:`CopulaRosenblattTransform` (D069) at
+    arbitrary dimension so ``form_hlrf`` runs unchanged via ``wrap_limit_state``.
+    """
+
+    marginals: list[Marginal]
+    copula: ExchangeableClaytonCopula
+
+    @property
+    def n_vars(self) -> int:
+        return self.copula.dim
+
+    def x_to_u(self, x: np.ndarray) -> np.ndarray:
+        x = np.asarray(x, dtype=float)
+        d = self.copula.dim
+        u = np.array([_clip_unit(_marginal_cdf(self.marginals[i], float(x[i]))) for i in range(d)])
+        z = np.empty(d)
+        z[0] = _standard_normal_ppf(u[0])
+        for k in range(2, d + 1):
+            w = _clip_unit(self.copula.conditional_cdf(u[:k]))
+            z[k - 1] = _standard_normal_ppf(w)
+        return z
+
+    def u_to_x(self, u: np.ndarray) -> np.ndarray:
+        u = np.asarray(u, dtype=float)
+        d = self.copula.dim
+        w = np.array([_clip_unit(_standard_normal_cdf(float(u[i]))) for i in range(d)])
+        uc = np.empty(d)  # copula-uniform components
+        uc[0] = w[0]
+        for k in range(2, d + 1):
+            uc[k - 1] = _clip_unit(self.copula.conditional_ppf(uc[: k - 1], float(w[k - 1]), k))
+        return np.array([_marginal_ppf(self.marginals[i], float(uc[i])) for i in range(d)])
+
+    def wrap_limit_state(self, g_physical: Callable[[np.ndarray], float]) -> Callable[[np.ndarray], float]:
+        """Turn a physical-space limit state g(x) into a U-space g(u) for ``form_hlrf``."""
+        return lambda u: g_physical(self.u_to_x(u))
+
+
+def build_clayton_rosenblatt(marginals: list[Marginal], theta: float) -> ClaytonRosenblattTransform:
+    """Construct a ``d``-variate :class:`ClaytonRosenblattTransform` (``d ≥ 2``)."""
+    d = len(marginals)
+    if d < 2:
+        raise SolverError("clayton_rosenblatt_requires_two_marginals")
+    return ClaytonRosenblattTransform(marginals=list(marginals), copula=clayton_d_copula(d, theta))
 
 
 # ---------------------------------------------------------------------------

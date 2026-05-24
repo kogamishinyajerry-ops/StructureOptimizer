@@ -61,7 +61,7 @@ v11 完成 = `python scripts/test_agent.py --rubric v11` 报告：
 - [x] SSS — 应力奇异性松弛（qp-relaxed）；屈曲约束驱动 deferred 到 D074 reopening
 - [x] TTT — 自适应频带采样 + peak-as-constraint
 - [x] UUU — reference-free 多目标质量指标
-- [ ] VVV — d 维 / Gumbel Archimedean copula
+- [x] VVV — d 维 / Gumbel Archimedean copula
 - [ ] WWW — 全相关矩阵 + Genz 精确多元系统 P_f
 - [ ] XXX — 弹性同时 (ρ,θ) MMA + fibre-continuity
 - [ ] YYY — 约束 Delaunay 多孔平滑+水密
