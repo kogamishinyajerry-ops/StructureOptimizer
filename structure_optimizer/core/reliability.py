@@ -749,3 +749,90 @@ def build_nataf_general(
     except np.linalg.LinAlgError as exc:
         raise SolverError("nataf_correlation_not_positive_definite") from exc
     return NatafTransform(marginals=marginals, correlation_x=rho, correlation_u=rz, chol=chol)
+
+
+# ---------------------------------------------------------------------------
+# Wave ZZ (v8, D055): system reliability — series systems + Ditlevsen bounds.
+#
+# D042 (RBTO) and D038 (FORM) handle a *single* limit state. Real structures
+# fail through one of several modes (series system) or only when several fail
+# together (parallel). The failure probability of a series system is bounded by
+# Ditlevsen's second-order bounds, which need the pairwise joint failure
+# probabilities P(F_i ∩ F_j) = Φ₂(−β_i, −β_j; ρ_ij) — hence a bivariate-normal
+# CDF, computed here by the exact ρ-integral identity.
+# ---------------------------------------------------------------------------
+
+
+def bivariate_normal_cdf(a: float, b: float, rho: float, n_nodes: int = 64) -> float:
+    """Φ₂(a, b; ρ) = P(X ≤ a, Y ≤ b) for standard bivariate normal, correlation ρ.
+
+    Uses the exact identity Φ₂(a,b;ρ) = Φ(a)Φ(b) + ∫₀^ρ φ₂(a,b;r) dr with the
+    bivariate density φ₂, integrated by Gauss-Legendre quadrature (numpy-only).
+    """
+    if not (-1.0 <= rho <= 1.0):
+        raise SolverError("bvn_rho_out_of_range")
+    rho = float(np.clip(rho, -0.999999, 0.999999))
+    pa, pb = _standard_normal_cdf(a), _standard_normal_cdf(b)
+    if rho == 0.0:
+        return float(pa * pb)
+    t, w = np.polynomial.legendre.leggauss(n_nodes)
+    r = rho * (t + 1.0) / 2.0
+    dens = np.exp(-(a * a - 2.0 * r * a * b + b * b) / (2.0 * (1.0 - r * r))) / (2.0 * np.pi * np.sqrt(1.0 - r * r))
+    return float(pa * pb + (rho / 2.0) * float(np.sum(w * dens)))
+
+
+def system_reliability_series(betas, correlation: np.ndarray | None = None, n_nodes: int = 64) -> dict:
+    """Failure probability of a **series** system (fails if ANY mode fails).
+
+    Args:
+        betas:        per-mode reliability indices β_k (P_k = Φ(−β_k)).
+        correlation:  m×m matrix of limit-state correlations ρ_ij = α_iᵀα_j
+                      (FORM MPP directions). Defaults to the identity (independent).
+
+    Returns a dict with the simple unimodal bounds (max P_i ≤ P_f ≤ Σ P_i) and the
+    tighter **Ditlevsen** second-order bounds (components ordered by descending
+    P_i, as the method requires for the tightest bounds).
+    """
+    betas = np.asarray(betas, dtype=float).reshape(-1)
+    m = betas.size
+    if m < 1:
+        raise SolverError("system_reliability_no_modes")
+    rho = np.eye(m) if correlation is None else np.asarray(correlation, dtype=float)
+    if rho.shape != (m, m):
+        raise SolverError("system_reliability_correlation_shape")
+
+    p = np.array([_standard_normal_cdf(-b) for b in betas])
+    simple_lower = float(p.max())
+    simple_upper = float(min(1.0, p.sum()))
+    if m == 1:
+        return {
+            "p_failure_lower": float(p[0]), "p_failure_upper": float(p[0]),
+            "simple_lower": float(p[0]), "simple_upper": float(p[0]),
+        }
+
+    order = np.argsort(-p)  # descending P_i for the tightest Ditlevsen bounds
+    bo = betas[order]
+    ro = rho[np.ix_(order, order)]
+    po = p[order]
+
+    def pij(i: int, j: int) -> float:
+        return bivariate_normal_cdf(-bo[i], -bo[j], float(ro[i, j]), n_nodes)
+
+    lower = float(po[0])
+    upper = float(po[0])
+    for i in range(1, m):
+        joints = [pij(i, j) for j in range(i)]
+        lower += max(0.0, float(po[i] - sum(joints)))
+        upper += float(po[i] - max(joints))
+    lower = float(np.clip(lower, simple_lower, simple_upper))
+    upper = float(np.clip(upper, simple_lower, simple_upper))
+    return {
+        "p_failure_lower": lower, "p_failure_upper": upper,
+        "simple_lower": simple_lower, "simple_upper": simple_upper,
+    }
+
+
+def system_reliability_parallel(beta_i: float, beta_j: float, rho: float, n_nodes: int = 64) -> float:
+    """Failure probability of a 2-component **parallel** system (fails iff BOTH
+    fail): P = P(F_i ∩ F_j) = Φ₂(−β_i, −β_j; ρ)."""
+    return bivariate_normal_cdf(-beta_i, -beta_j, rho, n_nodes)

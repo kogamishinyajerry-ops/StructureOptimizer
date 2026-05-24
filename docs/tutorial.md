@@ -1115,6 +1115,26 @@ res = fibre_steering_thermal_to(config, mesh, rho, 5.0, 1.0, n_steps=20,
 （kxx==kyy）灵敏度恒零**（旋转各向同性导体无效，精确解析检验）；最速下降使热柔度降 ~33% 单调。
 仅优化**方向场**（密度固定）；耦合密度+方向、角度场滤波/连续化是后续（见 D054）。
 
+### 18.6 系统可靠性（串/并联，Ditlevsen 界，Wave ZZ，D055）
+
+v6/v7 的 FORM 只算**单**极限态；v8 处理**多失效模式系统**。串联系统（任一模式失效即失效）的
+失效概率用 **Ditlevsen 二阶界**，需要二元正态 CDF Φ₂(−β_i,−β_j;ρ_ij)：
+
+```python
+import numpy as np
+from structure_optimizer.core.reliability import (
+    bivariate_normal_cdf, system_reliability_series, system_reliability_parallel)
+r = system_reliability_series([2.0, 2.5, 3.0])               # 独立串联
+rho = np.full((3,3), 0.8); np.fill_diagonal(rho, 1.0)
+rc = system_reliability_series([2.0, 2.5, 3.0], rho)         # 相关串联
+# r['p_failure_lower'/'upper'] = Ditlevsen 界；'simple_lower'/'upper' = 单模界
+```
+
+**关键 / 诚实边界**：二元正态 CDF 三个特例精确（ρ=0 乘积、Φ₂(0,0;ρ)=¼+asin(ρ)/2π 闭式、ρ→1→min）；
+单模式串联=Φ(−β)；独立串联落在 Ditlevsen 界内且比简单界紧；**正相关降低串联失效**（模式重叠）。
+ρ 钳到 0.999999，故 ρ=1 不精确退化（残差 ~2%，因 φ₂ 在 ρ=1 近奇异）；串联任意 m，并联仅 2 模式
+（m>2 并联需多元正态 CDF，见 D055）。
+
 ---
 
 ## 常见错误

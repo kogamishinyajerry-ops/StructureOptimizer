@@ -66,7 +66,7 @@ v8 完成 = `python scripts/test_agent.py --rubric v8` 报告：
 - [x] WW — 梯度种子 NSGA-III（D052 · 4 tests green · 种子前沿超体积 +45% > 随机 + min 柔度 223 vs 2094（梯度质量端点）+ 单调 + 可复现）
 - [x] XX — 一般 marginal Nataf（Gauss-Hermite）（D053 · 7 tests green · GH 积分 vs 对数正态闭式 3e-11 + Weibull/Gumbel 矩与 round-trip + 单调 + 一般 Nataf round-trip）
 - [x] YY — 纤维转向热 TO（D054 · 3 tests green · orientation 灵敏度 vs FD 1e-9 + 各向同性基张量灵敏度恒零 + 转向使热柔度降 33% 单调）
-- [ ] ZZ — 系统可靠性（多极限态串/并联）
+- [x] ZZ — 系统可靠性（多极限态串/并联）（D055 · 6 tests green · 二元正态 CDF 三个精确特例 + 单模式=Φ(−β) + 独立串联在 Ditlevsen 界内且比简单界紧 + 正相关降串联失效）
 - [ ] AAA — MS 嵌套环 → ear-clipping 封顶
 - [ ] BBB — v8 收口（rubric ≥ 99）
 
