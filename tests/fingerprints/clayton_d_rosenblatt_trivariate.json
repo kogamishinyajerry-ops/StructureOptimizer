@@ -1,0 +1,30 @@
+{
+  "benchmark": "clayton_trivariate",
+  "rubric_version": "v11.0-wave-VVV",
+  "kind": "clayton_d_rosenblatt",
+  "marginals": [
+    [
+      "normal",
+      10.0,
+      2.0
+    ],
+    [
+      "lognormal",
+      0.5,
+      0.3
+    ],
+    [
+      "normal",
+      -1.0,
+      0.5
+    ]
+  ],
+  "theta": 1.7,
+  "x": [
+    11.5,
+    1.9,
+    -0.7
+  ],
+  "u0": 0.7500000000000001,
+  "u_sha256": "sha256:8c013502964f70ea9afcd197a0d17ba72bf573f47fc572324274f944b7ec571f"
+}

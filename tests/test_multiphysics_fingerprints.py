@@ -528,6 +528,60 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         ]
         return field, ("field_sha256", rec["field_sha256"]), checks
 
+    if kind == "qp_relaxed_stress":
+        from structure_optimizer.core.simp import run_simp
+        from structure_optimizer.core.stress import qp_relaxed_stress_pnorm_sensitivity
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        rho = run_simp(config, mesh).densities
+        sigma_pn, dsdrho = qp_relaxed_stress_pnorm_sensitivity(config, mesh, rho, p=rec["p"], q=rec["q"])
+        checks = [("sigma_pn", rec["sigma_pn"], sigma_pn)]
+        return np.asarray(dsdrho), ("dsdrho_sha256", rec["dsdrho_sha256"]), checks
+
+    if kind == "adaptive_band":
+        from structure_optimizer.core.freq_response import adaptive_band_sample
+        from structure_optimizer.core.modal import solve_modal
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        opt = config.optimization
+        rho = np.where(mesh.void_mask, opt.min_density, opt.volume_fraction)
+        w1 = float(np.sqrt(solve_modal(config, mesh, rho, n_modes=1).omega_squared[0]))
+        lo, hi = rec["band_factors"]
+        ab = adaptive_band_sample(
+            config, mesh, rho, lo * w1, hi * w1, n_init=rec["n_init"], n_refine=rec["n_refine"], beta=rec["beta"]
+        )
+        checks = [("peak_value", rec["peak_value"], ab.peak_value), ("peak_omega", rec["peak_omega"], ab.peak_omega)]
+        return np.asarray(ab.omegas), ("omegas_sha256", rec["omegas_sha256"]), checks
+
+    if kind == "r2_indicator":
+        from structure_optimizer.core.multi_objective_to import r2_indicator, reference_free_hypervolume
+
+        front = np.asarray(rec["front"], dtype=float)
+        r2 = r2_indicator(front, ideal=np.asarray(rec["ideal"], dtype=float))
+        hv = reference_free_hypervolume(front, margin=rec["margin"])
+        checks = [("r2", rec["r2"], r2), ("reference_free_hv", rec["reference_free_hv"], hv)]
+        return np.array([r2, hv]), ("values_sha256", rec["values_sha256"]), checks
+
+    if kind == "clayton_d_rosenblatt":
+        from structure_optimizer.core.reliability import Marginal, build_clayton_rosenblatt
+
+        marginals = [Marginal(k, a, b) for k, a, b in rec["marginals"]]
+        tr = build_clayton_rosenblatt(marginals, theta=rec["theta"])
+        u = tr.x_to_u(np.asarray(rec["x"]))
+        checks = [("u0", rec["u0"], u[0])]
+        return np.asarray(u), ("u_sha256", rec["u_sha256"]), checks
+
+    if kind == "genz_mvn":
+        from structure_optimizer.core.reliability import system_reliability_series_exact
+
+        pf = system_reliability_series_exact(
+            np.asarray(rec["betas"]), np.asarray(rec["correlation"]), n_samples=rec["n_samples"], seed=rec["seed"]
+        )
+        checks = [("p_failure", rec["p_failure"], pf)]
+        return np.array([pf]), ("pf_sha256", rec["pf_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -597,6 +651,12 @@ def test_multiphysics_fingerprint_set_present():
         "copula_rosenblatt_clayton",
         "simultaneous_coupled_heat_sink__smoke",
         "smooth_watertight_ring",
+        # v11 exact-&-robust drivers (Wave ZZZ closure)
+        "qp_relaxed_stress_cantilever__smoke",
+        "adaptive_band_cantilever__smoke",
+        "reference_free_indicators",
+        "clayton_d_rosenblatt_trivariate",
+        "genz_system_reliability",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

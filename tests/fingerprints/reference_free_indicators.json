@@ -1,0 +1,27 @@
+{
+  "benchmark": "r2_three_point_front",
+  "rubric_version": "v11.0-wave-UUU",
+  "kind": "r2_indicator",
+  "front": [
+    [
+      3.0,
+      1.0
+    ],
+    [
+      2.0,
+      2.0
+    ],
+    [
+      1.0,
+      3.0
+    ]
+  ],
+  "ideal": [
+    0.0,
+    0.0
+  ],
+  "margin": 0.1,
+  "r2": 0.9636363636363637,
+  "reference_free_hv": 1.8400000000000007,
+  "values_sha256": "sha256:b0d90358abc799b7447006d382c7ae36d7b3f6fc3ee1353e4b98b154d8b93e34"
+}

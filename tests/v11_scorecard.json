@@ -1,0 +1,273 @@
+{
+  "version": "v11.0.0",
+  "total_max": 100,
+  "total_earned": 100,
+  "items": [
+    {
+      "section": "\u00a71",
+      "code": "1.1",
+      "title": "\u5e94\u529b\u5947\u5f02\u6027\u677e\u5f1b\uff08qp-relaxed\uff09",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "qp-relaxed stress + qp-stress-constrained MMA + test (buckling-driving deferred to D074 reopening)"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.2",
+      "title": "\u81ea\u9002\u5e94\u9891\u5e26 + peak \u7ea6\u675f",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "adaptive band sampling + peak-as-constraint + test"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.3",
+      "title": "reference-free \u8d28\u91cf\u6307\u6807",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "reference-free quality indicator + test"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.1",
+      "title": "d \u7ef4 / Gumbel copula",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "Gumbel / d-dim copula + round-trip test"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.2",
+      "title": "Genz \u7cbe\u786e\u591a\u5143\u7cfb\u7edf P_f",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "Genz multivariate system P_f + test"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.1",
+      "title": "\u5f39\u6027\u540c\u65f6 (\u03c1,\u03b8) MMA",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "elastic simultaneous (\u03c1,\u03b8) MMA + fibre-continuity test"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.2",
+      "title": "\u7ea6\u675f Delaunay \u591a\u5b54\u6c34\u5bc6",
+      "max_points": 7,
+      "earned": 7,
+      "status": "PASS",
+      "evidence": "constrained-Delaunay multi-hole + test"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.1",
+      "title": "Test count \u2265 1050",
+      "max_points": 4,
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "1075 tests collected"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.2",
+      "title": "Core coverage \u2265 95% (\u542b v11)",
+      "max_points": 4,
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "95.6% coverage"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.3",
+      "title": "Property tests \u2265 48",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "50 property tests"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.4",
+      "title": "Mutation kill rate \u2265 75%",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "80.0% kill rate"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.5",
+      "title": "Fingerprint DB \u2265 55",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "55 fingerprints"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.6",
+      "title": "pytest gate green (D033)",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "D033 gate + ADR"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.7",
+      "title": "v11 rubric \u5199\u5165 agent + CI",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "v11 in agent + CI"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.1",
+      "title": "\u5e94\u529b\u677e\u5f1b+\u5c48\u66f2 / \u81ea\u9002\u5e94\u9891\u5e26 demo",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "7 robust-driver-demo refs"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.2",
+      "title": "reference-free \u6307\u6807 demo",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "6 indicator-demo refs"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.3",
+      "title": "Gumbel / Genz demo",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "6 reliability-demo refs"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.4",
+      "title": "\u5f39\u6027 MMA / \u7ea6\u675f Delaunay demo",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "10 geometry-demo refs"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.1",
+      "title": "blueprint-v11 \u22656 ticks",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "12 ticks"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.2",
+      "title": "tutorial v11 \u22654 new sections",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "7 v11 subsections"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.3",
+      "title": "architecture v11 section",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "v11 section present"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.4",
+      "title": "ADRs D074+ \u2265 7",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "8 v11 ADRs"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.5",
+      "title": "v11 quantitative anchors documented",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "87 v11-anchor refs"
+    }
+  ],
+  "v1_check": {
+    "score": 100,
+    "regression": false,
+    "missing": []
+  },
+  "v2_check": {
+    "score": 97,
+    "regression": false,
+    "missing": []
+  },
+  "v3_check": {
+    "score": 99,
+    "regression": false,
+    "missing": []
+  },
+  "v4_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v5_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v6_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v7_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v8_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v9_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v10_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "pytest_check": {
+    "passed": 1071,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 4,
+    "returncode": 0,
+    "green": true,
+    "regression": false
+  }
+}

@@ -701,3 +701,43 @@ v9 把 driver 升到二阶，但多处仍是**单约束 / 高斯 copula / 块坐
 - 相关系统仅**单标量等相关** + Ditlevsen 界中点（≥3 模态带界差）；ρ∈[0,1)（D071）。
 - 平滑水密仅 **annulus（单孔/区域）**；轮廓重采样（面积"≈"）；水密是拓扑（强偏心孔 rung 可能几何自交）（D072）。
 - 详见 D066-D072 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 21. v11 — exact & robust: 应力奇异性松弛 + 一般 copula 维度 + 精确系统积分 + 约束 Delaunay
+
+v10 把 driver 升到约束丰富 + 可制造，但多处仍是**未处理应力奇异性 / 仅双变量 copula / 界中点近似 / 单孔
+几何 / 一阶投影梯度**。v11 = **精确化 + 鲁棒化（exact & robust）**：每个 wave 追溯到一条 v10（或更早）
+ADR 明列的 "Reopening criteria"——§20.2 的限制由此逐条解除：
+
+| v10 限制（§20.2） | v11 升级 | 模块 | ADR | 定量锚点 |
+|---|---|---|---|---|
+| raw 应力不解奇异性 | **qp-relaxed 应力**（σ̃=ρ^q·σ_vm）约束 MMA | `core/stress.py` + `core/nonlinear_simp.py` | D074 | qp 灵敏度 vs central-FD ≤1e-4（显式+隐式）+ 松弛按 ρ^q 抑制奇异性 + 双约束绑定。屈曲驱动 **deferred**（分析级灵敏度探针 λ 20.1→8.1）|
+| 固定频带采样 + peak 作目标 | **自适应采样 + peak-as-constraint** | `core/freq_response.py` | D075 | 自适应 25 evals 还原 dense-400 峰 0.015% vs uniform-7 漏 41% + peak 约束绑定 3.99e5→2.23e4 |
+| IGD⁺ 需参考前沿 | **reference-free 指标**（R2 + 自动参考点 HV）| `core/multi_objective_to.py` | D076 | R2 闭式 5/6 + 弱 Pareto 兼容 + R2/refHV/IGD⁺ 排序一致 [3,2,1,0] |
+| 仅双变量 Clayton/Frank | **Gumbel + d 维交换 Clayton** | `core/reliability.py` | D077 | Gumbel 条件 vs ∂C/∂u₁ ≤1e-6 + d 维条件 = 混合偏导比值 ≤1e-5 + round-trip ≤1e-9 |
+| Ditlevsen 界（双变量拼） | **Genz 精确多元系统 P_f**（全相关矩阵）| `core/reliability.py` | D078 | Genz→m=2 对精确 Φ₂ ≤1e-3 + R=I 精确 ΠΦ ≤1e-12 + 精确 P_f 落 Ditlevsen 界内 |
+| 同时 MMA 仅热 | **弹性正交各向异性同时 (ρ,θ) + fibre 连续性** | `core/orthotropic_simp.py` | D079 | iso ke 复现闭式 ≤1e-9 + dC/dρ·dC/dθ vs FD ≤1e-4 + 连续性约束绑定 0.46→0.14 |
+| 平滑水密仅 annulus | **约束 Delaunay 多孔**平滑+水密 | `core/stl_export.py` | D080 | 2/3 孔水密（每边恰 2 facet）+ 面积≈外−Σ孔 ≤1% + 边界边==环边 |
+
+### 21.1 exact & robust 原则
+
+- **精确化**：D078 用 Genz 分离变量 MC 把系统 P_f 从 Ditlevsen **界**升到**精确**多元 Φ_m（全相关矩阵）；
+  D076 把质量指标从需参考前沿的 IGD⁺ 升到 reference-free 的 R2 + 自动参考点 HV。
+- **鲁棒化**：D074 用 qp 松弛解经典应力奇异性（低密度单元 σ̃→0）；D075 自适应采样捕获固定网格漏掉的尖锐
+  共振，并把 peak 从目标升为约束；D080 用约束 Delaunay 解 D072 的单孔限制（任意多孔水密）。
+- **一般化**：D077 把 copula 从双变量 Clayton/Frank 升到 Gumbel（上尾相依）+ d 维交换 Clayton（闭式生成元
+  导数）；D079 把同时 (ρ,θ) MMA 从热升到弹性正交各向异性 + fibre 连续性约束。
+- **诚实优于吹嘘**：D074 屈曲驱动**deferred**（分析级 buckling_sensitivity 探针显示 ascent 反把 λ 拉低，绝不
+  谎称可用）；D075 单频约束会被失谐白嫖故用频带 + 必须阻尼；D076 排序一致是经验非定理；D077 Gumbel 逆是
+  二分非闭式、d 维仅交换 Clayton；D078 是 MC 估计非闭式、朴素非点阵；D079 连续性非周期感知、MMA 非凸；
+  D080 无 flip 约束恢复（失败显式报错）。
+
+### 21.2 v11 已知限制（诚实范围）
+
+- qp 松弛 q=2.5/p=8 非自调；**屈曲约束驱动 deferred**（D074 reopening，附 λ-drop 探针证据）。
+- 自适应采样是**贪心二分非全局** band-max 证明；MMA 内每步用固定 band_omegas（D075）。
+- R2 比较多前沿须共享 ideal+weights；排序一致是良构嵌套前沿经验等价（D076）。
+- Gumbel 逆是**二分非闭式**；d 维仅**交换 Clayton**（非嵌套/非 d 维 Gumbel/Frank）（D077）。
+- Genz 是 **MC 估计**（n_samples→∞ 收敛）+ 朴素 MC（非 Korobov 点阵）+ R 须 SPD（D078）。
+- 弹性 (ρ,θ) 连续性度量**非周期感知**（±89° 误罚）+ 单层平面 + MMA 非凸（D079）。
+- 约束 Delaunay **无 flip 恢复**（稀疏/强非凸边界显式报错非默默非水密）+ O(n²) + 拓扑水密（D080）。
+- 详见 D074-D080 各自 "Honest scope notes" + "Reopening criteria"。

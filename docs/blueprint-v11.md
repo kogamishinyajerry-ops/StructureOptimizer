@@ -51,10 +51,10 @@ v10 把 driver 升到约束丰富 + 可制造，但多处仍是**未处理应力
 
 v11 完成 = `python scripts/test_agent.py --rubric v11` 报告：
 
-- [ ] v11 rubric total ≥ 99 / 100
-- [ ] v10/v9/v8/v7/v6/v5/v4 regression = False（各 = 100）
-- [ ] **pytest gate green**（D033 — 0 failed / 0 errors）
-- [ ] 全红线保持
+- [x] v11 rubric total ≥ 99 / 100
+- [x] v10/v9/v8/v7/v6/v5/v4 regression = False（各 = 100）
+- [x] **pytest gate green**（D033 — 0 failed / 0 errors）
+- [x] 全红线保持
 
 ## 进度（wave 勾选）
 
@@ -65,7 +65,7 @@ v11 完成 = `python scripts/test_agent.py --rubric v11` 报告：
 - [x] WWW — 全相关矩阵 + Genz 精确多元系统 P_f
 - [x] XXX — 弹性同时 (ρ,θ) MMA + fibre-continuity
 - [x] YYY — 约束 Delaunay 多孔平滑+水密
-- [ ] ZZZ — v11 收口（rubric ≥ 99）
+- [x] ZZZ — v11 收口（rubric ≥ 99）
 
 > 注：v11 需在 `docs/quality-rubric-v11.md` + `scripts/test_agent.py` 的 `CHECKS_V11`
 > 落地评分项后才能 `--rubric v11` 打分（与 v10 同构：6 section / 100 分 / D033 gate /

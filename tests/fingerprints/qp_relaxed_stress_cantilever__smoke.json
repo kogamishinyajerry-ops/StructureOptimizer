@@ -1,0 +1,10 @@
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "rubric_version": "v11.0-wave-SSS",
+  "kind": "qp_relaxed_stress",
+  "p": 8.0,
+  "q": 2.5,
+  "sigma_pn": 2321.4294107606074,
+  "dsdrho_sha256": "sha256:ff5d0714cb4d7c861776ca1b418d3fa97f1b8a2b6e2350b35964b2df97248f4a"
+}

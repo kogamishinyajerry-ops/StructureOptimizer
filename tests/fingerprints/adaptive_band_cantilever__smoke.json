@@ -1,0 +1,16 @@
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "rubric_version": "v11.0-wave-TTT",
+  "kind": "adaptive_band",
+  "band_factors": [
+    0.8,
+    1.3
+  ],
+  "n_init": 7,
+  "n_refine": 18,
+  "beta": 2e-06,
+  "peak_value": 698818786.4363563,
+  "peak_omega": 36867.46393284244,
+  "omegas_sha256": "sha256:67d9daa16cb57947bbcd45392c34be1f383c440ec34d1e1a7793bd5425fa0bc6"
+}
