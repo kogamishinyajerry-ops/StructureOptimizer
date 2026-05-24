@@ -65,7 +65,7 @@ v7 完成 = `python scripts/test_agent.py --rubric v7` 报告：
 - [x] OO — 几何非线性 TO（TL 伴随）（D044 · 4 tests green · TL 伴随灵敏度 vs 中心差分 rel 2e-4 + 非线性柔度≠线性 + 自伴随线性极限）
 - [x] PP — 相关 / 非高斯不确定性（Nataf）（D045 · 8 tests green · 相关高斯线性极限态 β==(a₀−aᵀμ)/√(aᵀΣa) rel 1e-6 + 对数正态等效相关闭式 1e-12 + Φ⁻¹ 1e-10）
 - [x] QQ — NSGA-III 直接优化密度场（D046 · 6 tests green · 2D 超体积精确解析 + 累积存档超体积单调 + 真密度场柔度/体积 Pareto + 梯度自由前沿不支配梯度 SIMP）
-- [ ] RR — 阻尼频响 TO
+- [x] RR — 阻尼频响 TO（D047 · 5 tests green · 动柔度自伴随灵敏度 vs 中心差分 rel 1e-5 + 无阻尼退化实数 + 体积守恒下降使峰值幅值 2.60→0.97）
 - [ ] SS — Ear-clipping 通用多边形 STL + 孔洞
 - [ ] TT — v7 收口（rubric ≥ 99）
 

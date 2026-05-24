@@ -964,6 +964,31 @@ res = multi_objective_to(config, mesh, n_generations=10, population_size=12)
 **这是梯度自由搜索，打不过梯度 SIMP**——测试显式断言"前沿不支配梯度 SIMP 点"而非吹嘘
 超越。价值在于"真密度场的可验证 Pareto 前沿 + 收敛信号"，单目标 SIMP 给不了。
 
+### 17.6 阻尼频响 TO：动柔度（Wave RR，D047）
+
+v6（D035）的 Rayleigh 阻尼复频响是**正向**的；v7 把它接成驱动器。目标 = 平方动柔度
+J=|fᵀû|²（D=K−ω²M+iωC，C=αM+βK）。因 K/M/C 对称且输出载荷=输入载荷，伴随**自伴随**：
+dc/dρ_e=−û_eᵀ(dD_e/dρ_e)û_e，dJ/dρ_e=2·Re(c̄·dc/dρ_e)。
+
+```python
+from structure_optimizer.benchmarks.registry import load_benchmark
+from structure_optimizer.core.mesh import create_structured_mesh
+from structure_optimizer.core.freq_response import (
+    dynamic_compliance_sensitivity, minimize_dynamic_compliance)
+
+config = load_benchmark("cantilever", preset="smoke")
+mesh = create_structured_mesh(config)
+out = dynamic_compliance_sensitivity(config, mesh, rho, omega=50.0, alpha=0.5, beta=1e-4)
+# out.objective = |fᵀû|²；out.sensitivity = dJ/dρ（自伴随，已验对中心差分 rel 1e-5）
+res = minimize_dynamic_compliance(config, mesh, omega=50.0, alpha=0.5, beta=1e-4, n_steps=20)
+# res.objective_history 单调下降；扫频显示共振峰 2.60→0.97（避共振）
+```
+
+**关键 / 诚实边界**：灵敏度对中心差分 rel 1e-5（实测 ~1e-7）；无阻尼退化为实数、J=(fᵀu)²
+与 v5 实数解一致；体积守恒投影梯度下降使 J 单调降 ~86% 且扫频峰值显著下降。但这是**单频**
+目标 + **紧凑投影梯度**（无滤波，非 MMA/OC 生产优化器）——验证的是"解析灵敏度能把 J 推下去
+并削峰"，不是生产级动态 TO（见 D047 reopening）。
+
 ---
 
 ## 常见错误
