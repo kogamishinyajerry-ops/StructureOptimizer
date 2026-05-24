@@ -1390,6 +1390,28 @@ z = rb.x_to_u(x)   # 物理 → 独立标准正态；rb.wrap_limit_state(g) 直�
 与 1500 样本经验 τ 差 <0.03）。诚实声明：**仅双变量**（d 维需生成元的 d−1 重条件）；**仅 Clayton/Frank**
 （Gumbel 无闭式条件逆，省略）；Frank τ 的 Debye 是 2000 点 Simpson 近似（非解析）；假设**联合已知**（不从数据拟合 copula）。
 
+### 20.5 同时 (ρ,θ) MMA 耦合（Wave OOO，D070）
+
+D062（`coupled_density_orientation_to`）用**块坐标交替最小化**（密度 OC 步 → 取向最速下降步，循环），交替会卡在
+坐标式驻点。D062 的 reopening 项就是**同时 (ρ,θ) MMA**：把 `[ρ_design; θ_design]` 堆成一个设计向量，一次 MMA
+同时动 ρ 和 θ：
+
+```python
+from structure_optimizer.core.thermal_simp import simultaneous_density_orientation_mma, load_thermal_benchmark
+config, _k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
+r = simultaneous_density_orientation_mma(config, mesh, kxx=5.0, kyy=1.0, max_iter=40,
+                                         heat_sources=sources, thermal_bcs=bcs)
+# r.densities / angles / compliance_history / volume_history
+```
+
+目标梯度堆叠两个自伴随灵敏度 `dC/dρ`（D043，密度滤波）+ `dC/dθ`（D054）；唯一约束体积 `g=mean(ρ)−vf≤0`
+只作用在 ρ 块（`∂g/∂θ≡0`）。角度盒约束 `[−π/2, π/2]`（张量周期 π，π/2 覆盖所有方向）。
+
+**关键 / 诚实边界**：合并灵敏度 `[dC/dρ; dC/dθ]` vs 中心差分两块都 ≤1e-4（实测 ~1e-8）+ 同时 MMA 柔度
+**≤ 交替最小化**（heat_sink smoke kxx=5/kyy=1：同时 2.0949e5 vs 交替 2.5905e5，优 19%）+ 体积可行（≤vf+0.02）。
+诚实声明：**热**柔度（非弹性耦合）；"≤交替"是**本基准经验非定理**（MMA 是局部优化器，病态起点可能更差，测试留 1.001 容差）；
+θ **未滤波**（无 fibre-continuity 约束，角度场可局部粗糙）；单体积约束（与 D066 应力约束合并是 reopening 项）。
+
 ---
 
 ## 常见错误

@@ -423,3 +423,114 @@ def coupled_density_orientation_to(
             break
 
     return CoupledThermalResult(densities=rho, angles=angles, compliance_history=history, converged=converged)
+
+
+@dataclass
+class SimultaneousCoupledResult:
+    """Output of simultaneous (ρ,θ) MMA coupled thermal TO (Wave OOO, D070)."""
+
+    densities: np.ndarray
+    angles: np.ndarray
+    compliance_history: list[float]
+    volume_history: list[float]
+    converged: bool
+
+
+def simultaneous_density_orientation_mma(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    kxx: float,
+    kyy: float,
+    kxy: float = 0.0,
+    max_iter: int = 40,
+    theta_bound: float = np.pi / 2.0,
+    init_angles: np.ndarray | None = None,
+    heat_sources: list[dict[str, Any]] | None = None,
+    thermal_bcs: list[dict[str, Any]] | None = None,
+    change_tol: float = 1e-3,
+) -> SimultaneousCoupledResult:
+    """Coupled density + fibre-orientation thermal TO by **simultaneous** MMA over
+    the stacked design ``[ρ_design ; θ_design]`` (Wave OOO, D070).
+
+    D062's reopening criterion: replace the block-coordinate *alternating*
+    minimisation of :func:`coupled_density_orientation_to` (density OC step, then
+    orientation steepest descent) with a single MMA step that moves ρ and θ
+    **together**. The combined objective gradient stacks the two self-adjoint
+    sensitivities — ``dC/dρ`` (D043 :func:`anisotropic_thermal_sensitivity`,
+    density-filtered) and ``dC/dθ`` (D054 :func:`orientation_sensitivity`) — and the
+    only constraint, the volume inequality ``g = mean(ρ) − vf ≤ 0``, acts on the ρ
+    block (``∂g/∂θ ≡ 0``). Angles are box-bounded to ``[−θ_bound, θ_bound]`` (the
+    conductivity tensor has period π, so ``π/2`` spans all directions).
+
+    Joint stepping escapes the coordinate-wise stalls of alternation, so the final
+    compliance is **at least as low** as the block-coordinate result on the same
+    problem (verified by test). Stops on ``max|Δx| < change_tol`` or ``max_iter``.
+    """
+    from structure_optimizer.core.mma import MMAState, mma_step
+    from structure_optimizer.core.thermal import orientation_field_to_tensors
+
+    opt = config.optimization
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+    n_elem = mesh.elements.shape[0]
+    vf = float(opt.volume_fraction)
+
+    rho = _default_initial_density(config, mesh)
+    angles = np.zeros(n_elem) if init_angles is None else np.asarray(init_angles, dtype=float).reshape(-1).copy()
+
+    x = np.concatenate([rho[design], angles[design]])
+    xmin = np.concatenate([np.full(n_design, opt.min_density), np.full(n_design, -theta_bound)])
+    xmax = np.concatenate([np.ones(n_design), np.full(n_design, theta_bound)])
+    dfdx = np.zeros((1, 2 * n_design))
+    dfdx[0, :n_design] = 1.0 / n_design  # ∂(mean ρ)/∂ρ_e; ∂/∂θ ≡ 0
+    state = MMAState()
+
+    def _compliance(rho_v: np.ndarray, ang_v: np.ndarray) -> float:
+        field = orientation_field_to_tensors(kxx, kyy, ang_v, kxy)
+        return float(
+            solve_thermal(
+                config, mesh, rho_v, conductivity=1.0,
+                heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+                conductivity_tensor_field=field,
+            ).thermal_compliance
+        )
+
+    compliance_history: list[float] = []
+    volume_history: list[float] = []
+    converged = False
+    for _ in range(max_iter):
+        rho[design] = x[:n_design]
+        rho = _apply_density_masks(config, mesh, rho)
+        angles[design] = x[n_design:]
+        field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
+        d_rho = anisotropic_thermal_sensitivity(
+            config, mesh, rho, conductivity_tensor_field=field,
+            heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+        )
+        d_rho = density_filter(mesh, rho, d_rho, opt.filter_radius, opt.min_density)
+        d_theta = orientation_sensitivity(config, mesh, rho, angles, kxx, kyy, kxy, heat_sources, thermal_bcs)
+
+        compliance_history.append(_compliance(rho, angles))
+        volume_history.append(float(np.sum(rho[design]) / n_design))
+
+        df0dx = np.concatenate([d_rho[design], d_theta[design]])
+        fval = np.array([float(np.mean(x[:n_design]) - vf)])
+        x_new, _lmbda = mma_step(x, df0dx, fval, dfdx, xmin, xmax, state)
+        change = float(np.max(np.abs(x_new - x)))
+        x = x_new
+        if change < change_tol:
+            converged = True
+            break
+
+    rho[design] = x[:n_design]
+    rho = _apply_density_masks(config, mesh, rho)
+    angles[design] = x[n_design:]
+    compliance_history.append(_compliance(rho, angles))
+    volume_history.append(float(np.sum(rho[design]) / n_design))
+    return SimultaneousCoupledResult(
+        densities=rho,
+        angles=angles,
+        compliance_history=compliance_history,
+        volume_history=volume_history,
+        converged=converged,
+    )
