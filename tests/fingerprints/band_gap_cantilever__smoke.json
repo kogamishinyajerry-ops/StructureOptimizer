@@ -1,0 +1,10 @@
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "rubric_version": "v9.0-wave-DDD",
+  "kind": "band_gap",
+  "lower_mode": 0,
+  "density_fill": 0.6,
+  "dgap_sha256": "sha256:d3d256ff134d165d7168b69b084dcd2541944f5efe72af2a08570ab16ff26d64",
+  "gap": 39327160199.49629
+}

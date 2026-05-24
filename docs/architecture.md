@@ -613,3 +613,45 @@ criteria"——§17.2 的限制由此逐条解除：
 - 带孔 STL：曲线（多顶点）孔零宽桥缝非流形，水密仅断言洁净直角孔；slit-free 约束 Delaunay
   是 reopening 项（D056）。
 - 详见 D050-D056 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 19. v9 — second-order drivers: constrained optimisers & coupled fields
+
+v8 把 v7 的灵敏度闭成 OC 环并把分布/几何一般化，但多处仍停在**单移动极限 OC / 单场 / 独立优化 /
+桥缝几何**。v9 = **把这些 driver 升到二阶**：真正的约束优化器（MMA）、多场交替最小化、几何鲁棒化、
+可靠性从评估升成驱动 TO。每个 wave 都源自 v8（或更早）ADR 明列的 "Reopening criteria"——§18.2 的
+限制由此逐条解除：
+
+| v8 限制（§18.2） | v9 升级 | 模块 | ADR | 定量锚点 |
+|---|---|---|---|---|
+| TL TO 仅单移动极限 OC | **MMA** 约束优化器驱动 TL 非线性 TO | `core/nonlinear_simp.py` | D058 | MMA/OC 柔度比 0.946（同体积竞争）+ 体积可行 + 单调 |
+| 频域 TO 仅受迫响应 | 特征频率**带隙** / minimax 频带（建在 modal solver） | `core/freq_response.py` | D059 | 带隙灵敏度 vs FD 1.76e-6（特征值灵敏度精确）+ 爬升加宽 2.2× |
+| NSGA 仅 2 目标 | **≥3 目标多载况** NSGA-III + 种子（精确 n-D HSO 超体积） | `core/multi_objective_to.py` | D060 | HSO vs 2D + 容斥 + Das-Dennis C(d+2,2) + 载况真冲突 + 种子 HV+28% |
+| Nataf 仅边缘+相关 | **Rosenblatt** 变换（已知联合分布条件 CDF） | `core/reliability.py` | D061 | Rosenblatt == Cholesky 白化 1e-10 + 去相关 Cov(U)=I + FORM β 闭式 |
+| 单场 orientation 固定 | **耦合**密度 + orientation 热 TO（交替最小化） | `core/thermal_simp.py` | D062 | 耦合 ≤ 单独密度（3.1×）且 ≤ 单独 orientation（17×）+ 各向同性退化精确 |
+| 可靠性仅单极限态评估 | **系统可靠性驱动 TO**（驱动到目标系统 β） | `core/rbto.py` | D063 | 达标系统 β + β_sys<min 单模 + 单模退化到 D042 + 在 D055 Ditlevsen 界内 |
+| 带孔 STL 桥缝非流形 | **slit-free** 孔三角化（曲线孔鲁棒水密） | `core/stl_export.py` | D064 | 环形孔水密=True（AAA=False）+ 面积=实心格数×格面积 + 多拓扑皆水密 |
+
+### 19.1 二阶 driver 原则
+
+- **约束优化器 + 多场耦合**：MMA（D058）替代单移动极限 OC，交替最小化（D062）耦合密度与
+  orientation 两场，系统可靠性（D063）把 D042 单模态 RBTO 升成多模态系统 β 驱动。
+- **几何鲁棒化优于平滑**：slit-free cell 三角化（D064）牺牲平滑边界换取曲线孔的鲁棒水密——
+  与 D056 平滑但脆弱的桥缝互补；两者都不是"平滑且鲁棒"（需 MS 轮廓 CDT，reopening）。
+- **诚实优于吹嘘**：MMA 在 compliance-only 上只是与 OC 竞争（≈0.95×，非碾压），真优势是多约束；
+  耦合是块坐标交替（非同时 MMA）；系统可靠性模态视为独立；slit-free 对角 pinch 如实报非水密。
+- **向后兼容**：v9 全部 API 附加在 v8 之上（`mma_nonlinear_to` 复用 D044 TL 伴随；`multi_load_case_to`
+  复用 pareto_nsga 助手；`RosenblattTransform` 镜像 NatafTransform 接口；`coupled_*` 局部 import；
+  `write_stl_slit_free_holes` 不动 D056 路径）；v4-v8 调用与 rubric 无回归。
+- **完成度门控**：`python scripts/test_agent.py --rubric v9` ≥99/100，v4/v5/v6/v7/v8 无回归 +
+  pytest gate green（D033）+ 全永久红线保持。
+
+### 19.2 v9 已知限制（诚实范围）
+
+- MMA-TL 只接了体积约束（`mma_step` 多约束能力未用）；compliance-only 上 MMA≈OC（D058）。
+- 带隙假设**非重根**（重根处灵敏度是次梯度集）；投影梯度爬升非 MMA；未做目标频带放置（D059）。
+- 多目标仍**梯度自由**（种子注入梯度端点）；HSO 是 O(k^{n−1})，不适合多目标大前沿（D060）。
+- Rosenblatt 仅 **MVN 联合**；高斯 copula 退化到 Nataf；非高斯联合是 reopening（D061）。
+- 耦合是**块坐标交替**（非同时 (ρ,θ) MMA）；无角度场制造约束（D062）。
+- 系统可靠性模态视为**独立**；可靠性旋钮仍是体积分数；线性位移极限态（D063）。
+- slit-free 仅**边连通**区域水密（对角 pinch 非流形）；阶梯边界非平滑（D064）。
+- 详见 D058-D064 各自 "Honest scope notes" + "Reopening criteria"。

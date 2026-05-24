@@ -394,6 +394,72 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         ]
         return np.asarray(pts), ("vertices_sha256", rec["vertices_sha256"]), checks
 
+    if kind == "mma_nonlinear":
+        from structure_optimizer.core.nonlinear_simp import mma_nonlinear_to
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        r = mma_nonlinear_to(config, mesh, n_load_steps=rec["n_load_steps"], max_iter=rec["max_iter"])
+        checks = [
+            ("compliance_final", rec["compliance_final"], r.compliance_history[-1]),
+            ("converged", rec["converged"], r.converged),
+        ]
+        return np.asarray(r.densities), ("densities_sha256", rec["densities_sha256"]), checks
+
+    if kind == "band_gap":
+        from structure_optimizer.core.freq_response import band_gap_sensitivity
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        densities = np.full(mesh.elements.shape[0], rec["density_fill"])
+        gap, dgap = band_gap_sensitivity(config, mesh, densities, lower_mode=rec["lower_mode"])
+        checks = [("gap", rec["gap"], gap)]
+        return np.asarray(dgap), ("dgap_sha256", rec["dgap_sha256"]), checks
+
+    if kind == "rosenblatt":
+        from structure_optimizer.core.reliability import build_rosenblatt_normal
+
+        rt = build_rosenblatt_normal(np.asarray(rec["mean"]), np.asarray(rec["cov"]))
+        u = rt.x_to_u(np.asarray(rec["x"]))
+        checks = [("u0", rec["u0"], u[0])]
+        return np.asarray(u), ("u_sha256", rec["u_sha256"]), checks
+
+    if kind == "coupled_thermal":
+        from structure_optimizer.core.thermal_simp import (
+            coupled_density_orientation_to,
+            load_thermal_benchmark,
+        )
+
+        config, _k, sources, bcs = load_thermal_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        r = coupled_density_orientation_to(
+            config, mesh, rec["kxx"], rec["kyy"], n_outer=rec["n_outer"],
+            n_orient_steps=rec["n_orient_steps"], heat_sources=sources, thermal_bcs=bcs)
+        checks = [("compliance_final", rec["compliance_final"], r.compliance_history[-1])]
+        return np.asarray(r.densities), ("densities_sha256", rec["densities_sha256"]), checks
+
+    if kind == "slit_free":
+        import tempfile
+        from dataclasses import replace
+
+        from structure_optimizer.core.stl_export import write_stl_slit_free_holes
+
+        config = load_benchmark("cantilever", preset="smoke")
+        config = replace(config, mesh=replace(config.mesh, nelx=40, nely=40, width=40.0, height=40.0))
+        mesh = create_structured_mesh(config)
+        rho = np.zeros(mesh.nelx * mesh.nely)
+        for ey in range(mesh.nely):
+            for ex in range(mesh.nelx):
+                r = np.hypot(ex + 0.5 - 20.0, ey + 0.5 - 20.0)
+                rho[mesh.element_index(ex, ey)] = 1.0 if 7.0 < r < 15.0 else 0.0
+        info = write_stl_slit_free_holes(mesh, rho, tempfile.mktemp(suffix=".stl"))
+        checks = [
+            ("n_solid_cells", rec["n_solid_cells"], info["n_solid_cells"]),
+            ("cross_section_area", rec["cross_section_area"], info["cross_section_area"]),
+            ("is_watertight", rec["is_watertight"], info["is_watertight"]),
+        ]
+        return rho, ("densities_sha256", rec["densities_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -451,6 +517,12 @@ def test_multiphysics_fingerprint_set_present():
         "system_reliability_series",
         "fibre_steering_heat_sink__smoke",
         "holed_cap_rect",
+        # v9 second-order drivers (Wave JJJ closure)
+        "mma_nonlinear_cantilever__smoke",
+        "band_gap_cantilever__smoke",
+        "rosenblatt_trivariate",
+        "coupled_thermal_heat_sink__smoke",
+        "slit_free_annulus",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

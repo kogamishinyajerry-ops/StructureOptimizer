@@ -71,7 +71,7 @@ v9 完成 = `python scripts/test_agent.py --rubric v9` 报告：
 - [x] GGG — 耦合密度 + orientation 热 TO（D062 · 4 tests green · 交替最小化热柔度 ≤ 单独优化密度（3.1×）且 ≤ 单独优化 orientation（17×）+ 逐 cycle 单调下降 2.88e6→2.59e5 + 各向同性退化精确等于纯密度 TO（Δ=0、角度恒 0）+ 确定性；诚实：块坐标交替非同时 MMA、OC+steepest 非 MMA、无角度场制造约束）
 - [x] HHH — 系统可靠性驱动 TO（D063 · 5 tests green · 体积二分达到目标系统 β（vf 0.413 β_sys 2.06≥2.0）+ β_sys < min 单模态 β（独立 2 模态系统比任一模态更难）+ 单模态精确退化到 D042 rbto_simp + 体积随目标 β 单调 + 独立 Pf 落在 D055 Ditlevsen 界内；诚实：模态视为独立、可靠性旋钮仍是体积分数、线性位移极限态）
 - [x] III — slit-free 孔三角化（鲁棒水密）（D064 · 5 tests green · 环形孔 slit-free 水密=True 而 AAA 同场=False（解决 D056 曲线孔限制）+ 面积=实心格数×格面积精确 + 多曲线孔拓扑（4 环+双孔板）皆水密（property）+ 确定性 + 契约；诚实：仅边连通区域水密、对角 pinch（棋盘）非流形如实报 False、阶梯边界非平滑——平滑+鲁棒需 MS 轮廓 CDT 是 reopening）
-- [ ] JJJ — v9 收口（rubric ≥ 99）
+- [x] JJJ — v9 收口（D065 · rubric 目标 100/100 · 7 真实 demo（scripts/v9_demos.py）+ 5 fingerprint（DB 40→45）+ architecture §19 + tutorial §19.1-19.7 + CI v9 step；v4-v8 无回归 + pytest gate green）
 
 > 注：v9 需在 `docs/quality-rubric-v9.md` + `scripts/test_agent.py` 的 `CHECKS_V9` 落地
 > 评分项后才能 `--rubric v9` 打分（与 v8 同构：6 section / 100 分 / D033 gate / v4-v8 回归门）。

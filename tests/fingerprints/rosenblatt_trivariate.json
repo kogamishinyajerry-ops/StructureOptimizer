@@ -1,0 +1,34 @@
+{
+  "benchmark": "trivariate_normal",
+  "rubric_version": "v9.0-wave-FFF",
+  "kind": "rosenblatt",
+  "mean": [
+    2.0,
+    -1.0,
+    0.5
+  ],
+  "cov": [
+    [
+      1.0,
+      0.3,
+      -0.2
+    ],
+    [
+      0.3,
+      1.5,
+      0.1
+    ],
+    [
+      -0.2,
+      0.1,
+      0.8
+    ]
+  ],
+  "x": [
+    3.1,
+    0.2,
+    1.0
+  ],
+  "u_sha256": "sha256:f9b287ddfbb5f472fd792cba2b16a991bc2a5fcbb147bf6b239766f21f628827",
+  "u0": 1.1
+}

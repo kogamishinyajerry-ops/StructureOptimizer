@@ -1,0 +1,10 @@
+{
+  "benchmark": "annulus_40",
+  "preset": "smoke",
+  "rubric_version": "v9.0-wave-III",
+  "kind": "slit_free",
+  "densities_sha256": "sha256:653b07f3855630d1a1e9b409b620f327c089c41777d00d60746dfb7af03383e5",
+  "n_solid_cells": 560,
+  "cross_section_area": 560.0,
+  "is_watertight": true
+}

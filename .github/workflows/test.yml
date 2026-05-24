@@ -113,6 +113,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
         run: python scripts/test_agent.py --rubric v8 --strict
 
+      - name: v9 test agent — second-order-drivers rubric scorecard
+        # v9 §4.7: v9 rubric scored after v8. The v9 run enforces the D033
+        # pytest-green no-regression gate and the v4/v5/v6/v7/v8 regression checks.
+        # Strict once v9 reaches ≥99/100.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --rubric v9 --strict
+
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
     runs-on: ubuntu-latest
