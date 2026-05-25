@@ -393,6 +393,68 @@ def optimize_stacking_sequence(
     return StackingSequenceResult(best_seq, a_m, b_m, d_m, float(np.linalg.norm(b_m)))
 
 
+def _is_self_balanced_angle(theta: float, tol: float = 1e-9) -> bool:
+    """A 0 or ±π/2 ply is its own balance — its ``Q̄₁₆ = Q̄₂₆ = 0`` (the off-axis
+    shear-extension coupling vanishes on the principal axes). Angles are radians,
+    period π."""
+    r = float(theta) % np.pi
+    return abs(r) < tol or abs(r - np.pi / 2.0) < tol or abs(r - np.pi) < tol
+
+
+def make_balanced_laminate(angles: np.ndarray, symmetric: bool = True) -> np.ndarray:
+    """Build a **balanced** (every ``+θ`` paired with a ``−θ``) — and optionally
+    **symmetric** — stacking sequence (radians) from a list of distinct lamina angles
+    (Wave DDDDDD, v14, D101).
+
+    Because ``Q̄₁₆(θ)`` and ``Q̄₂₆(θ)`` are **odd** in ``θ`` while the extensional
+    stiffness ``A = Σ Q̄_k t_k`` is order-independent, pairing each ``+θ`` with a
+    ``−θ`` ply of equal thickness makes the extension–shear coupling **``A₁₆ = A₂₆ =
+    0``** exactly. ``0`` and ``±π/2`` plies are already self-balanced and are not
+    duplicated. With ``symmetric=True`` the balanced half-stack is mirrored about the
+    mid-plane, which additionally gives ``B = 0`` (D087) — a **symmetric-balanced**
+    laminate, the workhorse decoupled layup (no extension–shear *and* no
+    extension–bending coupling).
+    """
+    angles = np.asarray(angles, dtype=float).reshape(-1)
+    half: list[float] = []
+    for a in angles:
+        half.append(float(a))
+        if not _is_self_balanced_angle(a):
+            half.append(-float(a))
+    half_arr = np.array(half, dtype=float)
+    if symmetric:
+        return np.concatenate([half_arr, half_arr[::-1]])
+    return half_arr
+
+
+def is_balanced_laminate(angles: np.ndarray, thicknesses: np.ndarray | None = None, tol: float = 1e-9) -> bool:
+    """True iff the laminate is **balanced** — every non-self-balanced ``+θ`` ply is
+    matched by a ``−θ`` ply of equal total thickness, so ``A₁₆ = A₂₆ = 0`` (Wave
+    DDDDDD, v14, D101).
+
+    Geometric test on the angles alone (radians): accumulate the **signed** thickness
+    per acute magnitude ``|θ|`` (``+θ`` adds, ``−θ`` subtracts); the laminate is
+    balanced iff every net is zero. ``0`` / ``±π/2`` plies are self-balanced and
+    ignored.
+    """
+    angles = np.asarray(angles, dtype=float).reshape(-1)
+    n = angles.size
+    if n == 0:
+        raise SolverError("balanced_laminate_no_plies")
+    t = np.ones(n) if thicknesses is None else np.asarray(thicknesses, dtype=float).reshape(-1)
+    if t.size != n:
+        raise SolverError("balanced_laminate_thickness_count_mismatch")
+    net: dict[float, float] = {}
+    for a, ti in zip(angles, t, strict=True):
+        if _is_self_balanced_angle(a):
+            continue
+        r = float(a) % np.pi  # +θ ↦ θ∈(0,π/2); −θ ↦ π−θ∈(π/2,π)
+        key = round(min(r, np.pi - r), 9)  # acute magnitude (shared by ±θ)
+        sign = 1.0 if r < np.pi / 2.0 else -1.0
+        net[key] = net.get(key, 0.0) + sign * float(ti)
+    return all(abs(v) < tol for v in net.values())
+
+
 def simultaneous_elastic_orientation_mma(
     config: BenchmarkConfig,
     mesh: StructuredMesh,

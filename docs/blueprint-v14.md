@@ -61,7 +61,7 @@ v14 完成 = `python scripts/test_agent.py --rubric v14` 报告：
 - [x] AAAAAA — d-Gumbel 接入 system_reliability_series（P_f=1−C(Φ(β)); Gumbel θ=1 bit-exact 复现独立串联; θ↑ 单调降至 comonotone max P_i; D098）
 - [x] BBBBBB — Genz 重排接入 system_reliability_series_exact（reorder opt-in；False bit-exact 复现 D078；True 固定 N 误差降 ~9×；D099）
 - [x] CCCCCC — Ruppert 接入 write_stl_cdt_multi_hole（refine opt-in；False byte-exact 复现 D080；True 最小角≥阈值+面积守恒+水密；**修了 wall-follows-refined-boundary 集成缺陷**；D100）
-- [ ] DDDDDD — balanced laminate 约束
+- [x] DDDDDD — balanced laminate 约束（+θ/−θ 配对 ⟹ A₁₆=A₂₆=0 精确；symmetric-balanced 同时 B=0；thickness-weighted 检测；0/π2 self-balanced；**construction+verification，未接入 optimize_stacking_sequence**；D101）
 - [ ] EEEEEE — 离散角集选择
 - [ ] FFFFFF — Ruppert concentric-shell 小输入角
 - [ ] GGGGGG — peak-binding flanking-mode（细网格，或诚实 defer）

@@ -2029,6 +2029,31 @@ r = write_stl_ruppert_multi_hole(outer, holes)                              # �
 **关键 / 定量锚点**（byte-exact backward-compat + 面积守恒 + 达成最小角）：refine=False 确定性 + `n_triangles=2·cap+2·环边`（D080 公式，**铁律**）；refine 加 Steiner 三角；面积 refine=True==False==32.0（6²−2²，≤1e-9）；**refine=True 水密**（修复后）；writer 用的 cap（constrained_delaunay_ruppert）最小角 ≥20° 而 plain CDT <20°（证明细化必要）；wrapper byte-identical。
 **诚实边界**：wall 法向用 apex-away 启发式（凸边界对，病态非凸可能翻一个法向，但水密 edge-manifold 仍保证）；refine=True 改变 n_triangles（键不变）；Ruppert 上界 20.7° + acute 角靠 max_steiner（concentric-shell 是 FFFFFF）；2.5D 挤出非 3D remesh。
 
+### 24.4 balanced laminate 约束 A₁₆=A₂₆=0（Wave DDDDDD，D101）
+
+D095 的铺层优化做了 *symmetric*（B=0，拉-弯解耦）约束，留下 reopening：*balanced*（每个 +θ 配一个 −θ ⟹ A₁₆=A₂₆=0，拉-剪解耦）。本波补上。工程上最常用的解耦层合板是 **symmetric-balanced**（两者都满足）。
+
+```python
+import numpy as np
+from structure_optimizer.core.orthotropic_simp import (
+    make_balanced_laminate, is_balanced_laminate, laminate_abd,
+)
+
+# 从一组不同角度（弧度！）造一个 balanced + symmetric 的铺层
+stack = make_balanced_laminate(np.deg2rad([30.0, 60.0]), symmetric=True)
+# → 每个 +θ 配 −θ（0/±π2 自平衡不重复），再镜像成 symmetric
+a, b, d = laminate_abd(D0, stack, thicknesses)
+# a[0,2]=A₁₆≈0, a[1,2]=A₂₆≈0（balance），‖b‖≈0（symmetry）
+
+is_balanced_laminate(np.deg2rad([45.0, -45.0]))            # True
+is_balanced_laminate(np.deg2rad([45.0, -45.0]), [2.0, 1.0]) # False（厚度加权）
+```
+
+**原理**：旋转后的折减刚度 Q̄₁₆/Q̄₂₆ 在 θ 上是**奇函数**，所以 +θ 与 −θ 的贡献逐项抵消 ⟹ A₁₆=A₂₆=0。`is_balanced_laminate` 是几何（仅看角度）判定：按 acute |θ| 累计**带符号厚度**（+θ 加、−θ 减），全部净零才平衡——因此厚度加权，counts 相等但厚度不等不算平衡。
+
+**关键 / 定量锚点**：balanced [+30,−30,+60,−60] 的 A₁₆,A₂₆=0（abs 1e-7）；symmetric-balanced 同时 A₁₆=A₂₆=0 **且** ‖B‖<1e-7；对照 unbalanced [+45,+45] 有 |A₁₆|,|A₂₆|>1e3；detection True/False（±θ 对、0/π2 self-balanced、孤立 +45）；厚度加权（[2,1] 不平衡且 A₁₆≠0）；guards（空板 / 厚度数不符 → SolverError）。
+**诚实边界**：是 **construction+verification，不是 optimiser 约束**——`make_balanced_laminate` 造一个、`is_balanced_laminate` 检一个，但**没有**把 balanced 接进 `optimize_stacking_sequence`（D095 不变，reopening）。**角度是弧度**（rotate_plane_stress 约定，函数不转换，degree 入参得到错误耦合）。只零 A₁₆/A₂₆（拉-剪），**不**零 D₁₆/D₂₆（弯-剪）——symmetric-balanced 一般仍有 D₁₆,D₂₆≠0。构造器假设等厚。
+
 ---
 
 ## 常见错误
