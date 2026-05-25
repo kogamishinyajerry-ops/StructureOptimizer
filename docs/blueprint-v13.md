@@ -63,7 +63,7 @@ v13 完成 = `python scripts/test_agent.py --rubric v13` 报告：
 - [x] BBBBB — 半功率带宽自适应窗口（peak-binding-不同设计 claim defer，D091）
 - [x] CCCCC — extent/spread 指标 + range-adaptive ρ（extent 与 spacing 互补：两点极端 Δ 同密集前沿，spacing 却都报 S=0；D092）
 - [x] DDDDD — d 维交换 Gumbel copula（ψ^{(k)}=ψ·g_k 精确递推闭式条件 CDF + Kendall τ=1−1/θ + d=2 退化到双变量；D093）
-- [ ] EEEEE — Genz 变量重排序
+- [x] EEEEE — Genz 变量重排序（Genz–Bretz priority ordering：固定 N=400 误差降 ~9× + 高 N 同值 + 退化到精确 equicorr 参考；D094）
 - [ ] FFFFF — 铺层顺序优化
 - [ ] GGGGG — Ruppert 质量细化（Steiner 插点）
 - [ ] HHHHH — v13 收口（rubric ≥ 99）

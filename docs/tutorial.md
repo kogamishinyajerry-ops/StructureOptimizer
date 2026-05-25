@@ -1922,6 +1922,24 @@ uk = cop.conditional_ppf([0.3, 0.5], w=0.73, k=3) # 单调条件的 bisection �
 维度/θ 守卫。**诚实边界**：逆是 bisection 非闭式；仅交换（单 θ，非 nested 分簇）；g_k 12dp 合并同幂（小 d 精确，超大 d 项数增长——出 2.5D 范畴不追）；
 无 Marshall–Olkin frailty 采样器（采样走 Rosenblatt ppf）；**尚未接入 `system_reliability_series`**（本波只交付 copula 原语，集成是 reopening）。
 
+### 23.5 Genz 变量重排序（Wave EEEEE，D094）
+
+Genz 分离变量估计器的方差严重依赖积分轴的**顺序**：先积"宽松/大质量"轴会把高方差的"紧约束"轴留到最后，放大每样本乘积的离散度。
+Genz–Bretz **priority ordering** 把最受约束（期望概率最小）的轴排在最前。
+
+```python
+from structure_optimizer.core.reliability import genz_mvn_cdf_reordered, genz_mvn_cdf
+
+# 与 genz_mvn_cdf 同 estimand，但先做有序 Cholesky 重排
+p_safe = genz_mvn_cdf_reordered(upper=betas, correlation=R, n_samples=20000, seed=0)
+```
+
+**关键 / 定量锚点**（精确 1-D 参考 + 固定 N 误差比）：6 维 equicorr（ρ=0.5）高 N 重排估计对**精确 1-factor 1-D 求积参考** ≤2e-3；
+**headline**：故意坏序问题固定 N=400、60 seed 平均 |误差| 重排 < ½ 未排（实测比 ~0.11，即 ~9× 降低）；重排=relabel（高 N 重排与未排同值 ≤3e-3）；
+priority order 把 bound 升序（最小质量先）；满相关矩阵高 N 重排≈未排 ≤4e-3；m=1 闭式 + 确定性 + shape/非 SPD 守卫。
+**诚实边界**：期望限用截断正态均值（启发式非证明最优）；不改 estimand 只降方差；新增 `genz_mvn_cdf_reordered` 不翻默认（保 D078/D086）；
+满相关只能对未排 MC 互验（无闭式）；**未接入 lattice/series**（reopening）。
+
 ---
 
 ## 常见错误

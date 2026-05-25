@@ -1561,6 +1561,91 @@ def _genz_product_estimate(b: np.ndarray, chol: np.ndarray, w: np.ndarray) -> fl
     return float(f.mean())
 
 
+def _genz_reorder_cholesky(b: np.ndarray, R: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """**Genz–Bretz variable prioritisation** — the ordered Cholesky that reorders the
+    integration variables *smallest-expected-probability first* (Wave EEEEE, D094).
+
+    At each column ``j`` it picks, among the not-yet-placed variables, the one whose
+    expected truncated upper limit ``Φ((b_i − Σ_{k<j} L_ik y_k)/√(R_ii − Σ_{k<j}
+    L_ik²))`` is smallest (the most-constrained axis), swaps it into position ``j``,
+    completes the Cholesky column, and sets ``y_j`` to the **mean of the standard
+    normal truncated to ``(−∞, up_j]``** (``= −φ(up_j)/Φ(up_j)``). Concentrating the
+    small-probability axes first sharply lowers the variance of the
+    separation-of-variables estimator (:func:`_genz_product_estimate`).
+
+    Returns ``(b_ordered, L_ordered, perm)``. The permutation only relabels the
+    integral, so the estimated CDF is **unchanged** in the limit — reordering buys
+    convergence, not a different answer. Raises ``SolverError`` for a non-SPD ``R``.
+    """
+    b = np.asarray(b, dtype=float).reshape(-1).copy()
+    RR = np.asarray(R, dtype=float).copy()
+    m = b.size
+    L = np.zeros((m, m))
+    y = np.zeros(m)
+    perm = np.arange(m)
+    inv_sqrt_2pi = 1.0 / np.sqrt(2.0 * np.pi)
+    for j in range(m):
+        best_p = None
+        best_i = j
+        for i in range(j, m):
+            dsum = float(L[i, :j] @ y[:j]) if j > 0 else 0.0
+            var = RR[i, i] - float((L[i, :j] ** 2).sum())
+            den = np.sqrt(max(var, 1e-300))
+            p = _standard_normal_cdf((b[i] - dsum) / den)
+            if best_p is None or p < best_p:
+                best_p = p
+                best_i = i
+        if best_i != j:  # swap chosen variable into position j (b, R rows+cols, L rows, perm)
+            perm[[j, best_i]] = perm[[best_i, j]]
+            b[[j, best_i]] = b[[best_i, j]]
+            RR[[j, best_i], :] = RR[[best_i, j], :]
+            RR[:, [j, best_i]] = RR[:, [best_i, j]]
+            L[[j, best_i], :] = L[[best_i, j], :]
+        diag = RR[j, j] - float((L[j, :j] ** 2).sum())
+        if diag <= 0.0:
+            raise SolverError("genz_reorder_not_positive_definite")
+        L[j, j] = np.sqrt(diag)
+        for i in range(j + 1, m):
+            L[i, j] = (RR[i, j] - float(L[i, :j] @ L[j, :j])) / L[j, j]
+        up = (b[j] - (float(L[j, :j] @ y[:j]) if j > 0 else 0.0)) / L[j, j]
+        up_pdf = inv_sqrt_2pi * np.exp(-0.5 * up * up)
+        y[j] = -up_pdf / max(_standard_normal_cdf(up), 1e-300)
+    return b, L, perm
+
+
+def genz_mvn_cdf_reordered(
+    upper: np.ndarray,
+    correlation: np.ndarray,
+    n_samples: int = 20000,
+    seed: int = 0,
+) -> float:
+    """Multivariate-normal CDF ``Φ_m(b; R)`` via the Genz estimator with **variable
+    reordering** (Wave EEEEE, D094).
+
+    Identical estimand to :func:`genz_mvn_cdf` (D078) but applies
+    :func:`_genz_reorder_cholesky` first, so the most-constrained integration axes are
+    handled first. On a poorly-ordered problem this cuts the randomisation error
+    several-fold at the same ``n_samples`` while converging to the **same** value (the
+    reordering is a relabelling). Shares the :func:`_genz_product_estimate` kernel with
+    both the MC (D078) and lattice (D086) estimators.
+    """
+    b = np.asarray(upper, dtype=float).reshape(-1)
+    m = b.size
+    R = np.asarray(correlation, dtype=float)
+    if R.shape != (m, m):
+        raise SolverError("genz_mvn_correlation_shape")
+    try:
+        np.linalg.cholesky(R)
+    except np.linalg.LinAlgError as exc:
+        raise SolverError("genz_mvn_not_positive_definite") from exc
+    if m == 1:
+        return float(_standard_normal_cdf(b[0] / np.sqrt(R[0, 0])))
+    b_ord, chol, _ = _genz_reorder_cholesky(b, R)
+    rng = np.random.default_rng(seed)
+    w = rng.random((n_samples, m - 1))
+    return float(np.clip(_genz_product_estimate(b_ord, chol, w), 0.0, 1.0))
+
+
 @dataclass
 class GenzLatticeResult:
     """Output of :func:`genz_mvn_cdf_lattice` (Wave EEEE, D086)."""
