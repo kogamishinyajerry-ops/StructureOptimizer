@@ -45,7 +45,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from structure_optimizer.core.config import BenchmarkConfig
-from structure_optimizer.core.fem2d import _assemble_stiffness_dense, element_stiffness
+from structure_optimizer.core.fem2d import SolverError, _assemble_stiffness_dense, element_stiffness
 from structure_optimizer.core.mesh import StructuredMesh
 
 
@@ -430,5 +430,118 @@ def maximize_buckling_load(
         densities=rho,
         lambda_history=lambda_history,
         volume_history=volume_history,
+        converged=converged,
+    )
+
+
+@dataclass
+class BucklingConstrainedTOResult:
+    """Output of :func:`buckling_constrained_mma` (Wave AAAAA, D090)."""
+
+    densities: np.ndarray
+    compliance_history: list[float]
+    lambda_history: list[float]
+    volume_history: list[float]
+    lambda_safety: float
+    converged: bool
+
+
+def buckling_constrained_mma(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    lambda_safety: float,
+    vf: float | None = None,
+    max_iter: int = 40,
+    change_tol: float = 1e-3,
+    filter_radius: float | None = None,
+    init_densities: np.ndarray | None = None,
+) -> BucklingConstrainedTOResult:
+    """Minimise static compliance subject to a **buckling constraint**
+    ``λ_crit ≥ λ_safety`` *and* a volume fraction, via MMA (Wave AAAAA, D090).
+
+    D082 (Wave AAAA) shipped the **design-grade** buckling sensitivity but used it
+    only as an *ascent* objective (`maximize_buckling_load`). D082's recorded
+    reopening criterion named the production use case: a buckling **constraint**
+    sitting alongside compliance + volume. This driver does exactly that, reusing
+    the proven D066 two-constraint MMA structure. The inequalities for
+    :func:`core.mma.mma_step` are
+
+        ``g₁(x) = 1 − λ_crit(x) / λ_safety ≤ 0``   (buckling: λ_crit ≥ λ_safety)
+        ``g₂(x) = mean(x) − vf ≤ 0``               (volume)
+
+    minimising SIMP static compliance (``dc/dρ_e = −dscale_e·uₑᵀkₑuₑ``). The
+    buckling-constraint gradient is the **design-grade** ``−dλ/dρ / λ_safety``
+    (:func:`design_grade_buckling_sensitivity` — the analysis-grade gradient points
+    the wrong way, see D082). All gradients density-filtered. When ``λ_safety`` is
+    below the buckling-free compliance optimum's ``λ_crit`` the constraint is
+    inactive and this reduces to plain compliance minimisation; above it, the
+    constraint binds and the optimum trades compliance for buckling resistance.
+
+    Returns a :class:`BucklingConstrainedTOResult`.
+    """
+    from structure_optimizer.core.fem2d import solve_linear_elastic
+    from structure_optimizer.core.filtering import density_filter
+    from structure_optimizer.core.mma import MMAState, mma_step
+
+    if not (lambda_safety > 0.0):
+        raise SolverError("buckling_constrained_nonpositive_lambda_safety")
+    opt = config.optimization
+    radius = opt.filter_radius if filter_radius is None else filter_radius
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+    vf_target = float(opt.volume_fraction) if vf is None else float(vf)
+
+    if init_densities is None:
+        rho = np.where(mesh.void_mask, opt.min_density, vf_target)
+    else:
+        rho = np.asarray(init_densities, dtype=float).reshape(-1).copy()
+
+    x = rho[design].astype(float).copy()
+    xmin = np.full(n_design, opt.min_density)
+    xmax = np.ones(n_design)
+    state = MMAState()
+
+    compliance_history: list[float] = []
+    lambda_history: list[float] = []
+    volume_history: list[float] = []
+    converged = False
+    for _ in range(max_iter):
+        rho[design] = x
+        res = solve_linear_elastic(config, mesh, rho)
+        active = np.where(mesh.void_mask, opt.min_density, rho)
+        dscale = opt.penalty * np.where(mesh.void_mask, 0.0, active ** (opt.penalty - 1.0)) * (1.0 - opt.min_density)
+        dc = -dscale * res.element_strain_energy
+        sens_c = density_filter(mesh, rho, dc, radius, opt.min_density)
+
+        lambdas, phis = buckling_load_factor(config, mesh, rho, res.displacements, n_modes=1)
+        lam = float(lambdas[0])
+        dl = design_grade_buckling_sensitivity(config, mesh, rho, res.displacements, lam, phis[:, 0])
+        sens_l = density_filter(mesh, rho, dl, radius, opt.min_density)
+
+        compliance_history.append(res.compliance)
+        lambda_history.append(lam)
+        volume_history.append(float(np.mean(x)))
+
+        fval = np.array([1.0 - lam / lambda_safety, float(np.mean(x) - vf_target)])
+        dfdx = np.vstack([-sens_l[design] / lambda_safety, np.full(n_design, 1.0 / n_design)])
+        x_new, _lmbda = mma_step(x, sens_c[design], fval, dfdx, xmin, xmax, state)
+        change = float(np.max(np.abs(x_new - x)))
+        x = x_new
+        if change < change_tol:
+            converged = True
+            break
+
+    rho[design] = x
+    res = solve_linear_elastic(config, mesh, rho)
+    lam_final = float(buckling_load_factor(config, mesh, rho, res.displacements, n_modes=1)[0][0])
+    compliance_history.append(res.compliance)
+    lambda_history.append(lam_final)
+    volume_history.append(float(np.mean(x)))
+    return BucklingConstrainedTOResult(
+        densities=rho,
+        compliance_history=compliance_history,
+        lambda_history=lambda_history,
+        volume_history=volume_history,
+        lambda_safety=float(lambda_safety),
         converged=converged,
     )

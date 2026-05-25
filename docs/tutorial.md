@@ -1833,6 +1833,33 @@ copula 无 Rosenblatt/sampler、Korobov 随机化 SE 非确定性界、laminate 
 
 ---
 
+## 23. v13 — robust drivers & validated geometry：屈曲约束 + 峰约束驱动 + 多样性指标 + d 维 Gumbel + 重排序点阵 + 铺层优化 + Ruppert 细化
+
+v13 把 v12 honestly-deferred 的限制逐条追溯到 ADR reopening criterion 升级（AAAAA-HHHHH = D090-D097）。
+
+### 23.1 屈曲约束 MMA：λ_crit ≥ λ_safety（Wave AAAAA，D090）
+
+D082 给了设计级屈曲灵敏度但只当 **ascent 目标**（maximize_buckling_load）。生产用例不是"最大化 λ"，而是"**又刚又不屈曲**"——
+min compliance s.t. λ_crit ≥ λ_safety。本波交付这个屈曲**约束**驱动。
+
+```python
+from structure_optimizer.core.buckling import buckling_constrained_mma
+
+r = buckling_constrained_mma(config, mesh, lambda_safety=21.5, vf=vf, max_iter=40)
+# r.lambda_history / compliance_history / volume_history / lambda_safety / converged
+```
+
+两条不等式（D066 结构）：`g₁=1−λ_crit/λ_safety≤0`（屈曲）+ `g₂=mean−vf≤0`（体积），目标 SIMP 静柔度，屈曲约束梯度用
+**设计级** `−dλ/dρ/λ_safety`（analysis-grade 指错方向，见 D082）。λ_safety 低于 buckling-free 最优的 λ_crit 时约束失活退化为纯
+compliance-min；高于时绑定、用柔度换抗屈曲。
+
+**关键 / 定量锚点**（buckling-free baseline = 同 driver 约束失活，一致参考）：λ_safety=1.5×λ_free 时 λ_crit≥0.95×λ_safety 且
+>1.3×λ_free、**柔度严格更高**（probe：λ 14.3→21.2，柔度 +6.7%）+ 体积可行 + slack λ_safety(0.5×) 退化为 compliance-min（柔度/λ 内 2%/5%）
++ 确定性 + 守卫。**诚实边界**：单最低模无 mode-tracking（继承 D082，模态切换/重根未处理）；40 iter 近绑定非精确绑定（~99% λ_safety）；
+baseline 是同 driver 约束失活的**相对**比较非绝对最优；g_penalty void-mode 用默认（细网格需 D082 续延）。
+
+---
+
 ## 常见错误
 
 | 现象 | 原因 | 解决 |

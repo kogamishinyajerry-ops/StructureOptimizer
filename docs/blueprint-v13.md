@@ -59,7 +59,7 @@ v13 完成 = `python scripts/test_agent.py --rubric v13` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] AAAAA — 屈曲约束 MMA（λ_crit ≥ λ_safety）
+- [x] AAAAA — 屈曲约束 MMA（λ_crit ≥ λ_safety）
 - [ ] BBBBB — 峰约束驱动产生不同设计
 - [ ] CCCCC — extent/spread 指标 + range-adaptive ρ
 - [ ] DDDDD — d 维交换 Gumbel copula
