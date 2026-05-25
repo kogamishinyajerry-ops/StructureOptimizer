@@ -63,7 +63,7 @@ v12 完成 = `python scripts/test_agent.py --rubric v12` 报告：
 - [x] AAAA — 设计级屈曲灵敏度（∂u/∂ρ + void-mode relaxation）
 - [x] BBBB — 循环内自适应频带重采样
 - [x] CCCC — 增广 Tchebycheff R2 + 多样性指标
-- [ ] DDDD — 分层 Archimedean copula（per-cluster θ）
+- [x] DDDD — 分层 Archimedean copula（per-cluster θ）
 - [ ] EEEE — Korobov 点阵 Genz + 误差界
 - [ ] FFFF — 周期感知 fibre 连续性 + 层合
 - [ ] GGGG — flip 约束恢复 CDT + 质量细化

@@ -1715,6 +1715,32 @@ Spacing `S=sqrt((1/(m−1))Σ(d̄−d_i)²)`，`d_i` 为点 i 的 ℓ₁ 最近�
 S=0 却覆盖极差，必须配 extent 指标 + 收敛指标一起读，本波未发 extent）；ℓ₁ dense 两两距离 O(m²·n)；两指标都是**诊断**，
 **未接进 driver**（augmented-R2 当 NSGA-III 选择键 / spacing 当 niching 项是 reopening）。
 
+### 22.4 分层（nested）Clayton copula — per-cluster θ（Wave DDDD，D085）
+
+D077 的 exchangeable Clayton 只有**一个 θ**，每对变量依赖相同。真实可靠性系统会分簇：子系统内强耦合、子系统间弱耦合。
+两层 fully-nested Archimedean copula 表达这个：簇内 inner Clayton 用各自 `θ_g`，簇间 outer Clayton 用 `θ₀`。
+
+```python
+from structure_optimizer.core.reliability import nested_clayton_copula
+
+c = nested_clayton_copula(dim=4, clusters=[[0,1],[2,3]], theta_outer=2.0, thetas_inner=[6.0,4.0])
+c.cdf(u)                      # C(u)=ψ_θ₀(Σ_g φ_θ₀(C_g(u_g)))，C_g=ψ_θg(Σ φ_θg(u_i))
+c.bivariate_margin_cdf(0,1,0.4,0.6)   # 同簇 → Clayton(θ_g=6) ; 跨簇 → Clayton(θ₀=2)
+c.kendall_tau_within(0), c.kendall_tau_between()   # 6/8 vs 2/4
+```
+
+**嵌套条件**（Joe/McNeil，valid copula 的**充分**条件）：`θ_g ≥ θ₀ > 0`——簇内依赖至少和簇间一样强，`__post_init__` 强制。
+bivariate margin 精确（其余维设 1，用 `ψ_θ₀(φ_θ₀(x))=x`）：同簇对 = Clayton(θ_g)、跨簇对 = Clayton(θ₀)，故簇内 Kendall
+τ=θ_g/(θ_g+2)、簇间 τ=θ₀/(θ₀+2)。所有 θ 相等时**精确退化**为 exchangeable Clayton。
+
+**关键 / 定量锚点**（全闭式）：θ 全相等退化 == exchangeable（≤1e-12）+ bivariate margins 精确匹配 Clayton(6)/Clayton(4)/Clayton(2)
++ per-cluster τ（6/8>4/6>2/4，簇内>簇间）+ valid copula（C(1..1)=1、零参 grounding→0、uniform margin）+ 4 阶混合偏导（密度）
+grid 上 ≥0 + 嵌套条件/partition/计数守卫。**诚实边界**：**本波不发 nested Rosenblatt transform / sampler**——nested 的序贯条件
+CDF 要穿两层 generator（Faà di Bruno）、精确采样要 Marshall-Olkin tilted-stable frailty（**非 numpy-trivial**，拉特殊函数库会蹭
+numpy-only 红线），D077 的 exchangeable transform 仍是 FORM 主力，nested transform **reopened**；嵌套条件只是**充分**条件，
+**不声称**用负密度检测其违反（probe 里 θ_inner<θ_outer 在测试 grid 上没出负密度）；**只两层、单 family（Clayton）**，深层级 /
+混合 family / d-dim nested Gumbel 都 reopened（"non-Clayton d-dim" 只部分解决）。
+
 ---
 
 ## 常见错误

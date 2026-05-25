@@ -1048,6 +1048,110 @@ def build_clayton_rosenblatt(marginals: list[Marginal], theta: float) -> Clayton
     return ClaytonRosenblattTransform(marginals=list(marginals), copula=clayton_d_copula(d, theta))
 
 
+@dataclass
+class NestedClaytonCopula:
+    """**Nested (hierarchical) Clayton** copula with a **per-cluster** parameter
+    (Wave DDDD, D085).
+
+    :class:`ExchangeableClaytonCopula` (D077) forces one ``θ`` — every pair has the
+    same dependence. Real systems cluster: variables within a sub-system are tightly
+    coupled, sub-systems loosely. A two-level fully-nested Archimedean copula
+    captures that. With the Clayton generator ``φ_θ(u)=u^{-θ}−1`` and inverse
+    ``ψ_θ(s)=(1+s)^{-1/θ}``, for a partition of ``{0..d-1}`` into groups ``g`` with
+    inner parameters ``θ_g`` and an outer parameter ``θ₀``,
+
+        C(u) = ψ_{θ₀}( Σ_g φ_{θ₀}( C_g(u_g) ) ),
+        C_g(u_g) = ψ_{θ_g}( Σ_{i∈g} φ_{θ_g}(u_i) ).
+
+    **Nesting condition** (Joe/McNeil, *sufficient* for a valid copula):
+    ``θ_g ≥ θ₀ > 0`` for every group — within-cluster dependence at least as strong
+    as between-cluster. Enforced in ``__post_init__``.
+
+    The structure is exact in the bivariate margins (set the other arguments to 1,
+    using ``ψ_{θ₀}(φ_{θ₀}(x)) = x``): two variables **in the same group ``g``** have
+    margin = Clayton(``θ_g``); two in **different groups** have margin =
+    Clayton(``θ₀``). Hence pairwise Kendall's τ = ``θ_g/(θ_g+2)`` within group ``g``
+    and ``θ₀/(θ₀+2)`` between groups. When all ``θ_g = θ₀`` it reduces **exactly** to
+    :class:`ExchangeableClaytonCopula`.
+    """
+
+    dim: int
+    clusters: list[list[int]]
+    theta_outer: float
+    thetas_inner: list[float]
+
+    def __post_init__(self) -> None:
+        if self.dim < 2:
+            raise SolverError("nested_clayton_dim_too_small")
+        if len(self.clusters) != len(self.thetas_inner):
+            raise SolverError("nested_clayton_cluster_theta_count_mismatch")
+        if self.theta_outer <= 0.0:
+            raise SolverError("nested_clayton_nonpositive_outer_theta")
+        flat = [i for cl in self.clusters for i in cl]
+        if sorted(flat) != list(range(self.dim)):
+            raise SolverError("nested_clayton_clusters_not_a_partition")
+        for th in self.thetas_inner:
+            if th < self.theta_outer:
+                raise SolverError("nested_clayton_nesting_condition_violated")
+
+    def _cluster_aggregate(self, u: np.ndarray, g: int) -> float:
+        """Inner copula value ``C_g(u_g) = ψ_{θ_g}(Σ_{i∈g} φ_{θ_g}(u_i))``."""
+        th = self.thetas_inner[g]
+        s = float(np.sum(np.asarray([u[i] for i in self.clusters[g]], dtype=float) ** (-th) - 1.0))
+        return float((1.0 + s) ** (-1.0 / th))
+
+    def cdf(self, u: np.ndarray) -> float:
+        """The ``d``-variate nested copula CDF ``C(u)``."""
+        u = np.asarray(u, dtype=float)
+        if u.shape[0] != self.dim:
+            raise SolverError("nested_clayton_dim_mismatch")
+        th0 = self.theta_outer
+        outer = 0.0
+        for g in range(len(self.clusters)):
+            cg = self._cluster_aggregate(u, g)
+            outer += cg ** (-th0) - 1.0
+        return float((1.0 + outer) ** (-1.0 / th0))
+
+    def bivariate_margin_cdf(self, i: int, j: int, ui: float, uj: float) -> float:
+        """Bivariate margin ``C(u_i,u_j)`` (all other arguments = 1). Equals
+        Clayton(``θ_g``) if ``i,j`` share group ``g``, else Clayton(``θ₀``)."""
+        if i == j or not (0 <= i < self.dim) or not (0 <= j < self.dim):
+            raise SolverError("nested_clayton_bad_margin_indices")
+        u = np.ones(self.dim)
+        u[i] = ui
+        u[j] = uj
+        return self.cdf(u)
+
+    def _group_of(self, i: int) -> int:
+        for g, cl in enumerate(self.clusters):
+            if i in cl:
+                return g
+        raise SolverError("nested_clayton_index_not_in_any_cluster")
+
+    def kendall_tau_within(self, g: int) -> float:
+        """Pairwise Kendall's τ within group ``g`` = ``θ_g/(θ_g+2)``."""
+        if not (0 <= g < len(self.clusters)):
+            raise SolverError("nested_clayton_bad_group")
+        th = self.thetas_inner[g]
+        return float(th / (th + 2.0))
+
+    def kendall_tau_between(self) -> float:
+        """Pairwise Kendall's τ between groups = ``θ₀/(θ₀+2)``."""
+        return float(self.theta_outer / (self.theta_outer + 2.0))
+
+
+def nested_clayton_copula(
+    dim: int, clusters: list[list[int]], theta_outer: float, thetas_inner: list[float]
+) -> NestedClaytonCopula:
+    """Construct a :class:`NestedClaytonCopula` (two-level fully-nested Clayton)."""
+    return NestedClaytonCopula(
+        dim=int(dim),
+        clusters=[list(c) for c in clusters],
+        theta_outer=float(theta_outer),
+        thetas_inner=[float(t) for t in thetas_inner],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Wave XX (v8, D053): general-marginal Nataf via Gauss-Hermite quadrature.
 #
