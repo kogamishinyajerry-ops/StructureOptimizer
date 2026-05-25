@@ -66,7 +66,7 @@ v12 完成 = `python scripts/test_agent.py --rubric v12` 报告：
 - [x] DDDD — 分层 Archimedean copula（per-cluster θ）
 - [x] EEEE — Korobov 点阵 Genz + 误差界
 - [x] FFFF — 周期感知 fibre 连续性 + 层合
-- [ ] GGGG — flip 约束恢复 CDT + 质量细化
+- [x] GGGG — flip 约束恢复 CDT + 质量细化
 - [ ] HHHH — v12 收口（rubric ≥ 99）
 
 > 注：v12 需在 `docs/quality-rubric-v12.md` + `scripts/test_agent.py` 的 `CHECKS_V12`

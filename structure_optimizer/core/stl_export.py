@@ -1118,6 +1118,190 @@ def constrained_delaunay_triangulate(outer_loop, holes=None) -> tuple[np.ndarray
     return pts, kept
 
 
+def _tri_sorted_edges(t: tuple[int, int, int]) -> list[tuple[int, int]]:
+    return [tuple(sorted((t[0], t[1]))), tuple(sorted((t[1], t[2]))), tuple(sorted((t[2], t[0])))]
+
+
+def _apex(t: tuple[int, int, int], c: int, d: int) -> int:
+    """The vertex of triangle ``t`` that is not ``c`` or ``d``."""
+    for v in t:
+        if v != c and v != d:
+            return v
+    raise SolverError("cdt_degenerate_triangle")
+
+
+def _edge_to_tri_indices(tris: list[tuple[int, int, int]]) -> dict[tuple[int, int], list[int]]:
+    m: dict[tuple[int, int], list[int]] = {}
+    for i, t in enumerate(tris):
+        for e in _tri_sorted_edges(t):
+            m.setdefault(e, []).append(i)
+    return m
+
+
+def recover_constraints_by_flips(
+    pts: np.ndarray,
+    tris: list[tuple[int, int, int]],
+    constraints: set[tuple[int, int]],
+    max_flips: int = 10000,
+) -> list[tuple[int, int, int]]:
+    """Recover missing **constraint edges** in a Delaunay triangulation by **edge
+    flips** (Sloan 1993), so non-convex / sparsely-sampled boundaries triangulate
+    without giving up (Wave GGGG, D088).
+
+    For each constraint edge ``(a,b)`` absent from ``tris``, build the list of edges
+    that properly cross the segment ``a–b``; repeatedly flip a crossing edge whose
+    two triangles form a **convex** quad (deferring non-convex ones to the end of
+    the list), re-adding the flipped diagonal if it still crosses. Each convex flip
+    strictly reduces the crossing count, so the constraint is recovered in finitely
+    many flips. Returns the updated triangle list (constraint edges now present).
+    """
+    tris = [tuple(t) for t in tris]
+    flips = 0
+    for a, b in constraints:
+        present = set()
+        for t in tris:
+            present.update(_tri_sorted_edges(t))
+        if tuple(sorted((a, b))) in present:
+            continue
+        pa, pb = pts[a], pts[b]
+        # crossing-edge work list
+        crossing = [
+            e for e in {e for t in tris for e in _tri_sorted_edges(t)}
+            if a not in e and b not in e and _segment_intersects(pa, pb, pts[e[0]], pts[e[1]])
+        ]
+        guard = 0
+        while crossing and flips < max_flips:
+            guard += 1
+            if guard > max_flips:
+                break
+            c, d = crossing.pop(0)
+            owners = [i for i, t in enumerate(tris) if tuple(sorted((c, d))) in _tri_sorted_edges(t)]
+            if len(owners) != 2:
+                continue  # boundary/constraint edge — cannot flip
+            t1, t2 = tris[owners[0]], tris[owners[1]]
+            x, y = _apex(t1, c, d), _apex(t2, c, d)
+            # convex quad ⟺ the new diagonal x–y properly crosses the old c–d
+            if not _segment_intersects(pts[x], pts[y], pts[c], pts[d]):
+                crossing.append((c, d))  # defer non-convex
+                continue
+            # flip: replace the two triangles, new diagonal (x,y)
+            new = [t for i, t in enumerate(tris) if i not in owners]
+            new.append((x, y, c))
+            new.append((x, y, d))
+            tris = new
+            flips += 1
+            new_edge = tuple(sorted((x, y)))
+            if new_edge != tuple(sorted((a, b))) and _segment_intersects(pa, pb, pts[x], pts[y]):
+                crossing.append(new_edge)
+    return tris
+
+
+def _min_triangle_angle(pts: np.ndarray, tris: list[tuple[int, int, int]]) -> float:
+    """Smallest interior angle (radians) over all triangles — a mesh-quality gauge."""
+    worst = np.pi
+    for i, j, k in tris:
+        p = [pts[i], pts[j], pts[k]]
+        for m in range(3):
+            u = p[(m + 1) % 3] - p[m]
+            v = p[(m + 2) % 3] - p[m]
+            nu, nv = np.linalg.norm(u), np.linalg.norm(v)
+            if nu < 1e-300 or nv < 1e-300:
+                continue
+            ang = np.arccos(np.clip(float(u @ v) / (nu * nv), -1.0, 1.0))
+            worst = min(worst, ang)
+    return float(worst)
+
+
+def refine_min_angle_flips(
+    pts: np.ndarray,
+    tris: list[tuple[int, int, int]],
+    constraints: set[tuple[int, int]],
+    max_passes: int = 30,
+) -> list[tuple[int, int, int]]:
+    """Improve the minimum angle by **Lawson Delaunay flips** on non-constraint
+    edges (Wave GGGG, D088).
+
+    An edge shared by two triangles is *locally Delaunay* unless the opposite apex
+    lies inside the other triangle's circumcircle; flipping a non-Delaunay edge
+    locally **increases the minimum angle** (Lawson). Constraint edges are never
+    flipped, so the result is a **constrained** Delaunay triangulation (Delaunay
+    subject to the boundary) and the boundary — hence watertightness — is preserved.
+    """
+    tris = [tuple(t) for t in tris]
+    for _ in range(max_passes):
+        flipped = False
+        edge_map = _edge_to_tri_indices(tris)
+        for (c, d), owners in edge_map.items():
+            if len(owners) != 2 or (c, d) in constraints:
+                continue
+            t1, t2 = tris[owners[0]], tris[owners[1]]
+            x, y = _apex(t1, c, d), _apex(t2, c, d)
+            if not _segment_intersects(pts[x], pts[y], pts[c], pts[d]):
+                continue  # non-convex quad — flip would invert
+            cc = _circumcircle(pts[t1[0]], pts[t1[1]], pts[t1[2]])
+            if cc is None:
+                continue
+            center, r2 = cc
+            # non-Delaunay if the other apex y is strictly inside t1's circumcircle
+            if (pts[y][0] - center[0]) ** 2 + (pts[y][1] - center[1]) ** 2 < r2 - 1e-12:
+                new = [t for i, t in enumerate(tris) if i not in owners]
+                new.append((x, y, c))
+                new.append((x, y, d))
+                tris = new
+                flipped = True
+                break
+        if not flipped:
+            break
+    return tris
+
+
+def constrained_delaunay_flip_recover(
+    outer_loop, holes=None, refine: bool = False
+) -> tuple[np.ndarray, list[tuple[int, int, int]]]:
+    """Constrained-Delaunay triangulation with **flip-based constraint recovery**
+    (and optional min-angle refinement), the no-give-up successor to D080's
+    :func:`constrained_delaunay_triangulate` (Wave GGGG, D088).
+
+    Bowyer-Watson Delaunay of all ring vertices, then
+    :func:`recover_constraints_by_flips` to force every boundary edge in (rather
+    than raising as D080 does for non-convex / sparse boundaries). With
+    ``refine=True``, :func:`refine_min_angle_flips` then improves the minimum angle.
+    Triangles are region-filtered (centroid inside outer, outside holes). The
+    watertightness guarantee is still **verified**: the kept boundary edges must
+    equal the ring constraints, else ``SolverError`` (recovery genuinely failed).
+    """
+    outer = _clean_ring(outer_loop)
+    hole_rings = [_clean_ring(h) for h in (holes or [])]
+    pts_list: list[np.ndarray] = []
+    constraints: set[tuple[int, int]] = set()
+    for ring in [outer, *hole_rings]:
+        start = len(pts_list)
+        pts_list.extend(ring)
+        m = ring.shape[0]
+        for k in range(m):
+            constraints.add(tuple(sorted((start + k, start + (k + 1) % m))))
+    pts = np.asarray(pts_list, dtype=float)
+
+    tris = _bowyer_watson_delaunay(pts)
+    tris = recover_constraints_by_flips(pts, tris, constraints)
+    if refine:
+        tris = refine_min_angle_flips(pts, tris, constraints)
+
+    kept = []
+    for t in tris:
+        centroid = pts[list(t)].mean(axis=0)
+        if _point_in_loop(centroid, outer) and not any(_point_in_loop(centroid, h) for h in hole_rings):
+            kept.append(t)
+    edge_count: dict[tuple[int, int], int] = {}
+    for t in kept:
+        for e in _tri_sorted_edges(t):
+            edge_count[e] = edge_count.get(e, 0) + 1
+    boundary = {e for e, ct in edge_count.items() if ct == 1}
+    if boundary != constraints:
+        raise SolverError("cdt_constraint_recovery_failed")
+    return pts, kept
+
+
 def write_stl_cdt_multi_hole(
     outer_loop,
     holes=None,

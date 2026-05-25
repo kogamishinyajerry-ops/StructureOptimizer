@@ -1787,6 +1787,29 @@ r = simultaneous_elastic_orientation_mma(config, mesh, d0, periodic_continuity=T
 垂直缝有伪驻点（罚函数无碍、真测地距是 refinement）；**默认 opt-in False 保 D079 不变**（不偷改默认）；B≠0/B=0 阈值是 scale-aware
 松散 sanity（精确锚点是单层闭式 + 对称 B=0）。
 
+### 22.7 flip 约束恢复 CDT + 最小角细化（Wave GGGG，D088）
+
+D080 的 `constrained_delaunay_triangulate` 在无约束 Delaunay 穿过边界边时直接**报错** `cdt_constraint_recovery_failed`
+（非凸/稀疏边界常见）。本波用 **edge flip 恢复**（Sloan 1993）把缺失边界边翻回来，使这些边界水密三角化、**不报错**，再可选细化。
+
+```python
+from structure_optimizer.core.stl_export import constrained_delaunay_flip_recover, recover_constraints_by_flips, refine_min_angle_flips
+
+pts, tris = constrained_delaunay_flip_recover(outer_loop, holes=None, refine=False)  # 不报错地恢复
+pts, tris = constrained_delaunay_flip_recover(outer_loop, refine=True)               # + Lawson 最小角细化
+```
+
+恢复：对每条缺失约束边 `(a,b)`，列出与 `a–b` 真相交的边，反复翻转**凸**四边形的对角线（非凸延后、翻后仍相交则重入列），
+每次凸翻转严格减少相交数 → 有限步恢复。细化：仅对**非约束**边做 Lawson Delaunay 翻转（对面顶点在外接圆内即翻），局部**增大最小角**，
+约束边永不翻 → 边界/水密保持。`constrained_delaunay_flip_recover` 仍**验证** boundary edges == 约束（真失败才 raise）。**D080 原函数不动**。
+
+**关键 / 定量锚点**（闭式 + manifold）：11 顶点星形 D080 报错、本波恢复出 n−2 三角且**2-manifold 帽**（每边属 1 或 2 三角 → 水密）
++ **精确铺砌**（三角面积和 == 多边形面积 ≤1e-6、所有约束边在）+ 最小角细化在已知例**严格升** 18.75°→19.38° 且保面积/manifold
++ 星形上细化**永不降** min angle（Lawson 单调）+ 凸多边形**退化**为 D080 同三角集 + 带洞恢复仍水密、铺砌环形面积。
+**诚实边界**：恢复在三角 list 上 **O(n²)**、无 half-edge（小网格够用，max_flips 守卫）；细化**只 Lawson 翻转、不插点（非 Ruppert）**——
+最大化定点集内最小角、**不能**消除边界采样强加的 sliver，故只声称"改善/不降最小角"、**不保证最小角下界**；只翻凸四边形，退化共线无可翻时
+恢复不进展、最终 boundary≠constraints **仍 raise**（best-effort，水密保证从不削弱、宁可响亮失败）；opt-in 新函数、D080 行为不变。
+
 ---
 
 ## 常见错误
