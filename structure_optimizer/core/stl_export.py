@@ -1326,6 +1326,43 @@ def _retriangulate_region(pts, constraints, outer, hole_rings):
     return kept
 
 
+def _apex_locked(t: tuple[int, int, int], apexes: set[int], cons: set[tuple[int, int]]) -> bool:
+    """Is triangle ``t`` the unavoidable wedge at a small-angle apex — a vertex in
+    ``apexes`` whose two triangle edges are both constraint subsegments (D103)? Such a
+    triangle's smallest angle is the input angle itself and must not be refined."""
+    for i in range(3):
+        v = t[i]
+        if v in apexes:
+            o1, o2 = t[(i + 1) % 3], t[(i + 2) % 3]
+            if tuple(sorted((v, o1))) in cons and tuple(sorted((v, o2))) in cons:
+                return True
+    return False
+
+
+def _small_angle_apexes(ptl, cons, threshold_rad: float) -> set[int]:
+    """Input vertices where two incident **input** segments meet at an angle below
+    ``threshold_rad`` — the *small-angle apexes* that defeat plain midpoint Ruppert
+    (D103). Computed once on the original constraint set; the indices stay valid because
+    Steiner points are only ever appended."""
+    adj: dict[int, list[int]] = {}
+    for a, b in cons:
+        adj.setdefault(a, []).append(b)
+        adj.setdefault(b, []).append(a)
+    apexes: set[int] = set()
+    for v, nbrs in adj.items():
+        for i in range(len(nbrs)):
+            for j in range(i + 1, len(nbrs)):
+                d1 = ptl[nbrs[i]] - ptl[v]
+                d2 = ptl[nbrs[j]] - ptl[v]
+                n1 = float(np.linalg.norm(d1))
+                n2 = float(np.linalg.norm(d2))
+                if n1 < 1e-12 or n2 < 1e-12:
+                    continue
+                if np.arccos(np.clip((d1 @ d2) / (n1 * n2), -1.0, 1.0)) < threshold_rad:
+                    apexes.add(v)
+    return apexes
+
+
 def ruppert_refine(
     pts,
     constraints: set[tuple[int, int]],
@@ -1333,6 +1370,8 @@ def ruppert_refine(
     hole_rings=None,
     min_angle_deg: float = 20.0,
     max_steiner: int = 300,
+    concentric_shells: bool = False,
+    shell_angle_deg: float = 60.0,
 ) -> tuple[np.ndarray, list[tuple[int, int, int]], set[tuple[int, int]], int]:
     """**Ruppert's Delaunay refinement** — insert **Steiner points** until every
     triangle's minimum angle ≥ ``min_angle_deg`` (Wave GGGGG, D096).
@@ -1351,8 +1390,18 @@ def ruppert_refine(
        boundary watertight.
 
     The angle bound is capped at the provably-terminating 20.7° (Ruppert/Shewchuk) for
-    inputs without acute boundary angles. Returns ``(pts, tris, constraints,
-    n_steiner)``.
+    inputs without acute boundary angles. **Small input angles** (two input segments
+    meeting below ~60°) defeat plain midpoint splitting — splitting one apex subsegment
+    encroaches its neighbour, which is split, *ad infinitum* (it only stops on the
+    ``max_steiner`` backstop, and may even break watertightness). With
+    ``concentric_shells=True`` subsegments incident to such a small-angle apex
+    (``< shell_angle_deg``) are split at a **power-of-two radius from the apex** instead
+    of the midpoint, so split points on the two incident segments land on the same
+    concentric circle (isosceles ⟹ ``∠ = 90°−θ/2 < 90°`` ⟹ no mutual encroachment),
+    and refinement **terminates** without the ``max_steiner`` backstop. The unavoidable
+    sub-bound triangles at the input angle itself remain — geometry cannot remove them.
+    ``concentric_shells=False`` (default) reproduces D096's midpoint behaviour exactly.
+    Returns ``(pts, tris, constraints, n_steiner)``.
     """
     hole_rings = hole_rings or []
     if not 0.0 < min_angle_deg <= 20.7:
@@ -1361,11 +1410,21 @@ def ruppert_refine(
     cons = set(constraints)
     min_ang = np.radians(min_angle_deg)
     n_steiner = 0
+    apexes = _small_angle_apexes(ptl, cons, np.radians(shell_angle_deg)) if concentric_shells else set()
 
     def _split_segment(a: int, b: int) -> None:
         nonlocal n_steiner
         idx = len(ptl)
-        ptl.append(0.5 * (ptl[a] + ptl[b]))
+        if concentric_shells and (a in apexes) != (b in apexes):
+            # concentric-shell split: place the new vertex a power-of-two radius from the
+            # small-angle apex (r/L ∈ [2^-0.5, 2^0.5]/2 ≈ [0.354, 0.707], always interior).
+            apex, other = (a, b) if a in apexes else (b, a)
+            d = ptl[other] - ptl[apex]
+            length = float(np.linalg.norm(d))
+            r = 2.0 ** round(np.log2(length / 2.0))
+            ptl.append(ptl[apex] + (r / length) * d)
+        else:
+            ptl.append(0.5 * (ptl[a] + ptl[b]))
         cons.discard(tuple(sorted((a, b))))
         cons.add(tuple(sorted((a, idx))))
         cons.add(tuple(sorted((idx, b))))
@@ -1383,10 +1442,15 @@ def ruppert_refine(
         if enc is not None:
             _split_segment(*enc)
             continue
-        # 2. worst skinny in-region triangle
+        # 2. worst skinny in-region triangle — but with concentric shells, skip the
+        #    triangle wedged at a small-angle apex (both its apex-edges are subsegments):
+        #    its small angle IS the input angle, geometrically unremovable, so trying to
+        #    refine it would never terminate.
         worst = None
         worst_ang = np.pi
         for t in kept:
+            if concentric_shells and _apex_locked(t, apexes, cons):
+                continue
             ang = _min_triangle_angle(P, [t])
             if ang < worst_ang:
                 worst_ang = ang
@@ -1413,7 +1477,11 @@ def ruppert_refine(
 
 
 def constrained_delaunay_ruppert(
-    outer_loop, holes=None, min_angle_deg: float = 20.0, max_steiner: int = 300
+    outer_loop,
+    holes=None,
+    min_angle_deg: float = 20.0,
+    max_steiner: int = 300,
+    concentric_shells: bool = False,
 ) -> tuple[np.ndarray, list[tuple[int, int, int]]]:
     """Constrained-Delaunay triangulation refined by **Ruppert Steiner insertion** to a
     guaranteed minimum-angle bound, the quality-refining successor to D088's
@@ -1436,7 +1504,8 @@ def constrained_delaunay_ruppert(
             constraints.add(tuple(sorted((start + k, start + (k + 1) % m))))
 
     pts, kept, cons, _ = ruppert_refine(
-        pts_list, constraints, outer, hole_rings, min_angle_deg=min_angle_deg, max_steiner=max_steiner
+        pts_list, constraints, outer, hole_rings,
+        min_angle_deg=min_angle_deg, max_steiner=max_steiner, concentric_shells=concentric_shells,
     )
     edge_count: dict[tuple[int, int], int] = {}
     for t in kept:

@@ -2079,6 +2079,24 @@ res = select_ply_angles(D0, np.deg2rad([-45.0, 45.0]), 4, objective="min_couplin
 **关键 / 定量锚点**：闭式 D_11=(h³/12)·max Q̄_11（rel 1e-9）；穷举全部 |C|^n 赋值确认无更优（可证全局）；selection 严格优于 ordering 固定混合清单；min_coupling 达 ‖B‖<1e-7 floor；单候选 bit-exact 复现 D095；guards（空集 / 0 plies / 未知目标 / n=7 太大 → SolverError）。
 **诚实边界**：只选**角度值**，不优化 ply 数 / 每层厚度。`max_bending` 全局最优是退化的（全选一个角）——这是"自由选角最大化 D_11、无 ply 数或耦合约束"的诚实正确答案，测试穷举确认而非伪装多样性；要非退化解需加 balanced/symmetric/D₁₆ 约束（reopening）。`min_coupling` 是 brute-force（n≤6, |C|≤6）；symmetric=True 时 B 已被对称强制为 0，min_coupling 失去意义。角度弧度。未接入弹性 MMA 循环。
 
+### 24.6 Ruppert concentric-shell 小输入角（Wave FFFFFF，D103）
+
+D096 的 Ruppert 细化只对**无锐输入角**保证终止。当两条输入段在某顶点（apex）以小角度（<~60°）相交，midpoint 分裂会让相邻两段**互相 encroach、无限分裂**——D096 靠 `max_steiner` 兜底，实则非真正终止（一个 30×10 体 + 4.8° 尖刺，plain midpoint 插几十点后**破坏水密**）。本波补上。
+
+```python
+from structure_optimizer.core.stl_export import constrained_delaunay_ruppert
+
+spike = [[0,0],[30,0],[30,10],[0,10],[-120,5]]  # 体 + 4.8° 尖刺 apex
+# 默认 midpoint：raise ruppert_not_watertight（D096 的缺陷）
+# concentric_shells=True：自然终止 + 水密 + 非 apex 区 ≥20°
+pts, tris = constrained_delaunay_ruppert(spike, min_angle_deg=20.0, concentric_shells=True)
+```
+
+**两个协同机制**（都 gated 在 opt-in `concentric_shells=False` 之后）：(1) **concentric-shell 段分裂**——incident 到小角 apex 的段，按**距 apex 的 2 的幂半径**分裂（`r=2^round(log2(L/2))`，`r/L∈[0.354,0.707]` 恒为有效内点），两侧段分裂点落在同一同心圆 → isosceles → apex 侧角 `90°−θ/2<90°` → 不互相 encroach，ping-pong 停止；(2) **apex-lock 跳过**——`_apex_locked` 识别 apex 处不可消的 wedge 三角（两边都是约束段），其最小角**就是**输入角，skinny 循环跳过它，否则会永远追它的外心。两者合起来使 acute 输入**真正终止**，不靠 `max_steiner` 兜底。
+
+**关键 / 定量锚点**：shells 下 n_steiner 在 max_steiner=300 与 600 相同且 <300（自然收敛非 budget 限）；plain midpoint 同输入 raise not_watertight（D096 缺陷）；shells 输出水密 + 非 apex-locked 三角 min 角 ≥20°（实测 33.7°）；**非 acute 输入（方形）flag byte-exact no-op**（apex 集空 → midpoint 路径，pts `array_equal` + tris/cons/n_steiner 全等）；apex 检测只标 <阈值角（尖刺 {4}，90° 角 ∅）；20.7° 安全 guard 不变。
+**诚实边界**：**输入角本身永不被消除**（几何禁止）——apex wedge 三角恒为输入角；交付的是*终止*+*水密*+*能达标处达标*，不是"全部 ≥20°"，所以测试只在**非 apex-locked** 区量角。`shell_angle_deg=60°` 是经典阈值非逐输入调。2 的幂 shell 是趋向 isosceles 的**启发式非任意输入的形式终止证明**——`max_steiner` 兜底保留。**未接入 `write_stl_cdt_multi_hole` 的 refine 路径**（该 writer 仍 concentric_shells=False，byte-identical D100，reopening）。2.5D 挤出非 3D remesh。
+
 ---
 
 ## 常见错误
