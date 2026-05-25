@@ -477,3 +477,87 @@ def reference_free_hypervolume(front: np.ndarray, margin: float = 0.1) -> float:
     ref = hi + margin * rng
     hv = hypervolume_2d if a.shape[1] == 2 else hypervolume_nd
     return hv(a, ref)
+
+
+def augmented_tchebycheff_r2(
+    front: np.ndarray,
+    weights: np.ndarray | None = None,
+    ideal: np.ndarray | None = None,
+    n_divisions: int = 10,
+    rho: float = 0.05,
+) -> float:
+    """**Augmented**-Tchebycheff R2 quality indicator, for minimisation (Wave CCCC,
+    D084).
+
+    :func:`r2_indicator` scalarises with the plain Tchebycheff utility
+    ``max_j λ_j(a_j − z*_j)``. That ``max`` is **blind to non-binding objectives**:
+    two points equal in the binding coordinate score identically even if one is
+    strictly better (dominates) in the others — so plain R2 cannot distinguish a
+    *weakly*-efficient point from the *properly*-efficient one that dominates it.
+    The augmented scalarisation adds a small ``ℓ₁`` term
+
+        g_aug(a; λ, z*) = max_j λ_j(a_j − z*_j) + ρ · Σ_j λ_j(a_j − z*_j)
+
+        R2_aug(A) = (1/|W|) · Σ_{λ∈W} min_{a∈A} g_aug(a; λ, z*)
+
+    which breaks those ties toward the dominating point. **Lower is better.**
+    Properties (closed-form): ``ρ = 0`` recovers :func:`r2_indicator` **exactly**;
+    for ``ρ > 0`` and a front at/above the utopia, ``g_aug ≥ g_plain`` pointwise so
+    ``R2_aug ≥ R2`` always. Like R2 it needs no reference front (weights + utopia
+    only); comparing fronts requires a shared ``ideal`` and ``weights``.
+    """
+    a = np.asarray(front, dtype=float)
+    if a.ndim != 2:
+        raise SolverError("augmented_r2_expects_2d_front")
+    if a.shape[0] == 0:
+        raise SolverError("augmented_r2_empty_front")
+    if rho < 0.0:
+        raise SolverError("augmented_r2_negative_rho")
+    n_obj = a.shape[1]
+    if weights is None:
+        w = das_dennis_reference_points(n_obj, n_divisions)
+    else:
+        w = np.asarray(weights, dtype=float)
+        if w.ndim != 2 or w.shape[1] != n_obj:
+            raise SolverError("augmented_r2_weight_dim_mismatch")
+        if w.shape[0] == 0:
+            raise SolverError("augmented_r2_empty_weights")
+    z = a.min(axis=0) if ideal is None else np.asarray(ideal, dtype=float).reshape(-1)
+    if z.shape[0] != n_obj:
+        raise SolverError("augmented_r2_ideal_dim_mismatch")
+    shifted = a - z  # (m, n_obj)
+    total = 0.0
+    for lam in w:
+        weighted = lam * shifted  # (m, n_obj)
+        g = np.max(weighted, axis=1) + rho * np.sum(weighted, axis=1)  # (m,)
+        total += float(g.min())
+    return total / w.shape[0]
+
+
+def spacing_indicator(front: np.ndarray) -> float:
+    """Schott **spacing** diversity indicator (Wave CCCC, D084), for any objective
+    count.
+
+    With ``d_i`` the ℓ₁ nearest-neighbour distance of point ``i`` within the front
+    and ``d̄`` their mean,
+
+        S = sqrt( (1/(m−1)) · Σ_i (d̄ − d_i)² )
+
+    the standard deviation of the nearest-neighbour gaps. **Lower is more uniform**;
+    a perfectly evenly-spaced front gives ``S = 0``. Unlike convergence indicators
+    (R2 / IGD⁺ / hypervolume) this measures *distribution only* — it says nothing
+    about proximity to the true front, so it complements them rather than replacing
+    them. Permutation-invariant; needs ``m ≥ 2`` points.
+    """
+    a = np.asarray(front, dtype=float)
+    if a.ndim != 2:
+        raise SolverError("spacing_expects_2d_front")
+    m = a.shape[0]
+    if m < 2:
+        raise SolverError("spacing_needs_two_points")
+    # pairwise ℓ₁ distances; nearest non-self neighbour per point
+    l1 = np.abs(a[:, None, :] - a[None, :, :]).sum(axis=2)  # (m, m)
+    np.fill_diagonal(l1, np.inf)
+    d = l1.min(axis=1)  # (m,)
+    d_bar = float(d.mean())
+    return float(np.sqrt(np.sum((d_bar - d) ** 2) / (m - 1)))

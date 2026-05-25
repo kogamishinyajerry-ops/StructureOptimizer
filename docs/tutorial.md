@@ -1691,6 +1691,30 @@ dense sweep 可行（真峰 ≤1.05×limit、体积 ≤vf+0.02）+ 确定性 + �
 min-volume-s.t.-peak **不可用**（单目标 min-volume 由 detuning 坍到近空、真峰爆 40–120×，TTT 已记的失败，已复验）。
 每步一次完整 `adaptive_band_sample`（≈21 次频响解）是跟踪的诚实成本；单最低共振无 mode-tracking。
 
+### 22.3 增广 Tchebycheff R2 + Schott spacing 多样性指标（Wave CCCC，D084）
+
+D076 的 `r2_indicator` 用纯 Tchebycheff `max_j λ_j(a_j−z*_j)`，但这个 max **看不见非约束目标**：两个点在 binding
+坐标相等就同分，哪怕一个在其余目标上严格更优（dominates）——纯 R2 因此分不清 **weakly** efficient 点和 dominate 它的
+**properly** efficient 点。另外 R2/IGD⁺/HV 全测收敛、没人测 **分布**。v12 CCCC 补上两者。
+
+```python
+from structure_optimizer.core.multi_objective_to import augmented_tchebycheff_r2, spacing_indicator
+
+r2a = augmented_tchebycheff_r2(front, ideal=z, rho=0.05)  # max 项 + ρ·Σ ℓ₁ 项，破 tie 向 dominate 点
+s   = spacing_indicator(front)                            # Schott 最近邻 ℓ₁ 间距标准差；越小越均匀，均匀→0
+```
+
+增广标量化 `g_aug = max_j λ_j(a_j−z*_j) + ρ·Σ_j λ_j(a_j−z*_j)`，`R2_aug=(1/|W|)Σ_λ min_a g_aug`。闭式性质：
+`ρ=0` **精确退化**为 `r2_indicator`；`ρ>0` 且 front 在 utopia 之上时 `g_aug≥g_plain` 逐点成立 ⟹ `R2_aug≥R2` 恒成立。
+Spacing `S=sqrt((1/(m−1))Σ(d̄−d_i)²)`，`d_i` 为点 i 的 ℓ₁ 最近邻距离——纯分布度量（不管离真前沿多近），**补充**而非替代收敛指标。
+
+**关键 / 定量锚点**（全闭式）：`ρ=0` 退化 == 纯 R2（≤1e-12）+ `ρ>0` 时 augmented ≥ plain + **weak-vs-proper 区分**：
+λ=(.5,.5)、z*=0 下 weakly (0.5,0.5) 与 dominate 它的 (0.5,0.3) 纯 R2 **同分** 0.25，augmented 严格偏好 dominate 点
+（闭式 0.30 vs 0.29）+ spacing 均匀前沿 **S=0**、聚集前沿 S>0 且 permutation-invariant。**诚实边界**：`rho=0.05` 固定默认
+不随目标尺度自适应（poorly-normalised front 上可能太弱/太强，建议归一化目标）；spacing **只测分布、可被钻空子**（两个极端点
+S=0 却覆盖极差，必须配 extent 指标 + 收敛指标一起读，本波未发 extent）；ℓ₁ dense 两两距离 O(m²·n)；两指标都是**诊断**，
+**未接进 driver**（augmented-R2 当 NSGA-III 选择键 / spacing 当 niching 项是 reopening）。
+
 ---
 
 ## 常见错误
