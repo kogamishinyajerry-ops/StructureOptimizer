@@ -15,6 +15,7 @@ numpy-only; dense assembly (smoke meshes); ``SolverError`` status strings.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import permutations
 
 import numpy as np
 
@@ -295,6 +296,101 @@ def laminate_abd(
         B += 0.5 * qbar * (z[k + 1] ** 2 - z[k] ** 2)
         D += (1.0 / 3.0) * qbar * (z[k + 1] ** 3 - z[k] ** 3)
     return A, B, D
+
+
+@dataclass
+class StackingSequenceResult:
+    """Output of :func:`optimize_stacking_sequence` (Wave FFFFF, D095)."""
+
+    sequence: np.ndarray  # optimised ply angles, bottom (−h/2) → top (+h/2)
+    a_matrix: np.ndarray  # extensional A (3×3)
+    b_matrix: np.ndarray  # coupling B (3×3)
+    d_matrix: np.ndarray  # bending D (3×3)
+    objective_value: float  # D[0,0] for "max_bending"; ‖B‖_F for "min_coupling"
+
+
+def _stacking_position_weights(n: int, thickness: float) -> np.ndarray:
+    """Bending position weights ``c_k = (z_k³ − z_{k-1}³)/3`` for ``n`` uniform plies of
+    thickness ``t`` in a mid-plane-centred stack — the per-ply multiplier on ``Q̄_11``
+    in ``D_11``. Largest at the two surfaces, smallest at the mid-plane."""
+    h = n * thickness
+    z = np.concatenate([[-h / 2.0], -h / 2.0 + np.cumsum(np.full(n, thickness))])
+    return (z[1:] ** 3 - z[:-1] ** 3) / 3.0
+
+
+def optimize_stacking_sequence(
+    d0: np.ndarray,
+    ply_angles: np.ndarray,
+    thickness: float = 1.0,
+    objective: str = "max_bending",
+    symmetric: bool = False,
+) -> StackingSequenceResult:
+    """Optimise the **stacking sequence** (ordering) of a fixed ply inventory under
+    classical lamination theory (Wave FFFFF, D095).
+
+    Two discrete objectives over the *arrangement* of the given plies (uniform
+    ``thickness``):
+
+    - ``"max_bending"`` — maximise the bending stiffness ``D_11``. Because
+      ``D_11 = Σ_k c_k · Q̄_11(θ_k)`` with **fixed, position-only** weights
+      ``c_k`` (:func:`_stacking_position_weights`, largest at the surfaces), the
+      maximiser is the **rearrangement inequality**: place the stiffest plies (largest
+      ``Q̄_11``) at the highest-``c`` positions (the outer surfaces). This is a
+      **closed-form, provably global** optimum — no search.
+    - ``"min_coupling"`` — minimise the extension–bending coupling ``‖B‖_F`` by
+      exhaustive search over the distinct permutations (exact for the small inventories,
+      ``n ≤ 8``, of 2.5-D laminate design).
+
+    With ``symmetric=True`` the input ``ply_angles`` is the **bottom half-stack**; the
+    full laminate is built as ``half + reversed(half)``, which makes ``B = 0`` *exactly*
+    (the classical mid-plane-symmetry decoupling) regardless of the objective, and the
+    half-stack order is then chosen to maximise ``D_11``.
+    """
+    d0 = np.asarray(d0, dtype=float)
+    angles = np.asarray(ply_angles, dtype=float).reshape(-1)
+    if angles.size == 0:
+        raise SolverError("stacking_no_plies")
+    if thickness <= 0.0:
+        raise SolverError("stacking_nonpositive_thickness")
+    if objective not in ("max_bending", "min_coupling"):
+        raise SolverError("stacking_unknown_objective")
+
+    def _abd(seq: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        return laminate_abd(d0, seq, np.full(seq.size, thickness))
+
+    if symmetric:
+        # ply_angles is the half-stack; mirror about the mid-plane ⟹ B = 0 exactly.
+        q_half = np.array([rotate_plane_stress(d0, float(a))[0, 0] for a in angles])
+        order = np.argsort(-q_half)  # stiffest half-ply nearest the surface (rearrangement)
+        half = angles[order]
+        seq = np.concatenate([half, half[::-1]])
+        a_m, b_m, d_m = _abd(seq)
+        obj = float(np.linalg.norm(b_m)) if objective == "min_coupling" else float(d_m[0, 0])
+        return StackingSequenceResult(seq, a_m, b_m, d_m, obj)
+
+    n = angles.size
+    if objective == "max_bending":
+        c = _stacking_position_weights(n, thickness)
+        q = np.array([rotate_plane_stress(d0, float(a))[0, 0] for a in angles])
+        seq = np.empty(n)
+        # rearrangement: highest Q̄_11 ply → highest-c position
+        seq[np.argsort(-c)] = angles[np.argsort(-q)]
+        a_m, b_m, d_m = _abd(seq)
+        return StackingSequenceResult(seq, a_m, b_m, d_m, float(d_m[0, 0]))
+
+    # min_coupling: exhaustive over distinct permutations (small n only)
+    if n > 8:
+        raise SolverError("stacking_min_coupling_too_many_plies")
+    best_seq = None
+    best_norm = np.inf
+    for perm in {tuple(p) for p in permutations(angles.tolist())}:
+        _, b_m, _ = _abd(np.array(perm))
+        nb = float(np.linalg.norm(b_m))
+        if nb < best_norm:
+            best_norm = nb
+            best_seq = np.array(perm)
+    a_m, b_m, d_m = _abd(best_seq)
+    return StackingSequenceResult(best_seq, a_m, b_m, d_m, float(np.linalg.norm(b_m)))
 
 
 def simultaneous_elastic_orientation_mma(

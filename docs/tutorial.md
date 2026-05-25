@@ -1940,6 +1940,28 @@ priority order 把 bound 升序（最小质量先）；满相关矩阵高 N 重�
 **诚实边界**：期望限用截断正态均值（启发式非证明最优）；不改 estimand 只降方差；新增 `genz_mvn_cdf_reordered` 不翻默认（保 D078/D086）；
 满相关只能对未排 MC 互验（无闭式）；**未接入 lattice/series**（reopening）。
 
+### 23.6 铺层顺序优化（Wave FFFFF，D095）
+
+D087 的 `laminate_abd` 只**评估**一个铺层；本波加在固定 ply inventory 的**排列**上做优化。
+
+```python
+from structure_optimizer.core.orthotropic_simp import optimize_stacking_sequence, orthotropic_plane_stress_matrix
+
+d0 = orthotropic_plane_stress_matrix(e1=140e3, e2=10e3, nu12=0.3, g12=5e3)
+# 最大化弯曲 D_11：rearrangement 闭式（最硬的 0° ply 放表面），可证全局最优
+r = optimize_stacking_sequence(d0, [0,0,45,90,-45,90], thickness=0.125, objective="max_bending")
+# 对称约束保 B=0：ply_angles 是下半 stack，full = half + reversed(half)
+rs = optimize_stacking_sequence(d0, [0,45,90], 0.125, objective="max_bending", symmetric=True)
+# 最小化耦合 ‖B‖：穷举 distinct 排列（n≤8）
+rc = optimize_stacking_sequence(d0, [0,0,90,90], 0.125, objective="min_coupling")
+```
+
+`max_bending` 因 `D_11=Σ c_k·Q̄_11(θ_k)` 中 `c_k` 只取决于位置（表面最大），最优解就是 **rearrangement 不等式**：最硬 ply 放最高 c 的表面位——闭式、可证全局。
+
+**关键 / 定量锚点**（rearrangement 全局最优 + 精确对称解耦）：max_bending 闭式 `D_11` = 全排列 brute-force 最大（≤1e-9）；最优把 0° 放两表面、90° 放中面；
+symmetric ⟹ ‖B‖<1e-9（精确镜像解耦）；min_coupling = brute min（≤1e-12）且 [0,0,90,90] 达 ‖B‖<1e-9；优化耦合 < 坏序 1e-6 倍；空/厚度/objective/>8 ply 守卫。
+**诚实边界**：只优化**排列**非角度**值**；max_bending 仅 `D_11` 单分量（多向/off-axis 要搜索）；min_coupling O(n!) 限 n≤8；**无 balanced (+θ/−θ) 约束**（reopening）；均匀 ply 厚。
+
 ---
 
 ## 常见错误
