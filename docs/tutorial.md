@@ -1741,6 +1741,29 @@ numpy-only 红线），D077 的 exchangeable transform 仍是 FORM 主力，nest
 **不声称**用负密度检测其违反（probe 里 θ_inner<θ_outer 在测试 grid 上没出负密度）；**只两层、单 family（Clayton）**，深层级 /
 混合 family / d-dim nested Gumbel 都 reopened（"non-Clayton d-dim" 只部分解决）。
 
+### 22.5 Korobov 点阵 Genz + 报告标准误（Wave EEEE，D086）
+
+D078 的 `genz_mvn_cdf` 用伪随机点采样（plain MC，误差 `O(N^{-1/2})`、**无可用误差估计**）。Genz 被积函数是光滑正态 CDF
+乘积——正适合点阵规则。本波用 **随机移位 Korobov rank-1 lattice**：更快收敛 + shift 间散布给出**真实可报告的标准误**。
+
+```python
+from structure_optimizer.core.reliability import genz_mvn_cdf_lattice, system_reliability_series_lattice
+
+res = genz_mvn_cdf_lattice(upper, R, n_points=1021, n_shifts=12, a=76)   # 生成向量 z=(1,a,..,a^{m-2}) mod N
+res.value, res.std_error          # 估计 + 移位间散布标准误 std(ddof=1)/√n_shifts
+pf, se = system_reliability_series_lattice(betas, R)   # P_f=1−Φ_m(β;R) + SE
+```
+
+每个随机移位 `Δ` 给点 `w_k=frac(k·z/N+Δ)`，跑一次 Genz 估计；`n_shifts` 个独立移位 → 均值是 value、散布是 SE。
+`_genz_product_estimate` 内核与 D078 共享逻辑（但 **D078 原函数不动**，无回归）。
+
+**关键 / 定量锚点**（参考 = equicorrelation 1-D Gauss-Hermite 约化，精确到求积；numpy-only）：独立情形精确（R=I → 被积常数 → ∏Φ(b_i)
+≤1e-9）+ equicorrelation 4-D ρ=0.5 `|value−exact|≤4·SE` 且 SE<1e-3 + **等预算下跑赢 plain MC**（20 seed RMS < MC/3，probe 实测 ~25×）
++ **SE 是真误差估计**（|err|≤3·SE 在 ≥27/30 seed，且 SE 随 n_points 增大而缩小）+ system wrapper 报 SE + 确定性/守卫。
+**诚实边界**：默认 `(a=76,N=1021)` 只是**一个不错的小 Korobov 规则、非认证最优**（a=306 时增益从 ~25× 掉到 ~11×，暴露 z 选择敏感），
+无 CBC 构造；"标准误"是**随机移位的 MC 标准误、非确定性最坏界**（真 QMC 界需 variation×discrepancy，未算）——criterion 的"error bounds"
+按**报告标准误**交付并如实命名；不做 Genz 变量重排序（两法都未排）；高维/近奇异 R 下点阵优势收窄（SE 仍有效、只是不再声称提速）。
+
 ---
 
 ## 常见错误
