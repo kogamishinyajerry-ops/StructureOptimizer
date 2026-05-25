@@ -1,0 +1,27 @@
+{
+  "benchmark": "orthotropic",
+  "preset": "n/a",
+  "rubric_version": "v13.0-wave-FFFFF",
+  "kind": "stacking_sequence",
+  "inventory": [
+    0.0,
+    0.0,
+    45.0,
+    90.0,
+    -45.0,
+    90.0
+  ],
+  "thickness": 0.125,
+  "objective": "max_bending",
+  "sequence": [
+    0.0,
+    45.0,
+    90.0,
+    90.0,
+    -45.0,
+    0.0
+  ],
+  "d11": 3700.476293430116,
+  "b_absmax": 1957.221187215364,
+  "sequence_sha256": "sha256:d8f8e2c8f85a87d29acd297b6365f0743c98b1632fb127448a97c5f7b84f0958"
+}

@@ -1,0 +1,16 @@
+{
+  "benchmark": "reliability",
+  "preset": "n/a",
+  "rubric_version": "v13.0-wave-DDDDD",
+  "kind": "gumbel_d_copula",
+  "theta": 2.2,
+  "u": [
+    0.3,
+    0.5,
+    0.7
+  ],
+  "cdf": 0.24978240404274227,
+  "conditional_cdf": 0.9052100513359758,
+  "kendall_tau": 0.5454545454545454,
+  "metrics_sha256": "sha256:7ad31d5361da4a70b9839d4aff80ff2aa48a02ba3c1e6e91961f32aefd28e7b0"
+}

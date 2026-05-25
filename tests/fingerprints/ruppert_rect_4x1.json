@@ -1,0 +1,11 @@
+{
+  "benchmark": "stl_cdt",
+  "preset": "n/a",
+  "rubric_version": "v13.0-wave-GGGGG",
+  "kind": "ruppert_refine",
+  "min_angle_deg": 20.0,
+  "n_triangles": 4,
+  "n_points": 6,
+  "min_angle_achieved_deg": 26.565051177077994,
+  "tris_sha256": "sha256:e61970de5992e437ba6b8496b58c1bcb10777f0c6f1f60bb99925c50e1598835"
+}

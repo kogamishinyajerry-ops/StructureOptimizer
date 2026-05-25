@@ -141,6 +141,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
         run: python scripts/test_agent.py --rubric v12 --strict
 
+      - name: v13 test agent — robust-drivers-&-validated-geometry rubric scorecard
+        # v13 §4.7: v13 rubric scored after v12. The v13 run enforces the D033
+        # pytest-green no-regression gate and the v4-v12 regression checks.
+        # Strict once v13 reaches ≥99/100.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --rubric v13 --strict
+
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
     runs-on: ubuntu-latest

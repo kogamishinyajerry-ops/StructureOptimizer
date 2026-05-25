@@ -769,3 +769,25 @@ v12 把 v11 honestly-deferred 的限制逐条**追溯到 ADR 里记录的 reopen
 - laminate_abd 是独立 CLT 计算器**未接 driver**（不优化铺层）；sin²Δθ 在垂直缝有伪驻点（D087）。
 - CDT 恢复 O(n²) 无 half-edge；细化只 Lawson 翻转**不插点**（不保证最小角下界）；真退化共线仍报错（D088）。
 - 详见 D082-D089 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 23. v13 — robust drivers & validated geometry：屈曲约束 + 带宽自适应 + 多样性指标 + d 维 Gumbel + 重排序点阵 + 铺层优化 + Ruppert 细化
+
+v13 沿用纪律：每个 wave（AAAAA-GGGGG）追溯一条 v12（D082-D088）ADR 明列的 **reopening criterion**，做不到时**诚实 defer 而非伪造**；HHHHH 收口。这是 v12 之后的 **robust drivers & validated geometry** 里程碑——把"设计级 / 自适应"进一步推到"约束驱动 / 尺度不变 / 可证保证"。
+
+### 23.1 v13 设计原则（与 v12 同构）
+
+- **约束驱动**：D090 把 D082 的屈曲 ascent 升为**屈曲约束 MMA**（min compliance s.t. λ_crit≥λ_safety + volume≤vf），用 D082 设计级灵敏度，约束真绑定（λ 14.3→21.2，+6.7% compliance 代价）。
+- **自适应 / 尺度不变**：D091 半功率带宽自适应窗口（Δω/ω=α/ω+βω，跨 sharpness 鲁棒，最尖共振 ~11% vs fixed 62%）；D092 extent (Δ) 多样性指标 + range-adaptive ρ（尺度不变，补 spacing 看不见的 spread）。
+- **更强的相依 / 积分 / 几何**：D093 d 维交换 Gumbel copula（ψ^{(k)}=ψ·g_k 精确递推闭式条件 CDF，上尾相关，d=2 退化双变量）；D094 Genz 变量重排序（Genz–Bretz priority ordering，固定 N 误差降 ~9×，高 N 同值）；D095 铺层顺序优化（max_bending = rearrangement 闭式全局最优、symmetric ⟹ B=0 精确、min_coupling 穷举到 0）；D096 Ruppert Steiner 插点（14°→≥20°，Lawson 在固定顶点集做不到，仍水密，封顶 20.7°）。
+- **诚实优于吹嘘**：D091 peak-binding-不同设计 claim 在 smoke mesh **不成立、诚实 defer**（probe 证据，非伪造）；D092 extent 是 spread 非 convergence、归一用观测 range 非真 ideal/nadir；D093 逆是 bisection 非闭式、仅交换非 nested、未接 series；D094 期望限是启发式非证明最优、不改 estimand、未接 lattice/series；D095 只优化排列非角度值、max_bending 仅 D_11 单分量、无 balanced 约束；D096 封顶 20.7°（Ruppert/Shewchuk 终止保证上限，不吹 30°）、无小输入角处理、未接 write_stl。
+
+### 23.2 v13 已知限制（诚实范围）
+
+- 屈曲约束：单最低模、无 mode-tracking；MMA 内每步一次屈曲特征解（smoke mesh）（D090）。
+- 带宽自适应：opt-in 保 D083 默认；半功率宽假定 Rayleigh 模型；peak-binding-不同设计 deferred（D091）。
+- extent：是 spread 非 convergence（要配 R2/IGD⁺/HV）；归一用前沿自身观测 range；非 Deb 的 Δ-metric；未接 selection（D092）。
+- d-Gumbel：逆 bisection 非闭式；仅交换（单 θ）非 nested；g_k 12dp 合并；无 frailty 采样器；**未接入 system_reliability_series**（D093）。
+- Genz 重排：期望限启发式；只降方差不改 estimand；满相关只对未排 MC 互验；**未接入 lattice/series**（D094）。
+- 铺层：只优化排列非角度值；max_bending 仅 D_11 单分量；min_coupling O(n!) 限 n≤8；**无 balanced (+θ/−θ) 约束**；均匀 ply 厚（D095）。
+- Ruppert：上界封 20.7°；**无小输入角处理**（acute 角靠 max_steiner 兜底）；每插一点全局重三角化 O(n²)；质量仅最小角无尺寸分级；2D caps；**未接入 write_stl_cdt_multi_hole**（D096）。
+- 详见 D090-D097 各自 "Honest scope notes" + "Reopening criteria"。

@@ -1,0 +1,19 @@
+{
+  "benchmark": "reliability",
+  "preset": "n/a",
+  "rubric_version": "v13.0-wave-EEEEE",
+  "kind": "genz_reordered",
+  "b": [
+    3.0,
+    2.5,
+    2.0,
+    1.0,
+    0.0,
+    -0.5
+  ],
+  "rho": 0.5,
+  "n_samples": 20000,
+  "seed": 0,
+  "value": 0.22130296211303757,
+  "value_sha256": "sha256:e25e423687718631da302604606ed33b9b209433a4ae9f0594622cb663536aed"
+}

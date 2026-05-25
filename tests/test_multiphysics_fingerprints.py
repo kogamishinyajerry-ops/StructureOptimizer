@@ -643,6 +643,83 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         checks = [("n_triangles", rec["n_triangles"], len(tris)), ("total_area", rec["total_area"], area)]
         return flat, ("tris_sha256", rec["tris_sha256"]), checks
 
+    if kind == "extent_range_adaptive":
+        from structure_optimizer.core.multi_objective_to import (
+            augmented_tchebycheff_r2,
+            extent_indicator,
+            spacing_indicator,
+        )
+
+        front = np.array([[0.0, 4.0], [1.0, 3.0], [2.0, 2.0], [3.0, 1.0], [4.0, 0.0]])
+        w = np.array([[1.0, 0.0], [0.5, 0.5], [0.0, 1.0]])
+        ext = extent_indicator(front)
+        spc = spacing_indicator(front)
+        r2n = augmented_tchebycheff_r2(front, weights=w, rho=0.05, normalize_ranges=True)
+        r2f = augmented_tchebycheff_r2(front, weights=w, rho=0.05)
+        checks = [
+            ("extent", rec["extent"], ext),
+            ("spacing", rec["spacing"], spc),
+            ("r2_aug_normalized", rec["r2_aug_normalized"], r2n),
+            ("r2_aug_fixed", rec["r2_aug_fixed"], r2f),
+        ]
+        return np.array([ext, spc, r2n, r2f]), ("metrics_sha256", rec["metrics_sha256"]), checks
+
+    if kind == "gumbel_d_copula":
+        from structure_optimizer.core.reliability import gumbel_d_copula
+
+        g = gumbel_d_copula(3, rec["theta"])
+        u = rec["u"]
+        cdf, cond, tau = g.cdf(u), g.conditional_cdf(u), g.kendall_tau()
+        checks = [
+            ("cdf", rec["cdf"], cdf),
+            ("conditional_cdf", rec["conditional_cdf"], cond),
+            ("kendall_tau", rec["kendall_tau"], tau),
+        ]
+        return np.array([cdf, cond, tau]), ("metrics_sha256", rec["metrics_sha256"]), checks
+
+    if kind == "genz_reordered":
+        from structure_optimizer.core.reliability import genz_mvn_cdf_reordered
+
+        m = len(rec["b"])
+        R = np.full((m, m), rec["rho"])
+        np.fill_diagonal(R, 1.0)
+        val = genz_mvn_cdf_reordered(
+            np.array(rec["b"]), R, n_samples=rec["n_samples"], seed=rec["seed"]
+        )
+        checks = [("value", rec["value"], val)]
+        return np.array([val]), ("value_sha256", rec["value_sha256"]), checks
+
+    if kind == "stacking_sequence":
+        from structure_optimizer.core.orthotropic_simp import (
+            optimize_stacking_sequence,
+            orthotropic_plane_stress_matrix,
+        )
+
+        d0 = orthotropic_plane_stress_matrix(140e3, 10e3, 0.3, 5e3)
+        res = optimize_stacking_sequence(
+            d0, np.array(rec["inventory"]), rec["thickness"], objective=rec["objective"]
+        )
+        checks = [
+            ("sequence", rec["sequence"], res.sequence),
+            ("d11", rec["d11"], res.objective_value),
+            ("b_absmax", rec["b_absmax"], float(np.abs(res.b_matrix).max())),
+        ]
+        return np.asarray(res.sequence, dtype=float), ("sequence_sha256", rec["sequence_sha256"]), checks
+
+    if kind == "ruppert_refine":
+        from structure_optimizer.core.stl_export import _min_triangle_angle, constrained_delaunay_ruppert
+
+        pts, tris = constrained_delaunay_ruppert(
+            [[0.0, 0.0], [4.0, 0.0], [4.0, 1.0], [0.0, 1.0]], min_angle_deg=rec["min_angle_deg"]
+        )
+        flat = np.array(sorted(tuple(sorted(t)) for t in tris), dtype=float).ravel()
+        checks = [
+            ("n_triangles", rec["n_triangles"], len(tris)),
+            ("n_points", rec["n_points"], len(pts)),
+            ("min_angle_achieved_deg", rec["min_angle_achieved_deg"], float(np.degrees(_min_triangle_angle(pts, tris)))),
+        ]
+        return flat, ("tris_sha256", rec["tris_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -724,6 +801,12 @@ def test_multiphysics_fingerprint_set_present():
         "korobov_genz_equicorr",
         "laminate_abd_symmetric",
         "cdt_flip_recovery_star",
+        # v13 robust drivers & validated geometry (Wave HHHHH closure)
+        "extent_range_adaptive_front",
+        "gumbel_d_copula_conditional",
+        "genz_reordered_equicorr",
+        "stacking_sequence_max_bending",
+        "ruppert_rect_4x1",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

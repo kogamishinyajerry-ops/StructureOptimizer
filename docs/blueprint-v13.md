@@ -66,7 +66,7 @@ v13 完成 = `python scripts/test_agent.py --rubric v13` 报告：
 - [x] EEEEE — Genz 变量重排序（Genz–Bretz priority ordering：固定 N=400 误差降 ~9× + 高 N 同值 + 退化到精确 equicorr 参考；D094）
 - [x] FFFFF — 铺层顺序优化（max_bending = rearrangement 闭式全局最优 = brute force + symmetric ⟹ B=0 精确 + min_coupling 穷举到 0；D095）
 - [x] GGGGG — Ruppert 质量细化（Steiner 插点把 14°→≥20°，Lawson 在固定顶点集做不到；仍水密；D096）
-- [ ] HHHHH — v13 收口（rubric ≥ 99）
+- [x] HHHHH — v13 收口（v13_demos.py 7 demos + fingerprints 60→65 + property 54→57 + architecture §23 + tutorial §23.1-7 + CI v13 strict step + v13_scorecard.json；D097）
 
 > 注：v13 需在 `docs/quality-rubric-v13.md` + `scripts/test_agent.py` 的 `CHECKS_V13`
 > 落地评分项后才能 `--rubric v13` 打分（与 v12 同构：6 section / 100 分 / D033 gate /

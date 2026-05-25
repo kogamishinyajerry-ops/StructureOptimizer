@@ -1,0 +1,11 @@
+{
+  "benchmark": "multi_objective",
+  "preset": "n/a",
+  "rubric_version": "v13.0-wave-CCCCC",
+  "kind": "extent_range_adaptive",
+  "extent": 5.656854249492381,
+  "spacing": 0.0,
+  "r2_aug_normalized": 0.09166666666666667,
+  "r2_aug_fixed": 0.3666666666666667,
+  "metrics_sha256": "sha256:81a8904a02768086ea32715a28bb2e642b4ffc3bb483b262f75ed1a58f065928"
+}
