@@ -1,0 +1,30 @@
+{
+  "benchmark": "nested_clayton",
+  "preset": "n/a",
+  "rubric_version": "v12.0-wave-DDDD",
+  "kind": "nested_clayton",
+  "clusters": [
+    [
+      0,
+      1
+    ],
+    [
+      2,
+      3
+    ]
+  ],
+  "theta_outer": 2.0,
+  "thetas_inner": [
+    6.0,
+    4.0
+  ],
+  "u": [
+    0.4,
+    0.6,
+    0.5,
+    0.7
+  ],
+  "cdf": 0.3194791596885544,
+  "margins_sha256": "sha256:b502bfe6872f49e701c343ec1601171d6f4ec74270b289d5c84ced48a39d3c80",
+  "m01": 0.3946772680112699
+}

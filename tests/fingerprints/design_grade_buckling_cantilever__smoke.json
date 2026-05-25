@@ -1,0 +1,8 @@
+{
+  "benchmark": "cantilever",
+  "preset": "smoke",
+  "rubric_version": "v12.0-wave-AAAA",
+  "kind": "design_grade_buckling",
+  "eigenvalue": 20.102673122166504,
+  "dl_sha256": "sha256:a5389e94189545caf5bc83b586ca55cd783f1f1792c95e173fcc64c6b61e500f"
+}

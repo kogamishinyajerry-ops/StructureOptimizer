@@ -1810,6 +1810,27 @@ pts, tris = constrained_delaunay_flip_recover(outer_loop, refine=True)          
 最大化定点集内最小角、**不能**消除边界采样强加的 sliver，故只声称"改善/不降最小角"、**不保证最小角下界**；只翻凸四边形，退化共线无可翻时
 恢复不进展、最终 boundary≠constraints **仍 raise**（best-effort，水密保证从不削弱、宁可响亮失败）；opt-in 新函数、D080 行为不变。
 
+### 22.8 v12 收口（Wave HHHH，D089）
+
+v12 = **设计级 & 自适应**：把 v11 honestly-deferred 的 7 条限制逐条追溯到 ADR reopening criterion 升级（AAAA-GGGG = D082-D088），
+HHHH 收口。
+
+```bash
+python scripts/test_agent.py --rubric v12 --strict   # 100/100，v4-v11 各 100 无回归，D033 pytest-green
+python scripts/v12_demos.py build/v12_demos          # 9 个真实确定性 demo（覆盖 7 个 wave）
+python scripts/generate_v12_fingerprints.py          # 5 个 v12 fingerprint（55→60）
+```
+
+收口交付：`scripts/v12_demos.py`（9 demo）+ 5 新 fingerprint（design-grade buckling / nested Clayton / Korobov Genz / laminate /
+flip-CDT，各带 `test_multiphysics_fingerprints.py` rerun recipe + guard-set）+ `tests/test_property_v12.py`（3 property，51→54）
++ architecture §22 + CI `--rubric v12 --strict` 步 + 本节 + `quality-rubric-v12.md` + `CHECKS_V12`。
+
+**关键 / 定量锚点**：rubric 100/100（`tests/v12_scorecard.json`）+ v4-v11 各 100 无回归 + pytest gate green（D033）+ ≥1095 测试
+（54 property / 60 fingerprint）+ core coverage ≥95%。**诚实边界**：v12 关的是 v11 deferral、**非 production-complete**——D082-D088 各自
+"Honest scope notes/Reopening criteria" 仍在（屈曲 ascent 非约束无 mode-tracking、in-loop 赚约束保真非不同设计、spacing 可钻空子、
+copula 无 Rosenblatt/sampler、Korobov 随机化 SE 非确定性界、laminate 独立计算器、CDT 只 Lawson 无最小角下界）；rubric 是**自著门控非外部 benchmark**
+（100 = 实现匹配我写的契约、是回归 + 诚实账本）；5 fingerprint 覆盖 7 wave 中 5 个（快速非 MMA-loop driver），in-loop / 增广 R2 由单测覆盖。
+
 ---
 
 ## 常见错误

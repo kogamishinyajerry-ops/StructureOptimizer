@@ -1,0 +1,9 @@
+{
+  "benchmark": "cdt_star",
+  "preset": "n/a",
+  "rubric_version": "v12.0-wave-GGGG",
+  "kind": "cdt_flip_recovery",
+  "n_triangles": 9,
+  "total_area": 5.2719779650000005,
+  "tris_sha256": "sha256:2544411dc647bb7cb1abdb94cd2c445e0cc6bdd7d6e902a89e8fab158e4875a3"
+}

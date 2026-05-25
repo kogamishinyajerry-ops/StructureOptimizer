@@ -134,6 +134,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
         run: python scripts/test_agent.py --rubric v11 --strict
 
+      - name: v12 test agent — design-grade-&-adaptive rubric scorecard
+        # v12 §4.7: v12 rubric scored after v11. The v12 run enforces the D033
+        # pytest-green no-regression gate and the v4-v11 regression checks.
+        # Strict once v12 reaches ≥99/100.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --rubric v12 --strict
+
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
     runs-on: ubuntu-latest

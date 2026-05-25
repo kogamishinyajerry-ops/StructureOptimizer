@@ -582,6 +582,67 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         checks = [("p_failure", rec["p_failure"], pf)]
         return np.array([pf]), ("pf_sha256", rec["pf_sha256"]), checks
 
+    if kind == "design_grade_buckling":
+        from structure_optimizer.core.buckling import buckling_load_factor, design_grade_buckling_sensitivity
+        from structure_optimizer.core.fem2d import solve_linear_elastic
+        from structure_optimizer.core.simp import run_simp
+
+        config = load_benchmark(bench, preset=preset)
+        mesh = create_structured_mesh(config)
+        rho = run_simp(config, mesh).densities
+        u = solve_linear_elastic(config, mesh, rho).displacements
+        lambdas, phis = buckling_load_factor(config, mesh, rho, u, n_modes=1)
+        dl = design_grade_buckling_sensitivity(config, mesh, rho, u, float(lambdas[0]), phis[:, 0])
+        checks = [("eigenvalue", rec["eigenvalue"], float(lambdas[0]))]
+        return np.asarray(dl), ("dl_sha256", rec["dl_sha256"]), checks
+
+    if kind == "nested_clayton":
+        from structure_optimizer.core.reliability import nested_clayton_copula
+
+        c = nested_clayton_copula(4, rec["clusters"], rec["theta_outer"], rec["thetas_inner"])
+        cdf = c.cdf(np.asarray(rec["u"]))
+        margins = np.array([
+            c.bivariate_margin_cdf(0, 1, 0.4, 0.6),
+            c.bivariate_margin_cdf(2, 3, 0.4, 0.6),
+            c.bivariate_margin_cdf(0, 2, 0.4, 0.6),
+        ])
+        checks = [("cdf", rec["cdf"], cdf), ("m01", rec["m01"], margins[0])]
+        return margins, ("margins_sha256", rec["margins_sha256"]), checks
+
+    if kind == "korobov_genz":
+        from structure_optimizer.core.reliability import genz_mvn_cdf_lattice
+
+        m = 4
+        R = (1 - rec["rho"]) * np.eye(m) + rec["rho"] * np.ones((m, m))
+        res = genz_mvn_cdf_lattice(
+            np.ones(m), R, n_points=rec["n_points"], n_shifts=rec["n_shifts"], a=rec["a"], seed=rec["seed"]
+        )
+        checks = [("value", rec["value"], res.value), ("std_error", rec["std_error"], res.std_error)]
+        return np.array([res.value, res.std_error]), ("value_sha256", rec["value_sha256"]), checks
+
+    if kind == "laminate_abd":
+        from structure_optimizer.core.orthotropic_simp import laminate_abd, orthotropic_plane_stress_matrix
+
+        d0 = orthotropic_plane_stress_matrix(130e9, 10e9, 0.28, 5e9)
+        A, B, D = laminate_abd(d0, np.deg2rad(rec["angles_deg"]), np.asarray(rec["thicknesses"]))
+        stacked = np.concatenate([A.ravel(), B.ravel(), D.ravel()])
+        checks = [("A00", rec["A00"], float(A[0, 0])), ("B_absmax", rec["B_absmax"], float(np.abs(B).max()))]
+        return stacked, ("abd_sha256", rec["abd_sha256"]), checks
+
+    if kind == "cdt_flip_recovery":
+        from structure_optimizer.core.stl_export import _tri_area, constrained_delaunay_flip_recover
+
+        star = [
+            [2.6146, 0.045], [0.3886, 0.0405], [2.1953, 0.578], [-0.096, 0.7683],
+            [-2.5324, -0.7121], [-1.381, -1.0942], [-0.1425, -1.1], [0.558, -1.3289],
+            [0.1514, -0.3447], [0.5424, -0.3312], [1.9375, -0.8374],
+        ]
+        pts, tris = constrained_delaunay_flip_recover([np.array(p, float) for p in star], refine=True)
+        area = sum(_tri_area(pts[i], pts[j], pts[k]) for i, j, k in tris)
+        flat = np.array(sorted(tuple(sorted(t)) for t in tris), dtype=float).ravel()
+        checks = [("n_triangles", rec["n_triangles"], len(tris)), ("total_area", rec["total_area"], area)]
+        return flat, ("tris_sha256", rec["tris_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -657,6 +718,12 @@ def test_multiphysics_fingerprint_set_present():
         "reference_free_indicators",
         "clayton_d_rosenblatt_trivariate",
         "genz_system_reliability",
+        # v12 design-grade & adaptive drivers (Wave HHHH closure)
+        "design_grade_buckling_cantilever__smoke",
+        "nested_clayton_4d",
+        "korobov_genz_equicorr",
+        "laminate_abd_symmetric",
+        "cdt_flip_recovery_star",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

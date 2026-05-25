@@ -1,0 +1,14 @@
+{
+  "benchmark": "korobov_genz",
+  "preset": "n/a",
+  "rubric_version": "v12.0-wave-EEEE",
+  "kind": "korobov_genz",
+  "rho": 0.5,
+  "n_points": 1021,
+  "n_shifts": 12,
+  "a": 76,
+  "seed": 0,
+  "value": 0.6266800278852096,
+  "std_error": 5.715137918356375e-05,
+  "value_sha256": "sha256:cd4dff360c962032707a7b00b6a92d5ff10ff9ec5064735a01154035ae7535c0"
+}

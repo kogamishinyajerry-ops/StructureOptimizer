@@ -741,3 +741,31 @@ ADR 明列的 "Reopening criteria"——§20.2 的限制由此逐条解除：
 - 弹性 (ρ,θ) 连续性度量**非周期感知**（±89° 误罚）+ 单层平面 + MMA 非凸（D079）。
 - 约束 Delaunay **无 flip 恢复**（稀疏/强非凸边界显式报错非默默非水密）+ O(n²) + 拓扑水密（D080）。
 - 详见 D074-D080 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 22. v12 — design-grade & adaptive：设计级屈曲 + 循环内自适应 + 增广指标 + 分层 copula + 点阵积分 + 周期感知几何
+
+v12 把 v11 honestly-deferred 的限制逐条**追溯到 ADR 里记录的 reopening criterion** 并升级，不是数字追逐。每个 wave
+（AAAA-GGGG）= 一条 v11/早期 ADR 的 reopening；HHHH 收口。
+
+### 22.1 v12 设计原则（与 v11 同构）
+
+- **设计级**：D082 补上 D074 deferred 的屈曲灵敏度 **∂u/∂ρ 伴随**项（满足 D074 entry condition：定容 ascent 真升 λ_crit
+  20.1→34.8），关掉 v11 最大的诚实缺口。
+- **自适应**：D083 把 D075 的固定频带升为**循环内重采样**——共振漂 +99% 时约束测量保真（tracked 4% err vs stale 94% err）。
+- **更精细的指标 / 相依 / 积分 / 几何**：D084 增广 Tchebycheff R2（破 weakly-efficient tie）+ Schott spacing；D085 分层
+  Clayton copula（per-cluster θ，bivariate margin 精确退化）；D086 Korobov 点阵 Genz（~25× 快于 MC）+ 报告标准误；D087
+  周期感知 sin²Δθ fibre 连续性（±89° 不误罚）+ laminate [A,B,D]；D088 flip 约束恢复 CDT（非凸/稀疏边界不报错水密）+ Lawson 最小角细化。
+- **诚实优于吹嘘**：D082 单最低模无 mode-tracking、是 ascent 非约束；D083 刚度对齐 smoke 问题上设计几乎重合（赚的是约束保真非不同设计）；
+  D084 spacing 只测分布可被钻空子；D085 不发 nested Rosenblatt transform/sampler（碰 numpy-only 红线）；D086 是随机化 SE 非确定性 QMC 界、
+  默认生成向量非认证最优；D087 laminate 未接进 driver、sin² 非圆上度量；D088 只 Lawson 不插点（不保证最小角下界）、退化共线仍报错。
+
+### 22.2 v12 已知限制（诚实范围）
+
+- 屈曲：单最低模、无 mode-tracking / 重根处理；driver 是 ascent 非屈曲**约束**（D082）。
+- 循环内自适应：每步一次完整 adaptive_band_sample（~21 解）；峰约束与目标对齐时不产生不同设计（D083）。
+- 增广 R2 的 ρ=0.05 非尺度自适应；spacing 无 extent 配对、未接进 selection（D084）。
+- 分层 copula 只两层 + 单 family Clayton；**无 nested Rosenblatt/sampler**；嵌套条件仅充分（D085）。
+- Korobov 默认 (a=76,N=1021) 非 CBC 认证；"误差界"是随机移位 MC SE 非确定性界；无 Genz 变量重排（D086）。
+- laminate_abd 是独立 CLT 计算器**未接 driver**（不优化铺层）；sin²Δθ 在垂直缝有伪驻点（D087）。
+- CDT 恢复 O(n²) 无 half-edge；细化只 Lawson 翻转**不插点**（不保证最小角下界）；真退化共线仍报错（D088）。
+- 详见 D082-D089 各自 "Honest scope notes" + "Reopening criteria"。

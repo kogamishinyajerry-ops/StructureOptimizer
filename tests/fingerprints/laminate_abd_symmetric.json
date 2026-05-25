@@ -1,0 +1,21 @@
+{
+  "benchmark": "laminate",
+  "preset": "n/a",
+  "rubric_version": "v12.0-wave-FFFF",
+  "kind": "laminate_abd",
+  "angles_deg": [
+    45.0,
+    -45.0,
+    -45.0,
+    45.0
+  ],
+  "thicknesses": [
+    0.5,
+    0.5,
+    0.5,
+    0.5
+  ],
+  "A00": 83241703813.76921,
+  "B_absmax": 0.0,
+  "abd_sha256": "sha256:84d424ee24f698bfc2fef2f6726d8f584697c07ea85327a1b3d52e6544d2aae3"
+}
