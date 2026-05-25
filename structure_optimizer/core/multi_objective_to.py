@@ -485,9 +485,10 @@ def augmented_tchebycheff_r2(
     ideal: np.ndarray | None = None,
     n_divisions: int = 10,
     rho: float = 0.05,
+    normalize_ranges: bool = False,
 ) -> float:
     """**Augmented**-Tchebycheff R2 quality indicator, for minimisation (Wave CCCC,
-    D084).
+    D084; ``normalize_ranges`` added Wave CCCCC, D092).
 
     :func:`r2_indicator` scalarises with the plain Tchebycheff utility
     ``max_j λ_j(a_j − z*_j)``. That ``max`` is **blind to non-binding objectives**:
@@ -505,6 +506,15 @@ def augmented_tchebycheff_r2(
     for ``ρ > 0`` and a front at/above the utopia, ``g_aug ≥ g_plain`` pointwise so
     ``R2_aug ≥ R2`` always. Like R2 it needs no reference front (weights + utopia
     only); comparing fronts requires a shared ``ideal`` and ``weights``.
+
+    With ``normalize_ranges=True`` (Wave CCCCC, D092) the shifted objectives are
+    divided by the front's **per-objective range** (``max − min``) before the
+    Tchebycheff + augmentation, making the indicator **scale-invariant**: scaling any
+    objective by a constant leaves R2_aug unchanged. This fixes D084's honest gap —
+    a fixed ``ρ`` on raw, poorly-scaled objectives is dominated by the largest-scaled
+    one (the augmentation becomes negligible). When every range is 1 it reduces to
+    the unnormalised value exactly. (A degenerate range — single-point front — is
+    guarded to 1, i.e. no normalisation on that axis.)
     """
     a = np.asarray(front, dtype=float)
     if a.ndim != 2:
@@ -526,6 +536,10 @@ def augmented_tchebycheff_r2(
     if z.shape[0] != n_obj:
         raise SolverError("augmented_r2_ideal_dim_mismatch")
     shifted = a - z  # (m, n_obj)
+    if normalize_ranges:
+        rng = a.max(axis=0) - a.min(axis=0)
+        rng = np.where(rng <= 1e-12, 1.0, rng)
+        shifted = shifted / rng
     total = 0.0
     for lam in w:
         weighted = lam * shifted  # (m, n_obj)
@@ -561,3 +575,27 @@ def spacing_indicator(front: np.ndarray) -> float:
     d = l1.min(axis=1)  # (m,)
     d_bar = float(d.mean())
     return float(np.sqrt(np.sum((d_bar - d) ** 2) / (m - 1)))
+
+
+def extent_indicator(front: np.ndarray) -> float:
+    """Diversity **extent** Δ — the ℓ₂ length of the front's bounding-box diagonal
+    (Wave CCCCC, D092), for any objective count.
+
+        Δ = ‖ max_i a_i − min_i a_i ‖₂
+
+    the diagonal of the axis-aligned box enclosing the front. **Higher means the
+    front spreads wider** across objective space. It is the diversity *partner* of
+    :func:`spacing_indicator`: spacing measures how *evenly* points are distributed
+    (and reports a tightly-clustered or a two-extreme front as equally "uniform",
+    ``S = 0``), while extent measures how *far* the front reaches — a two-point front
+    that only spans the extremes scores the **same** Δ as a dense well-spread one,
+    so the pair (spread, uniformity) is needed to judge a front. Translation-
+    invariant; scales linearly when an objective is scaled. Needs ``m ≥ 1`` (a single
+    point gives ``Δ = 0``).
+    """
+    a = np.asarray(front, dtype=float)
+    if a.ndim != 2:
+        raise SolverError("extent_expects_2d_front")
+    if a.shape[0] == 0:
+        raise SolverError("extent_empty_front")
+    return float(np.linalg.norm(a.max(axis=0) - a.min(axis=0)))

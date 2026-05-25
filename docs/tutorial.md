@@ -1880,6 +1880,28 @@ r = adaptive_peak_constrained_mma(config, mesh, limit, lo, hi, beta=2e-6, bandwi
 "in-loop 赢 fixed 输"。真冲突需细网格反共振 flanking-mode 机制，**不伪造**，reopened。bandwidth_adaptive opt-in 保 D083；半功率宽设
 Rayleigh 模型；最尖处 ~11% 残差来自 5 点 p-norm + bisection（denser 可收紧，非本波重点）。
 
+### 23.3 extent 多样性指标 + range-adaptive ρ（Wave CCCCC，D092）
+
+D084 的 `spacing_indicator` 只量**均匀度**：它把"紧簇前沿"和"只有两端点的极端前沿"都报成 S=0（两者 NN 间距都相等）。
+均匀≠铺得开。本波补 **extent 指标 Δ = ‖max−min‖₂**（前沿包围盒对角线长，越大铺得越开），并给 augmented R2 加
+`normalize_ranges` 让 ρ 不被最大尺度目标吞掉。
+
+```python
+from structure_optimizer.core.multi_objective_to import extent_indicator, spacing_indicator, augmented_tchebycheff_r2
+
+extent_indicator(front)                                            # Δ = 包围盒对角线（越大越散）
+spacing_indicator(front)                                           # S = NN 间距 std（越小越匀）
+augmented_tchebycheff_r2(front, rho=0.05, normalize_ranges=True)   # 按每目标 range 归一 → 尺度不变
+```
+
+extent 与 spacing **互补**：判断前沿多样性需要 (spread=extent, uniformity=spacing) 这对指标，单看任一都不够。
+
+**关键 / 定量锚点**（闭式 + 尺度不变）：extent 闭式 [0,4]² 前沿 = √32（≤1e-12）；**互补 headline**：两端点极端前沿 Δ 与密集
+铺开前沿**相同**（都 √32），但 spacing 把两者都报 S=0——证明 extent 抓的是 spacing 看不见的"铺开度"；Δ 平移不变 + 单目标
+×10 → √(40²+4²)；range-adaptive：某目标 ×1000 时归一 R2 不变（≤1e-9）而固定 R2 涨 >1.5×；range=1 时归一 == 固定（≤1e-12）；
+1D/空前沿守卫 + 某目标常数（range 0 → 守卫为 1）不除零。**诚实边界**：extent 是 spread 非 convergence（要配 R2/IGD⁺/HV 看收敛）；
+归一用前沿**自身观测 range**（早期采样有偏，非真 ideal/nadir box）；`normalize_ranges` opt-in 保 D084；非 Deb 的 Δ-metric（不声称是）。
+
 ---
 
 ## 常见错误
