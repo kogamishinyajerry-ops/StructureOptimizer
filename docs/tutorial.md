@@ -1661,6 +1661,36 @@ design-grade ascent 升 λ_crit（20.1→34.8）而 analysis-grade 降（20.1→
 的 deferral；**单最低模无 mode-tracking**（屈曲 TO 有模态切换/重根，ascent 有 it₅≈8.4 瞬态下凹后爬升）；是 **ascent（最大化 λ）非约束**
 （屈曲约束进 compliance 问题是下一步）；单 Gauss 点 K_g + dense 每步多一次 adjoint solve。
 
+### 22.2 循环内自适应频带重采样：跟踪移动的共振（Wave BBBB，D083）
+
+D075（v11）的 `peak_constrained_mma` 把峰约束的频带 **一次性固定** 在优化前。但结构刚度随材料重分布而变，
+固有频率会漂移——smoke 悬臂上基频在一次 compliance-min 中漂 **+99%**（36867→73545 rad/s）。固定在初始共振处的频带
+完全滑离共振：在终设计上它只读到真峰（dense sweep）的 **6.3%**（少报 94%）——p-norm 约束于是在管错频率。D075 的
+reopening criterion 就是要 **循环内自适应重采样** 来补这个洞。
+
+```python
+from structure_optimizer.core.freq_response import adaptive_peak_constrained_mma
+
+r = adaptive_peak_constrained_mma(config, mesh, peak_limit, omega_lo, omega_hi,
+                                  beta=2e-6, vf=vf, max_iter=40)
+# r.peak_omega_history（每步重定位的共振，如 36867→73545）/ densities / peak_history / converged
+```
+
+每步重跑 `adaptive_band_sample` 在全 `[omega_lo, omega_hi]` 重定位移动的共振 `ω_peak`，再把约束频带重建成
+`ω_peak·linspace(1−w, 1+w, n_band)`（clip 到搜索范围）。约束因而全程跟踪共振。两条不等式沿用 D066/D075：
+`g₁=J_peak/J_lim−1≤0`（带内峰）+ `g₂=mean(x)−vf≤0`（体积），目标是 SIMP 静柔度（`dc/dρ_e=−dscale_e·uₑᵀkₑuₑ`）。
+轻阻尼默认 `beta=2e-6` 是刻意的：共振要够尖才**值得**跟踪（重阻尼单调响应无峰可追，固定/自适应频带重合），又够阻尼保证
+有限稳定解（对照 TTT 无阻尼 J→∞ 奇异）。
+
+**关键 / 定量锚点**（全锚定到独立 800 点 dense sweep）：共振漂移 ≥20%（实测 +99%）+ **in-loop 跑赢 stale 固定频带**：
+终设计上 tracked band 读真峰误差 **4.0%** 而固定在初始共振的 band 误差 **93.7%**（且 stale 误差 > 3× tracked）+ 终设计对
+dense sweep 可行（真峰 ≤1.05×limit、体积 ≤vf+0.02）+ 确定性 + 重阻尼退化（无峰可追时重采样 pin 到带下沿）+ 输入守卫。
+**诚实边界**：在这个 **刚度对齐** 的 smoke 问题上 in-loop 与固定频带的 **设计几乎重合**——compliance-min 本就降峰（终 8.2e6 vs 初 7.0e8），
+约束与目标同向、并不强 binding；这里 re-gridding 的价值是 **共振漂 +99% 时保持约束测量保真（4% vs 94%）**，不是产出不同设计。
+真正 **峰约束与目标冲突** 的表述（如 min dynamic compliance @ ω_op s.t. tracked-peak）留作 reopening，**不在此声称**。
+min-volume-s.t.-peak **不可用**（单目标 min-volume 由 detuning 坍到近空、真峰爆 40–120×，TTT 已记的失败，已复验）。
+每步一次完整 `adaptive_band_sample`（≈21 次频响解）是跟踪的诚实成本；单最低共振无 mode-tracking。
+
 ---
 
 ## 常见错误

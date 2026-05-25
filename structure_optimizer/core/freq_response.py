@@ -1128,3 +1128,154 @@ def peak_constrained_mma(
         band_omegas=band,
         converged=converged,
     )
+
+
+@dataclass
+class AdaptivePeakConstrainedTOResult:
+    """Output of :func:`adaptive_peak_constrained_mma` (Wave BBBB, D083)."""
+
+    densities: np.ndarray
+    compliance_history: list[float]
+    volume_history: list[float]
+    peak_history: list[float]  # in-loop tracked-band peak each iteration
+    peak_omega_history: list[float]  # tracked resonance location each iteration
+    band_history: list[np.ndarray]  # the re-gridded band used each iteration
+    peak_limit: float
+    omega_range: tuple[float, float]
+    converged: bool
+
+
+def adaptive_peak_constrained_mma(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    peak_limit: float,
+    omega_lo: float,
+    omega_hi: float,
+    alpha: float = 0.0,
+    beta: float = 2e-6,
+    vf: float | None = None,
+    max_iter: int = 40,
+    change_tol: float = 1e-3,
+    p: float = 12.0,
+    mass_type: str = "consistent",
+    n_init: int = 7,
+    n_refine: int = 14,
+    band_rel_width: float = 0.05,
+    n_band: int = 5,
+) -> AdaptivePeakConstrainedTOResult:
+    """Minimise static compliance subject to an **in-loop adaptively re-gridded**
+    forced-response peak constraint over ``[omega_lo, omega_hi]`` and a volume
+    fraction, via MMA (Wave BBBB, D083).
+
+    D075's :func:`peak_constrained_mma` pins the constraint band to a **fixed**
+    ``band_omegas`` chosen up front. But the natural frequencies move as material
+    redistributes — on the smoke cantilever the fundamental drifts ≈ +100 % over an
+    optimisation — so a band fixed at the *initial* resonance slides off-resonance
+    and the p-norm constraint stops measuring the true peak (it under-reports by
+    ~90 %). D075's recorded reopening criterion named **in-loop adaptive
+    re-gridding** to fix exactly this.
+
+    Each iteration this driver re-runs :func:`adaptive_band_sample` over the full
+    search range to **re-locate the moving resonance**, then rebuilds the
+    constraint band as ``ω_peak · [1−w, 1+w]`` (``n_band`` points, ``w =
+    band_rel_width``, clipped to the search range). The peak constraint therefore
+    tracks the resonance throughout, keeping its measurement faithful to the true
+    band maximum. The two inequalities for :func:`core.mma.mma_step` are the proven
+    D066/D075 pair
+
+        ``g₁(x) = J_peak(x) / J_lim − 1 ≤ 0``   (in-band forced-response peak)
+        ``g₂(x) = mean(x) − vf ≤ 0``            (volume)
+
+    minimising the SIMP static compliance (``dc/dρ_e = −dscale_e·uₑᵀkₑuₑ``). The
+    light default ``beta = 2e-6`` keeps the resonance **sharp enough to be worth
+    tracking** (a heavily-damped response has no peak to chase, and the fixed and
+    adaptive bands coincide); it is still damped enough for a finite, stable solve
+    (cf. Wave TTT's undamped singularity). Both gradients are density-filtered.
+
+    Returns an :class:`AdaptivePeakConstrainedTOResult` whose ``peak_omega_history``
+    records the tracked resonance each iteration — the evidence that re-gridding is
+    doing non-trivial work.
+    """
+    from structure_optimizer.core.fem2d import solve_linear_elastic
+    from structure_optimizer.core.mma import MMAState, mma_step
+
+    if not (peak_limit > 0.0):
+        raise SolverError("peak_constrained_nonpositive_limit")
+    if not (omega_hi > omega_lo):
+        raise SolverError("adaptive_band_invalid_range")
+    if n_band < 1:
+        raise SolverError("adaptive_peak_band_too_few")
+    opt = config.optimization
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+    vf_target = float(opt.volume_fraction) if vf is None else float(vf)
+    rho = np.where(mesh.void_mask, opt.min_density, vf_target)
+
+    x = rho[design].astype(float).copy()
+    xmin = np.full(n_design, opt.min_density)
+    xmax = np.ones(n_design)
+    state = MMAState()
+
+    compliance_history: list[float] = []
+    volume_history: list[float] = []
+    peak_history: list[float] = []
+    peak_omega_history: list[float] = []
+    band_history: list[np.ndarray] = []
+    converged = False
+
+    def _regrid(r: np.ndarray) -> tuple[float, np.ndarray]:
+        ab = adaptive_band_sample(
+            config, mesh, r, omega_lo, omega_hi, n_init, n_refine, alpha, beta, mass_type
+        )
+        spread = np.linspace(1.0 - band_rel_width, 1.0 + band_rel_width, n_band)
+        band = np.clip(ab.peak_omega * spread, omega_lo, omega_hi)
+        return ab.peak_omega, band
+
+    for _ in range(max_iter):
+        rho[design] = x
+        res = solve_linear_elastic(config, mesh, rho)
+        active = np.where(mesh.void_mask, opt.min_density, rho)
+        dscale = opt.penalty * np.where(mesh.void_mask, 0.0, active ** (opt.penalty - 1.0)) * (1.0 - opt.min_density)
+        dc = -dscale * res.element_strain_energy
+        sens_c = density_filter(mesh, rho, dc, opt.filter_radius, opt.min_density)
+
+        peak_omega, band = _regrid(rho)
+        peak, dpeak, _ = target_band_peak_sensitivity(config, mesh, rho, band, alpha, beta, p, mass_type)
+        sens_p = density_filter(mesh, rho, dpeak, opt.filter_radius, opt.min_density)
+
+        compliance_history.append(res.compliance)
+        volume_history.append(float(np.mean(x)))
+        peak_history.append(peak)
+        peak_omega_history.append(peak_omega)
+        band_history.append(band)
+
+        df0dx = sens_c[design]
+        fval = np.array([peak / peak_limit - 1.0, float(np.mean(x) - vf_target)])
+        dfdx = np.vstack([sens_p[design] / peak_limit, np.full(n_design, 1.0 / n_design)])
+        x_new, _lmbda = mma_step(x, df0dx, fval, dfdx, xmin, xmax, state)
+        change = float(np.max(np.abs(x_new - x)))
+        x = x_new
+        if change < change_tol:
+            converged = True
+            break
+
+    rho[design] = x
+    res = solve_linear_elastic(config, mesh, rho)
+    peak_omega_f, band_f = _regrid(rho)
+    peak_f, _, _ = target_band_peak_sensitivity(config, mesh, rho, band_f, alpha, beta, p, mass_type)
+    compliance_history.append(res.compliance)
+    volume_history.append(float(np.mean(x)))
+    peak_history.append(peak_f)
+    peak_omega_history.append(peak_omega_f)
+    band_history.append(band_f)
+    return AdaptivePeakConstrainedTOResult(
+        densities=rho,
+        compliance_history=compliance_history,
+        volume_history=volume_history,
+        peak_history=peak_history,
+        peak_omega_history=peak_omega_history,
+        band_history=band_history,
+        peak_limit=float(peak_limit),
+        omega_range=(float(omega_lo), float(omega_hi)),
+        converged=converged,
+    )
