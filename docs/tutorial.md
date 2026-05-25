@@ -2013,6 +2013,22 @@ p_f = system_reliability_series_exact_reordered(betas, R)                       
 **关键 / 定量锚点**（bit-exact backward-compat + 固定 N 方差缩减）：reorder=False 与 `1−genz_mvn_cdf(...)`（D078 路径）**逐位相同**（`==`，**集成铁律**）+ 与默认调用相同；高 N 重排==未排（≤3e-3）==精确 equicorr 参考；**headline** 固定 N=400、60 seed 重排误差 < ½ 未排（实测 ~0.11，≈9×）；便捷别名 == reorder=True；R=I 两路都 1−ΠΦ(β)（≤2e-4）；shape/空模态守卫。
 **诚实边界**：重排只改收敛不改 estimand（方差结果非精度）；**lattice 路径仍未重排**（D094 另一目标，reopening）；精确参考仅 equicorr；默认 reorder=False 保严格 backward-compat。
 
+### 24.3 Ruppert 细化接入 write_stl_cdt_multi_hole（Wave CCCCCC，D100）
+
+D080 的多孔 STL cap 用 plain CDT，可能含 sliver（6×6 带 2×2 孔的 cap 有 18.4° 角）。本波把 D096 Ruppert 接入。
+
+```python
+from structure_optimizer.core.stl_export import write_stl_cdt_multi_hole, write_stl_ruppert_multi_hole
+
+r = write_stl_cdt_multi_hole(outer, holes, refine=True, min_angle_deg=20.0)  # cap 质量细化
+r = write_stl_ruppert_multi_hole(outer, holes)                              # 便捷别名
+```
+
+**集成缺陷（v14 铁律抓到）**：refine=True 初版**非水密**——Ruppert 把边界段从中点分裂（Steiner 点落在环上），细化后 cap 有 wall 没有的边界顶点 → T-junction。**修法**：refine=True 时 wall 跟随**细化三角网边界边**（恰属一个三角形的边），外法向取背离内部 apex 的边垂直方向。refine=False 保留原环 wall 循环不变（byte-exact）。
+
+**关键 / 定量锚点**（byte-exact backward-compat + 面积守恒 + 达成最小角）：refine=False 确定性 + `n_triangles=2·cap+2·环边`（D080 公式，**铁律**）；refine 加 Steiner 三角；面积 refine=True==False==32.0（6²−2²，≤1e-9）；**refine=True 水密**（修复后）；writer 用的 cap（constrained_delaunay_ruppert）最小角 ≥20° 而 plain CDT <20°（证明细化必要）；wrapper byte-identical。
+**诚实边界**：wall 法向用 apex-away 启发式（凸边界对，病态非凸可能翻一个法向，但水密 edge-manifold 仍保证）；refine=True 改变 n_triangles（键不变）；Ruppert 上界 20.7° + acute 角靠 max_steiner（concentric-shell 是 FFFFFF）；2.5D 挤出非 3D remesh。
+
 ---
 
 ## 常见错误

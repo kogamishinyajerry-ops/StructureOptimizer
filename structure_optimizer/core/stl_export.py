@@ -1455,13 +1455,22 @@ def write_stl_cdt_multi_hole(
     z_thickness: float = 1.0,
     n_samples: int | None = None,
     solid_name: str = "topology_cdt_multi_hole",
+    refine: bool = False,
+    min_angle_deg: float = 20.0,
 ) -> dict:
     """Extrude a smooth multiply-connected polygon (outer + **arbitrary** holes) to
-    a watertight STL prism via constrained-Delaunay caps (Wave YYY, D080).
+    a watertight STL prism via constrained-Delaunay caps (Wave YYY, D080; ``refine``
+    added Wave CCCCCC, v14, D100).
 
     Unlike D072's annulus ribbon (exactly one hole), this handles any number of
     holes. Optional ``n_samples`` resamples every ring to equal arc-length spacing
-    (denser sampling makes the constraint edges Delaunay-favoured). Returns
+    (denser sampling makes the constraint edges Delaunay-favoured).
+
+    With ``refine=True`` the cap triangulation is **Ruppert-quality-refined** (D096,
+    :func:`constrained_delaunay_ruppert`) — Steiner points raise the minimum cap angle
+    to ``≥ min_angle_deg`` (better-conditioned export faces) while preserving the
+    cross-section and watertightness. **Default ``refine=False`` reproduces D080's
+    plain constrained-Delaunay cap byte-for-byte** (no regression). Returns
     ``n_triangles`` / ``cross_section_area`` / ``n_holes`` / ``is_watertight`` /
     ``out_path``.
     """
@@ -1471,7 +1480,10 @@ def write_stl_cdt_multi_hole(
     hole_rings = [
         _resample_closed_ring(h, n_samples) if n_samples else _clean_ring(h) for h in (holes or [])
     ]
-    pts, tris = constrained_delaunay_triangulate(outer, hole_rings)
+    if refine:
+        pts, tris = constrained_delaunay_ruppert(outer, hole_rings, min_angle_deg=min_angle_deg)
+    else:
+        pts, tris = constrained_delaunay_triangulate(outer, hole_rings)
 
     triangles: list[str] = []
     total_area = 0.0
@@ -1482,23 +1494,52 @@ def write_stl_cdt_multi_hole(
         a_hi, b_hi, c_hi = (np.array([p[0], p[1], z_thickness]) for p in (a, b, c))
         triangles.append(_format_triangle(a_lo, c_lo, b_lo, np.array([0.0, 0.0, -1.0])))
         triangles.append(_format_triangle(a_hi, b_hi, c_hi, np.array([0.0, 0.0, 1.0])))
-    for ring in [outer, *hole_rings]:
-        ring = np.asarray(ring, dtype=float)
-        if _signed_area(ring) < 0:
-            ring = ring[::-1].copy()
-        rn = ring.shape[0]
-        for kk in range(rn):
-            a, b = ring[kk], ring[(kk + 1) % rn]
-            a_lo = np.array([a[0], a[1], 0.0])
-            b_lo = np.array([b[0], b[1], 0.0])
-            a_hi = np.array([a[0], a[1], z_thickness])
-            b_hi = np.array([b[0], b[1], z_thickness])
+    if refine:
+        # Steiner points subdivide boundary segments, so the walls must follow the
+        # refined cap boundary (edges in exactly one triangle), not the original rings
+        # — otherwise the caps gain vertices the walls lack and the prism is non-manifold
+        # (T-junctions). Outward normal = the edge perpendicular pointing away from the
+        # owning triangle's interior apex.
+        owners: dict[tuple[int, int], list[int]] = {}
+        for ti, t in enumerate(tris):
+            for e in _tri_sorted_edges(t):
+                owners.setdefault(e, []).append(ti)
+        for e, own in owners.items():
+            if len(own) != 1:
+                continue
+            ia, ib = e
+            a, b = pts[ia], pts[ib]
+            apex = pts[_apex(tris[own[0]], ia, ib)]
             edge = b - a
             wall_n = np.array([edge[1], -edge[0], 0.0])
             nrm = np.linalg.norm(wall_n)
             wall_n = wall_n / nrm if nrm > 1e-300 else np.array([1.0, 0.0, 0.0])
+            if np.dot(0.5 * (a + b) - apex, wall_n[:2]) < 0.0:  # point away from interior
+                wall_n = -wall_n
+            a_lo = np.array([a[0], a[1], 0.0])
+            b_lo = np.array([b[0], b[1], 0.0])
+            a_hi = np.array([a[0], a[1], z_thickness])
+            b_hi = np.array([b[0], b[1], z_thickness])
             triangles.append(_format_triangle(a_lo, b_lo, b_hi, wall_n))
             triangles.append(_format_triangle(a_lo, b_hi, a_hi, wall_n))
+    else:
+        for ring in [outer, *hole_rings]:
+            ring = np.asarray(ring, dtype=float)
+            if _signed_area(ring) < 0:
+                ring = ring[::-1].copy()
+            rn = ring.shape[0]
+            for kk in range(rn):
+                a, b = ring[kk], ring[(kk + 1) % rn]
+                a_lo = np.array([a[0], a[1], 0.0])
+                b_lo = np.array([b[0], b[1], 0.0])
+                a_hi = np.array([a[0], a[1], z_thickness])
+                b_hi = np.array([b[0], b[1], z_thickness])
+                edge = b - a
+                wall_n = np.array([edge[1], -edge[0], 0.0])
+                nrm = np.linalg.norm(wall_n)
+                wall_n = wall_n / nrm if nrm > 1e-300 else np.array([1.0, 0.0, 0.0])
+                triangles.append(_format_triangle(a_lo, b_lo, b_hi, wall_n))
+                triangles.append(_format_triangle(a_lo, b_hi, a_hi, wall_n))
 
     out_path = Path(out_path)
     with open(out_path, "w") as f:
@@ -1513,3 +1554,28 @@ def write_stl_cdt_multi_hole(
         "is_watertight": stl_is_watertight(triangles),
         "out_path": str(out_path),
     }
+
+
+def write_stl_ruppert_multi_hole(
+    outer_loop,
+    holes=None,
+    out_path: str | Path = "ruppert_multi_hole.stl",
+    z_thickness: float = 1.0,
+    n_samples: int | None = None,
+    solid_name: str = "topology_ruppert_multi_hole",
+    min_angle_deg: float = 20.0,
+) -> dict:
+    """**Quality-refined** (Ruppert Steiner-insertion) multi-hole STL extrusion (Wave
+    CCCCCC, v14, D100) — convenience alias for :func:`write_stl_cdt_multi_hole` with
+    ``refine=True``. The cap's minimum triangle angle is raised to ``≥ min_angle_deg``
+    while the cross-section and watertightness are preserved."""
+    return write_stl_cdt_multi_hole(
+        outer_loop,
+        holes,
+        out_path=out_path,
+        z_thickness=z_thickness,
+        n_samples=n_samples,
+        solid_name=solid_name,
+        refine=True,
+        min_angle_deg=min_angle_deg,
+    )
