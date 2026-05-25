@@ -791,3 +791,28 @@ v13 沿用纪律：每个 wave（AAAAA-GGGGG）追溯一条 v12（D082-D088）AD
 - 铺层：只优化排列非角度值；max_bending 仅 D_11 单分量；min_coupling O(n!) 限 n≤8；**无 balanced (+θ/−θ) 约束**；均匀 ply 厚（D095）。
 - Ruppert：上界封 20.7°；**无小输入角处理**（acute 角靠 max_steiner 兜底）；每插一点全局重三角化 O(n²)；质量仅最小角无尺寸分级；2D caps；**未接入 write_stl_cdt_multi_hole**（D096）。
 - 详见 D090-D097 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 24. v14 — integration & production-wiring：把 v13 孤立原语接入生产驱动器 + robustness 收尾
+
+v13 每个 wave 加的是**孤立新能力**（新模块函数 + 锚点，彼此低耦合）。v13 收口的 D097 诚实记录了一批**未接入生产驱动器**的原语。v14 的主题是 **integration**：把这些原语**接入既有生产函数**，并完成 robustness 收尾（AAAAAA-GGGGGG 七个能力 wave，HHHHHH 收口 = D098-D105）。
+
+### 24.1 v14 设计原则 — integration 铁律
+
+v14 多数 wave **修改既有生产函数**（不是只加新函数），所以每个 integration wave 的锚点测试**必须包含 backward-compatibility 断言**：新参数是 opt-in 默认值，**逐位复现**（byte-exact）原行为，证明 integration 不回归。这条铁律叠加在原有"定量解析锚点"纪律之上。
+
+- **可靠性接入**：D098 把 d 维 Gumbel copula 接入串联系统 P_f=1−C(Φ(β))（θ=1 逐位复现独立路径，θ↑ 单调升至 comonotone）；D099 把 Genz 重排接入 `system_reliability_series_exact(reorder=)`（False 逐位复现 D078，True 固定 N 误差降 ~9×）。
+- **几何接入**：D100 把 Ruppert 接入 `write_stl_cdt_multi_hole(refine=)`（False byte-exact 复现 D080，True 最小角≥阈值 + 面积守恒 + 水密；**修了 wall-follows-refined-boundary 集成缺陷**——integration 铁律实战抓到的非水密 bug）。
+- **铺层约束 / 选择**：D101 balanced laminate（+θ/−θ ⟹ A₁₆=A₂₆=0 精确，symmetric-balanced 同时 B=0）；D102 离散角集**选择**（max_bending 闭式全局=全选最刚角 + 穷举确认；**复用 optimize_stacking_sequence 排序，单候选 bit-exact**）。
+- **robustness 收尾**：D103 Ruppert concentric-shell 小输入角（2 的幂同心壳分裂 + apex-lock 跳过 ⟹ acute 输入**自然终止**不靠 max_steiner 兜底，非 acute 输入 byte-exact no-op）。
+- **诚实优于吹嘘**：D104 peak-binding **关闭 D091 二度 defer**——找到缺失要素（ω_op 放两模态间反共振谷，min J(ω_op) 此处抬高 flanking 共振），证明耦合 + 约束改变设计 + in-loop regrid 改变设计；但**诚实记录约束非严格 KKT-binding、J 未被牺牲**（basin selector 非硬 trade-off），严格 binding 留 reopening。
+
+### 24.2 v14 已知限制（诚实范围）
+
+- D098 series copula：模 joint *safety*（series 充分）；非 general Rosenblatt；θ=1 才退化独立。
+- D099 reorder：只降方差不改 estimand；Genz–Bretz 启发式排序非证明最优。
+- D100 ruppert export：wall 法向 apex-away 启发式（病态非凸可能翻一个法向，水密仍保证）；refine=True 改 n_triangles（键不变）。
+- D101 balanced：是 construction+verification **未接 optimize_stacking_sequence**；只零 A₁₆/A₂₆ 不零 D₁₆/D₂₆；角度弧度；构造器假设等厚。
+- D102 angle selection：只选角度值不优化 ply 数/厚度；max_bending 全局最优退化（全选一角，无约束时正确）；min_coupling brute-force n≤6/|C|≤6。
+- D103 concentric-shell：输入角本身不可消（apex wedge 恒为输入角）；shell 是启发式趋 isosceles **非任意输入形式终止证明**（max_steiner 兜底保留）；**未接 write_stl_cdt_multi_hole 的 refine 路径**。
+- D104 peak-binding：约束**非严格 KKT-binding、J 未被牺牲**（basin selector）；tracked drift ~5%（弱于 D075）；单 flanking mode；Rayleigh 轻阻尼。
+- 详见 D098-D105 各自 "Honest scope notes" + "Reopening criteria"。

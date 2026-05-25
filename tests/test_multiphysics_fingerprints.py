@@ -720,6 +720,64 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         ]
         return flat, ("tris_sha256", rec["tris_sha256"]), checks
 
+    if kind == "series_copula":
+        from structure_optimizer.core.reliability import (
+            ExchangeableGumbelCopula,
+            system_reliability_series_copula,
+        )
+
+        cop = ExchangeableGumbelCopula(len(rec["betas"]), rec["theta"])
+        pf = system_reliability_series_copula(np.array(rec["betas"]), cop)
+        return np.array([pf]), ("p_f_sha256", rec["p_f_sha256"]), [("p_f", rec["p_f"], pf)]
+
+    if kind == "series_exact_reordered":
+        from structure_optimizer.core.reliability import system_reliability_series_exact_reordered
+
+        m = len(rec["betas"])
+        R = np.full((m, m), rec["rho"])
+        np.fill_diagonal(R, 1.0)
+        pf = system_reliability_series_exact_reordered(
+            np.array(rec["betas"]), R, n_samples=rec["n_samples"], seed=rec["seed"]
+        )
+        return np.array([pf]), ("p_f_sha256", rec["p_f_sha256"]), [("p_f", rec["p_f"], pf)]
+
+    if kind == "balanced_laminate":
+        from structure_optimizer.core.orthotropic_simp import (
+            laminate_abd,
+            make_balanced_laminate,
+            orthotropic_plane_stress_matrix,
+        )
+
+        d0 = orthotropic_plane_stress_matrix(140e3, 10e3, 0.3, 5e3)
+        stack = make_balanced_laminate(np.deg2rad(rec["angles_deg"]), symmetric=rec["symmetric"])
+        a, b, _ = laminate_abd(d0, stack, np.full(len(stack), rec["thickness"]))
+        bn = float(np.linalg.norm(b))
+        checks = [("a16", rec["a16"], a[0, 2]), ("a26", rec["a26"], a[1, 2]), ("b_norm", rec["b_norm"], bn)]
+        return np.array([a[0, 2], a[1, 2], bn]), ("metrics_sha256", rec["metrics_sha256"]), checks
+
+    if kind == "angle_selection":
+        from structure_optimizer.core.orthotropic_simp import (
+            orthotropic_plane_stress_matrix,
+            select_ply_angles,
+        )
+
+        d0 = orthotropic_plane_stress_matrix(140e3, 10e3, 0.3, 5e3)
+        res = select_ply_angles(
+            d0, np.deg2rad(rec["candidates_deg"]), rec["n_plies"], thickness=rec["thickness"], objective=rec["objective"]
+        )
+        checks = [("d11", rec["d11"], res.objective_value)]
+        return np.asarray(res.sequence, dtype=float), ("sequence_sha256", rec["sequence_sha256"]), checks
+
+    if kind == "concentric_shell":
+        from structure_optimizer.core.stl_export import constrained_delaunay_ruppert
+
+        pts, tris = constrained_delaunay_ruppert(
+            rec["polygon"], min_angle_deg=rec["min_angle_deg"], concentric_shells=True
+        )
+        flat = np.array(sorted(tuple(sorted(t)) for t in tris), dtype=float).ravel()
+        checks = [("n_triangles", rec["n_triangles"], len(tris)), ("n_points", rec["n_points"], len(pts))]
+        return flat, ("tris_sha256", rec["tris_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -807,6 +865,12 @@ def test_multiphysics_fingerprint_set_present():
         "genz_reordered_equicorr",
         "stacking_sequence_max_bending",
         "ruppert_rect_4x1",
+        # v14 integration & production-wiring (Wave HHHHHH closure)
+        "series_copula_gumbel",
+        "series_exact_reordered_equicorr",
+        "balanced_laminate_sym",
+        "angle_selection_max_bending",
+        "concentric_shell_spike",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

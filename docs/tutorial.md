@@ -2115,6 +2115,18 @@ r = peak_binding_mma(config, mesh, w_op, flo, fhi, peak_limit, beta=2e-6, regrid
 **关键 / 定量锚点**（对独立 dense sweep）：unconstrained min J(ω_op) 降目标但 flanking 峰升过初始（>init·1.05）；约束设计 flanking 峰 <0.7× unconstrained（实测 4.5×）且 ρ 不同；regrid vs stale 设计差 >5%（实测 27%）+ tracked 共振移 >2%；feasible（真峰 ≤limit·1.15）；确定性 bit-identical；guards。
 **诚实边界（关键）**：**约束并非严格 KKT-binding，J 未被牺牲**——0.3/0.5/0.8×init 的 limit 下约束都不 active，约束运行反而到达**更低** J（基非凸目标的 basin 效应）；约束起 **basin/轨迹选择器**作用（把优化器从"抬高 flanking"的路径引开），不是"压 flanking 必牺牲 J"的硬 trade-off。**已交付 vs D091**：(a) 耦合（min J(ω_op) 抬高 flanking）已证 = D091 真正的 blocker；(b) 约束改变设计；(c) in-loop regrid 改变设计。**仍 open**：严格 active 约束 + 可测 J 牺牲（reopening）。tracked drift ~5%（弱于 D075 的 ~100%），故 regrid-vs-stale 的**设计差 27%**是更强证据。smoke 24×10 测（快），48×20 已 probe 确认非细网格 artefact。
 
+### 24.8 v14 收口（Wave HHHHHH，D105）
+
+v14 七个能力 wave（D098-D104）收口：`scripts/v14_demos.py` 七个确定性 demo（每个跑真实生产驱动器）；fingerprints 65→70（series_copula / series_exact_reordered / balanced_laminate / angle_selection / concentric_shell，tolerant + bit-exact 双层）；property 57→60（balanced 零 A₁₆/A₂₆ / angle-selection 支配随机 multiset / Gumbel series θ=1 退化独立）；architecture §24 integration 叙事；CI v14 步从 `continue-on-error` 翻成 `--rubric v14 --strict`。
+
+```bash
+python scripts/v14_demos.py build/v14_demos        # 生成 7 个 demo HTML
+python scripts/test_agent.py --rubric v14 --strict # 权威评分（~6h，跑 v4-v13 全回归链）
+```
+
+**门控（authoritative）**：v14 rubric **100/100**；v4-v13 回归 = False（各 100）；pytest gate green（D033，0 failed）；全红线保持。结果记入 `tests/v14_scorecard.json`。
+**诚实边界**：v14 是 integration + robustness 里程碑，**不加新物理能力**（by design）。两条诚实 carrydown 留 open（不掩盖）：D101 balanced 是 construction+verification 未接 optimize_stacking_sequence；D104 peak-binding 证了耦合 + 设计改变但**非严格 KKT-binding**。D100/D103 的 refine 路径**未接 write_stl_cdt_multi_hole 的 refine=True**（concentric shells 只经 constrained_delaunay_ruppert 可达）。`--rubric v14 --strict` 慢（~6h+，回归链增至 v4-v13 共 10 里程碑全量 coverage）——别误杀轮替的 `pytest --cov` 子进程。
+
 ---
 
 ## 常见错误

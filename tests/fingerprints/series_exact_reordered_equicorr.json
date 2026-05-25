@@ -1,0 +1,17 @@
+{
+  "benchmark": "reliability",
+  "preset": "n/a",
+  "rubric_version": "v14.0-wave-BBBBBB",
+  "kind": "series_exact_reordered",
+  "betas": [
+    3.0,
+    2.5,
+    2.0,
+    1.5
+  ],
+  "rho": 0.4,
+  "n_samples": 20000,
+  "seed": 0,
+  "p_f": 0.08770432888077229,
+  "p_f_sha256": "sha256:7785224c88bd32bf2f012cbf02668509097056ceb3467ad994dae1ea06472d9a"
+}

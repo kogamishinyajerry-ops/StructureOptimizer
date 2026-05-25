@@ -1,0 +1,16 @@
+{
+  "benchmark": "orthotropic",
+  "preset": "n/a",
+  "rubric_version": "v14.0-wave-EEEEEE",
+  "kind": "angle_selection",
+  "candidates_deg": [
+    0.0,
+    45.0,
+    90.0
+  ],
+  "n_plies": 4,
+  "thickness": 0.125,
+  "objective": "max_bending",
+  "d11": 1467.768991133477,
+  "sequence_sha256": "sha256:66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925"
+}

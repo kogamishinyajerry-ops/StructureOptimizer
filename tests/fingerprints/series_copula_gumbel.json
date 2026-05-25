@@ -1,0 +1,14 @@
+{
+  "benchmark": "reliability",
+  "preset": "n/a",
+  "rubric_version": "v14.0-wave-AAAAAA",
+  "kind": "series_copula",
+  "betas": [
+    2.0,
+    2.5,
+    3.0
+  ],
+  "theta": 2.0,
+  "p_f": 0.02359641423357617,
+  "p_f_sha256": "sha256:8bf0a1a7569d7895acb0846fb0a7dd4d644af944d56c681f8af47f5b72c00f3a"
+}

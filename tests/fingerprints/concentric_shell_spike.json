@@ -1,0 +1,32 @@
+{
+  "benchmark": "stl_cdt",
+  "preset": "n/a",
+  "rubric_version": "v14.0-wave-FFFFFF",
+  "kind": "concentric_shell",
+  "polygon": [
+    [
+      0.0,
+      0.0
+    ],
+    [
+      30.0,
+      0.0
+    ],
+    [
+      30.0,
+      10.0
+    ],
+    [
+      0.0,
+      10.0
+    ],
+    [
+      -120.0,
+      5.0
+    ]
+  ],
+  "min_angle_deg": 20.0,
+  "n_triangles": 5,
+  "n_points": 7,
+  "tris_sha256": "sha256:c021f8ffceec624c6518237630a7bc20063ad8dab161976c8cd1f7cc36a2390a"
+}

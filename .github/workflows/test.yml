@@ -151,10 +151,9 @@ jobs:
       - name: v14 test agent — integration-&-production-wiring rubric scorecard
         # v14 §4.7: v14 rubric scored after v13. The v14 run enforces the D033
         # pytest-green no-regression gate and the v4-v13 regression checks.
-        # NOT strict yet — v14 is mid-build; flip to --strict once v14 reaches ≥99/100.
+        # Strict: v14 reached 100/100 at closure (Wave HHHHHH, D105).
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
-        run: python scripts/test_agent.py --rubric v14
-        continue-on-error: true
+        run: python scripts/test_agent.py --rubric v14 --strict
 
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)

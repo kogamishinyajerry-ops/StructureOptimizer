@@ -1,0 +1,16 @@
+{
+  "benchmark": "orthotropic",
+  "preset": "n/a",
+  "rubric_version": "v14.0-wave-DDDDDD",
+  "kind": "balanced_laminate",
+  "angles_deg": [
+    30.0,
+    60.0
+  ],
+  "symmetric": true,
+  "thickness": 0.125,
+  "a16": 0.0,
+  "a26": 0.0,
+  "b_norm": 8.038873388460929e-13,
+  "metrics_sha256": "sha256:e4660659d1842a57634460cbacf9c71a1df16aefecb5f0edb3770a24003a3970"
+}
