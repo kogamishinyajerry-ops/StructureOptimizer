@@ -1858,6 +1858,28 @@ compliance-min；高于时绑定、用柔度换抗屈曲。
 + 确定性 + 守卫。**诚实边界**：单最低模无 mode-tracking（继承 D082，模态切换/重根未处理）；40 iter 近绑定非精确绑定（~99% λ_safety）；
 baseline 是同 driver 约束失活的**相对**比较非绝对最优；g_penalty void-mode 用默认（细网格需 D082 续延）。
 
+### 23.2 半功率带宽自适应窗口（Wave BBBBB，D091）
+
+D083 的 in-loop 频带用固定 `band_rel_width`。但共振的尖锐度随阻尼变——固定 5% 窗口只在某一 ζ 附近准。本波按
+**半功率带宽** `Δω/ω_n=2ζ=α/ω_n+β·ω_n` 自适应窗口宽度。
+
+```python
+from structure_optimizer.core.freq_response import half_power_relative_bandwidth, adaptive_peak_constrained_mma
+
+half_power_relative_bandwidth(omega, alpha=0.0, beta=2e-6)   # = α/ω+β·ω = 2ζ
+r = adaptive_peak_constrained_mma(config, mesh, limit, lo, hi, beta=2e-6, bandwidth_adaptive=True)  # 窗口宽随共振尖锐度
+```
+
+`bandwidth_adaptive=True` 时每步用 tracked 共振处的半功率带宽设窗口半宽（默认 False 保 D083）。
+
+**关键 / 定量锚点**（闭式 + dense sweep）：half-power 闭式 = α/ω+β·ω = 2ζ（≤1e-15）+ **跨 sharpness 鲁棒**：β∈{5e-7,2e-6,8e-6}
+（ζ≈0.009→0.148）自适应 worst-case 误差 < ½ fixed-5% worst-case，最尖共振处自适应 ~11% vs fixed ~62% + driver 可行 + 确定性/守卫。
+**诚实边界 + defer**：D083 的另一条 reopening「peak-binding 产生不同设计」在 smoke mesh **不成立、诚实 defer**——probe 证据：min J(ω_op)
+（ω_op∈{0.85..1.4}ω₁）下 in-loop 和 fixed 设计**都可行**（true-peak 仅 limit 的 0.01-0.05），且无约束 min J(ω_op) 反而**降低**带内峰
+（7e8→6.1e6）非升高——小网格上"降一频响应"靠整体变刚把整条传递函数压下去，目标与峰约束**同向非冲突**；设计虽差 46% 但都可行不构成
+"in-loop 赢 fixed 输"。真冲突需细网格反共振 flanking-mode 机制，**不伪造**，reopened。bandwidth_adaptive opt-in 保 D083；半功率宽设
+Rayleigh 模型；最尖处 ~11% 残差来自 5 点 p-norm + bisection（denser 可收紧，非本波重点）。
+
 ---
 
 ## 常见错误

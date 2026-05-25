@@ -1145,6 +1145,23 @@ class AdaptivePeakConstrainedTOResult:
     converged: bool
 
 
+def half_power_relative_bandwidth(omega: float, alpha: float = 0.0, beta: float = 2e-6) -> float:
+    """Half-power **fractional** bandwidth ``Δω/ω_n = 2ζ(ω_n) = α/ω_n + β·ω_n`` of a
+    Rayleigh-damped (``C = αM + βK``) resonance at ``ω`` (Wave BBBBB, D091).
+
+    From ``ζ(ω_n) = ½(α/ω_n + β·ω_n)`` (see :func:`rayleigh_modal_damping_ratio`) and
+    the half-power relation ``Δω ≈ 2ζ·ω_n``. A sharp (lightly-damped) resonance has a
+    small fractional bandwidth; a broad one a large bandwidth. Used to size the
+    in-loop constraint band to the *current* resonance's sharpness instead of a fixed
+    fraction. Raises ``SolverError`` for ``ω ≤ 0`` or negative damping.
+    """
+    if omega <= 0.0:
+        raise SolverError("half_power_nonpositive_omega")
+    if alpha < 0.0 or beta < 0.0:
+        raise SolverError("rayleigh_damping_negative_coefficient")
+    return float(alpha / omega + beta * omega)
+
+
 def adaptive_peak_constrained_mma(
     config: BenchmarkConfig,
     mesh: StructuredMesh,
@@ -1162,6 +1179,7 @@ def adaptive_peak_constrained_mma(
     n_refine: int = 14,
     band_rel_width: float = 0.05,
     n_band: int = 5,
+    bandwidth_adaptive: bool = False,
 ) -> AdaptivePeakConstrainedTOResult:
     """Minimise static compliance subject to an **in-loop adaptively re-gridded**
     forced-response peak constraint over ``[omega_lo, omega_hi]`` and a volume
@@ -1191,6 +1209,12 @@ def adaptive_peak_constrained_mma(
     tracking** (a heavily-damped response has no peak to chase, and the fixed and
     adaptive bands coincide); it is still damped enough for a finite, stable solve
     (cf. Wave TTT's undamped singularity). Both gradients are density-filtered.
+
+    With ``bandwidth_adaptive=True`` (Wave BBBBB, D091) the window half-width is set
+    each iteration from the resonance's **half-power fractional bandwidth**
+    (:func:`half_power_relative_bandwidth`, ``= α/ω_peak + β·ω_peak``) instead of the
+    fixed ``band_rel_width`` — robust across resonance sharpness, where a single
+    fixed fraction is accurate only near one damping level.
 
     Returns an :class:`AdaptivePeakConstrainedTOResult` whose ``peak_omega_history``
     records the tracked resonance each iteration — the evidence that re-gridding is
@@ -1227,7 +1251,15 @@ def adaptive_peak_constrained_mma(
         ab = adaptive_band_sample(
             config, mesh, r, omega_lo, omega_hi, n_init, n_refine, alpha, beta, mass_type
         )
-        spread = np.linspace(1.0 - band_rel_width, 1.0 + band_rel_width, n_band)
+        # Wave BBBBB (D091): size the window to the resonance's half-power bandwidth
+        # when bandwidth_adaptive, instead of a fixed fractional width — a sharp
+        # resonance gets a narrow band, a broad one a wide band.
+        width = (
+            half_power_relative_bandwidth(ab.peak_omega, alpha, beta)
+            if bandwidth_adaptive
+            else band_rel_width
+        )
+        spread = np.linspace(1.0 - width, 1.0 + width, n_band)
         band = np.clip(ab.peak_omega * spread, omega_lo, omega_hi)
         return ab.peak_omega, band
 

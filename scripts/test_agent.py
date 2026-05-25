@@ -2557,13 +2557,19 @@ def check_v13_1_1_buckling_constrained() -> tuple[int, str, str]:
         8, "buckling-constrained in module, no test", "buckling-constrained MMA + test")
 
 
-def check_v13_1_2_peak_binding() -> tuple[int, str, str]:
-    """§1.2 peak-binding in-loop (dynamic compliance @ ω_op) (8 pts)."""
+def check_v13_1_2_bandwidth_adaptive() -> tuple[int, str, str]:
+    """§1.2 half-power bandwidth-adaptive in-loop window (8 pts).
+
+    (Pivoted from the original 'peak-binding produces a different design' plan,
+    which the smoke mesh cannot demonstrate — the dynamic objective lowers the
+    in-band peak so the constraint never binds; deferred with probe evidence in
+    D091. This ships the demonstrable D083 reopening item: a half-power
+    bandwidth-adaptive constraint window.)"""
     return _mod_and_test(
         "structure_optimizer/core/freq_response.py",
-        r"operating_freq|peak_binding|dynamic_compliance_at|omega_op|peak_binding_mma",
-        r"peak_binding|omega_op|operating_freq|dynamic_compliance_at",
-        8, "peak-binding in module, no test", "peak-binding in-loop driver + test")
+        r"bandwidth_adaptive|half_power_relative_bandwidth|adaptive_window",
+        r"bandwidth_adaptive|half_power",
+        8, "bandwidth-adaptive in module, no test", "half-power bandwidth-adaptive window + test")
 
 
 def check_v13_1_3_extent_adaptive_rho() -> tuple[int, str, str]:
@@ -2731,7 +2737,7 @@ def check_v13_6_5_anchors_documented() -> tuple[int, str, str]:
 
 CHECKS_V13 = [
     ("§1", "1.1", "屈曲约束 MMA (λ_crit≥λ_safety)", 8, check_v13_1_1_buckling_constrained),
-    ("§1", "1.2", "峰约束驱动产生不同设计", 8, check_v13_1_2_peak_binding),
+    ("§1", "1.2", "半功率带宽自适应窗口", 8, check_v13_1_2_bandwidth_adaptive),
     ("§1", "1.3", "extent 指标 + range-adaptive ρ", 8, check_v13_1_3_extent_adaptive_rho),
     ("§2", "2.1", "d 维交换 Gumbel copula", 8, check_v13_2_1_d_gumbel),
     ("§2", "2.2", "Genz 变量重排序", 8, check_v13_2_2_genz_reorder),

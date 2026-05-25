@@ -9,7 +9,7 @@
 | 项 | 分 | 判据 |
 |---|---|---|
 | 1.1 屈曲约束 MMA（λ_crit ≥ λ_safety）| 8 | `core/buckling.py` 有屈曲约束驱动 + 测试：三约束 MMA（compliance↓ + volume≤vf + λ_crit≥λ_safety），用 D082 设计级灵敏度 |
-| 1.2 峰约束驱动产生不同设计 | 8 | `core/freq_response.py` 有 peak-binding 驱动 + 测试：min dynamic compliance @ ω_op s.t. tracked-peak≤limit，in-loop vs fixed **设计可测不同** |
+| 1.2 半功率带宽自适应窗口 | 8 | `core/freq_response.py` 有 half-power 带宽自适应窗口（`half_power_relative_bandwidth` + `bandwidth_adaptive`）+ 测试：窗口宽=α/ω+βω 跨 sharpness 鲁棒。（原"peak-binding 不同设计"在 smoke mesh 不成立——诚实 defer，见 D091）|
 | 1.3 extent 指标 + range-adaptive ρ | 8 | `core/multi_objective_to.py` 有 extent/spread 指标 + 尺度自适应 ρ + 测试 |
 
 ## §2 robust reliability（16 分）

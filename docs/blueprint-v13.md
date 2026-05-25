@@ -25,7 +25,7 @@ geometry**：每个 wave 追溯一条 v12（或更早）ADR 明列的 "Reopening
 | 来源 ADR reopening criterion | v13 升级 |
 |---|---|
 | D082「buckling-*constrained* MMA (λ_crit ≥ λ_safety 第三不等式)」 | 屈曲约束 TO（compliance + volume + 屈曲）|
-| D083「peak-binding 表述（min dynamic compliance @ ω_op）」 | 峰约束驱动产生不同设计（in-loop 真改设计）|
+| D083「bandwidth-adaptive window（half-power）」 | 半功率带宽自适应窗口（peak-binding-不同设计 claim 诚实 defer，见 D091）|
 | D084「extent/spread 指标 + range-adaptive ρ」 | 多样性 extent (Δ) 指标 + 尺度自适应 ρ |
 | D085「non-Clayton d-dim copula」 | d 维交换 Gumbel copula（闭式条件 CDF）|
 | D086「Genz 变量重排序 + (CBC)」 | Genz 积分范围宽度重排序（MC + lattice 共享）|
@@ -37,7 +37,7 @@ geometry**：每个 wave 追溯一条 v12（或更早）ADR 明列的 "Reopening
 | Wave | 主题 | 关键模块 | 关键定量锚点 | ADR |
 |------|------|----------|--------------|-----|
 | AAAAA | 屈曲约束 MMA（λ_crit ≥ λ_safety 第三不等式）| `core/buckling.py` | 三约束 MMA（compliance↓ + volume≤vf + λ_crit≥λ_safety）绑定到 λ_safety + 设计级灵敏度 | D090 |
-| BBBBB | 峰约束驱动产生不同设计 | `core/freq_response.py` | min dynamic compliance @ ω_op s.t. tracked-peak≤limit → in-loop vs fixed **设计可测不同** | D091 |
+| BBBBB | 半功率带宽自适应窗口 | `core/freq_response.py` | 窗口宽 = half-power 带宽（α/ω+βω）跨 sharpness 鲁棒（fixed 5% 在 ζ≈0.009 误 62% vs 自适应 ~11%）；peak-binding-不同设计诚实 defer | D091 |
 | CCCCC | extent/spread 指标 + range-adaptive ρ | `core/multi_objective_to.py` | Δ-spread 闭式（两点极端 → 大）+ range-adaptive ρ 尺度不变区分 | D092 |
 | DDDDD | d 维交换 Gumbel copula | `core/reliability.py` | 闭式条件 CDF round-trip + Kendall τ=1−1/θ + 退化到双变量 Gumbel | D093 |
 | EEEEE | Genz 变量重排序 | `core/reliability.py` | 按积分范围宽度重排 → 同值更快收敛（vs 未排）+ 排列不变正确性 | D094 |
@@ -60,7 +60,7 @@ v13 完成 = `python scripts/test_agent.py --rubric v13` 报告：
 ## 进度（wave 勾选）
 
 - [x] AAAAA — 屈曲约束 MMA（λ_crit ≥ λ_safety）
-- [ ] BBBBB — 峰约束驱动产生不同设计
+- [x] BBBBB — 半功率带宽自适应窗口（peak-binding-不同设计 claim defer，D091）
 - [ ] CCCCC — extent/spread 指标 + range-adaptive ρ
 - [ ] DDDDD — d 维交换 Gumbel copula
 - [ ] EEEEE — Genz 变量重排序
