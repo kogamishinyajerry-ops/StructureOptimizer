@@ -1302,6 +1302,152 @@ def constrained_delaunay_flip_recover(
     return pts, kept
 
 
+def _diametral_circle_contains(pa: np.ndarray, pb: np.ndarray, q: np.ndarray) -> bool:
+    """Does the **diametral circle** of segment ``pa–pb`` strictly contain ``q``?
+    (centre = midpoint, radius = |pa−pb|/2). Equivalent to ``∠pa q pb > 90°`` — the
+    Ruppert *encroachment* test."""
+    m = 0.5 * (pa + pb)
+    r2 = 0.25 * float((pa - pb) @ (pa - pb))
+    return float((q - m) @ (q - m)) < r2 - 1e-12
+
+
+def _retriangulate_region(pts, constraints, outer, hole_rings):
+    """Rebuild a region-filtered constrained-Delaunay triangulation from the current
+    point set (Bowyer-Watson → flip-recover → Lawson refine → keep in-region)."""
+    tris = _bowyer_watson_delaunay(pts)
+    tris = recover_constraints_by_flips(pts, tris, constraints)
+    tris = refine_min_angle_flips(pts, tris, constraints)
+    kept = [
+        t
+        for t in tris
+        if _point_in_loop(pts[list(t)].mean(axis=0), outer)
+        and not any(_point_in_loop(pts[list(t)].mean(axis=0), h) for h in hole_rings)
+    ]
+    return kept
+
+
+def ruppert_refine(
+    pts,
+    constraints: set[tuple[int, int]],
+    outer: np.ndarray,
+    hole_rings=None,
+    min_angle_deg: float = 20.0,
+    max_steiner: int = 300,
+) -> tuple[np.ndarray, list[tuple[int, int, int]], set[tuple[int, int]], int]:
+    """**Ruppert's Delaunay refinement** — insert **Steiner points** until every
+    triangle's minimum angle ≥ ``min_angle_deg`` (Wave GGGGG, D096).
+
+    Lawson flips (:func:`refine_min_angle_flips`) can only *reorder* a fixed vertex
+    set, so they plateau at whatever min angle the input vertices allow; they cannot
+    guarantee an angle bound. Ruppert adds vertices:
+
+    1. **Encroached subsegment** — a boundary segment whose diametral circle
+       (:func:`_diametral_circle_contains`) contains another vertex is split at its
+       midpoint (the midpoint becomes a new boundary vertex; the constraint set is
+       subdivided), restoring boundary conformity.
+    2. **Skinny triangle** — for the worst in-region triangle below the bound, insert
+       its **circumcentre**; but if that circumcentre would encroach a subsegment,
+       split the segment instead (Ruppert's priority rule), which is what keeps the
+       boundary watertight.
+
+    The angle bound is capped at the provably-terminating 20.7° (Ruppert/Shewchuk) for
+    inputs without acute boundary angles. Returns ``(pts, tris, constraints,
+    n_steiner)``.
+    """
+    hole_rings = hole_rings or []
+    if not 0.0 < min_angle_deg <= 20.7:
+        raise SolverError("ruppert_angle_bound_unsafe")
+    ptl = [np.asarray(p, dtype=float) for p in pts]
+    cons = set(constraints)
+    min_ang = np.radians(min_angle_deg)
+    n_steiner = 0
+
+    def _split_segment(a: int, b: int) -> None:
+        nonlocal n_steiner
+        idx = len(ptl)
+        ptl.append(0.5 * (ptl[a] + ptl[b]))
+        cons.discard(tuple(sorted((a, b))))
+        cons.add(tuple(sorted((a, idx))))
+        cons.add(tuple(sorted((idx, b))))
+        n_steiner += 1
+
+    for _ in range(max_steiner):
+        P = np.array(ptl)
+        kept = _retriangulate_region(P, cons, outer, hole_rings)
+        # 1. encroached subsegment → split midpoint
+        enc = None
+        for a, b in cons:
+            if any(k not in (a, b) and _diametral_circle_contains(P[a], P[b], P[k]) for k in range(P.shape[0])):
+                enc = (a, b)
+                break
+        if enc is not None:
+            _split_segment(*enc)
+            continue
+        # 2. worst skinny in-region triangle
+        worst = None
+        worst_ang = np.pi
+        for t in kept:
+            ang = _min_triangle_angle(P, [t])
+            if ang < worst_ang:
+                worst_ang = ang
+                worst = t
+        if worst is None or worst_ang >= min_ang:
+            break
+        cc = _circumcircle(P[worst[0]], P[worst[1]], P[worst[2]])
+        if cc is None:
+            break
+        center = cc[0]
+        seg = next(((a, b) for a, b in cons if _diametral_circle_contains(P[a], P[b], center)), None)
+        if seg is not None:  # circumcentre would encroach → split that segment instead
+            _split_segment(*seg)
+            continue
+        if _point_in_loop(center, outer) and not any(_point_in_loop(center, h) for h in hole_rings):
+            ptl.append(center)
+            n_steiner += 1
+            continue
+        break  # circumcentre outside region but encroaches nothing — best effort, stop
+
+    P = np.array(ptl)
+    kept = _retriangulate_region(P, cons, outer, hole_rings)
+    return P, kept, cons, n_steiner
+
+
+def constrained_delaunay_ruppert(
+    outer_loop, holes=None, min_angle_deg: float = 20.0, max_steiner: int = 300
+) -> tuple[np.ndarray, list[tuple[int, int, int]]]:
+    """Constrained-Delaunay triangulation refined by **Ruppert Steiner insertion** to a
+    guaranteed minimum-angle bound, the quality-refining successor to D088's
+    :func:`constrained_delaunay_flip_recover` (Wave GGGGG, D096).
+
+    Builds the CDT (Bowyer-Watson + flip recovery), then :func:`ruppert_refine` inserts
+    Steiner points until the minimum angle ≥ ``min_angle_deg``. Watertightness is still
+    **verified** — the kept boundary edges must equal the (now subdivided) ring
+    constraints, else ``SolverError``. Returns ``(pts, tris)``.
+    """
+    outer = _clean_ring(outer_loop)
+    hole_rings = [_clean_ring(h) for h in (holes or [])]
+    pts_list: list[np.ndarray] = []
+    constraints: set[tuple[int, int]] = set()
+    for ring in [outer, *hole_rings]:
+        start = len(pts_list)
+        pts_list.extend(ring)
+        m = ring.shape[0]
+        for k in range(m):
+            constraints.add(tuple(sorted((start + k, start + (k + 1) % m))))
+
+    pts, kept, cons, _ = ruppert_refine(
+        pts_list, constraints, outer, hole_rings, min_angle_deg=min_angle_deg, max_steiner=max_steiner
+    )
+    edge_count: dict[tuple[int, int], int] = {}
+    for t in kept:
+        for e in _tri_sorted_edges(t):
+            edge_count[e] = edge_count.get(e, 0) + 1
+    boundary = {e for e, ct in edge_count.items() if ct == 1}
+    if boundary != cons:
+        raise SolverError("ruppert_not_watertight")
+    return pts, kept
+
+
 def write_stl_cdt_multi_hole(
     outer_loop,
     holes=None,

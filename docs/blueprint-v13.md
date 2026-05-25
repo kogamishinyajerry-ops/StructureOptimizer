@@ -65,7 +65,7 @@ v13 完成 = `python scripts/test_agent.py --rubric v13` 报告：
 - [x] DDDDD — d 维交换 Gumbel copula（ψ^{(k)}=ψ·g_k 精确递推闭式条件 CDF + Kendall τ=1−1/θ + d=2 退化到双变量；D093）
 - [x] EEEEE — Genz 变量重排序（Genz–Bretz priority ordering：固定 N=400 误差降 ~9× + 高 N 同值 + 退化到精确 equicorr 参考；D094）
 - [x] FFFFF — 铺层顺序优化（max_bending = rearrangement 闭式全局最优 = brute force + symmetric ⟹ B=0 精确 + min_coupling 穷举到 0；D095）
-- [ ] GGGGG — Ruppert 质量细化（Steiner 插点）
+- [x] GGGGG — Ruppert 质量细化（Steiner 插点把 14°→≥20°，Lawson 在固定顶点集做不到；仍水密；D096）
 - [ ] HHHHH — v13 收口（rubric ≥ 99）
 
 > 注：v13 需在 `docs/quality-rubric-v13.md` + `scripts/test_agent.py` 的 `CHECKS_V13`

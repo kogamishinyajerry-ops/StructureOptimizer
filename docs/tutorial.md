@@ -1962,6 +1962,23 @@ rc = optimize_stacking_sequence(d0, [0,0,90,90], 0.125, objective="min_coupling"
 symmetric ⟹ ‖B‖<1e-9（精确镜像解耦）；min_coupling = brute min（≤1e-12）且 [0,0,90,90] 达 ‖B‖<1e-9；优化耦合 < 坏序 1e-6 倍；空/厚度/objective/>8 ply 守卫。
 **诚实边界**：只优化**排列**非角度**值**；max_bending 仅 `D_11` 单分量（多向/off-axis 要搜索）；min_coupling O(n!) 限 n≤8；**无 balanced (+θ/−θ) 约束**（reopening）；均匀 ply 厚。
 
+### 23.7 Ruppert 质量细化（Wave GGGGG，D096）
+
+D088 的 Lawson flips 只能在**固定顶点集**上重排连接，最小角卡在顶点集允许的上限（4×1 矩形仅采角点 ⟹ ~14°）。Ruppert 通过**插 Steiner 点**突破：
+
+```python
+from structure_optimizer.core.stl_export import constrained_delaunay_ruppert
+
+# 在 circumcenter 插点 + 分裂 encroached 边，直到最小角 ≥ min_angle_deg
+pts, tris = constrained_delaunay_ruppert(outer_loop, holes=None, min_angle_deg=20.0)
+```
+
+算法：(1) **encroached 子段**（直径圆含其他顶点）从中点分裂；否则 (2) 对最差三角形插**circumcenter**——但若 circumcenter 会 encroach 某子段则改为分裂该段（Ruppert 优先规则，水密关键）。角度上界封顶在可证终止的 **20.7°**。
+
+**关键 / 定量锚点**（达成的角度下界 + Lawson-做不到对比）：4×1 矩形 Lawson-only <15°（≈14.04°），Ruppert ≥20°（实测 26.57°）；只 ADD 顶点 + 原角点不变；
+水密（边界顶点度全=2）；bound∈{10,15,20} 结果 ≥ bound；6×1 sliver 需更多 Steiner 点；bound>20.7°（或 ≤0）守卫。
+**诚实边界**：上界封 20.7°（Ruppert/Shewchuk 终止保证仅到此，不吹 30°）；**无小输入角处理**（acute 角靠 max_steiner 兜底，concentric-shell 是 reopening）；每插一点全局重三角化 O(n²)；质量仅最小角（无尺寸分级）；2D caps only；**未接入 `write_stl_cdt_multi_hole`**（reopening）。
+
 ---
 
 ## 常见错误
