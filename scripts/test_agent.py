@@ -74,6 +74,7 @@ class Scorecard:
     v10_check: dict = field(default_factory=dict)
     v11_check: dict = field(default_factory=dict)
     v12_check: dict = field(default_factory=dict)
+    v13_check: dict = field(default_factory=dict)
     pytest_check: dict = field(default_factory=dict)
 
     @property
@@ -2769,6 +2770,227 @@ def run_v13(section_filter: str | None = None) -> Scorecard:
     return sc
 
 
+# --- v14 rubric: integration & production-wiring -----------------------
+
+
+def check_v14_1_1_gumbel_series() -> tuple[int, str, str]:
+    """§1.1 d-Gumbel copula wired into system_reliability_series (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"system_reliability_series_copula|series_upper_tail|gumbel_series|series_gumbel",
+        r"system_reliability_series_copula|series_upper_tail|gumbel_series|series_gumbel",
+        8, "Gumbel-series in module, no test", "Gumbel→series + test")
+
+
+def check_v14_1_2_genz_reorder_series() -> tuple[int, str, str]:
+    """§1.2 Genz reordering wired into system_reliability_series_exact (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"system_reliability_series_exact_reordered|series_exact_reorder|series_reordered|reorder_series",
+        r"series_exact_reordered|series_reordered|reorder_series",
+        8, "reorder-series in module, no test", "Genz-reorder→series + test")
+
+
+def check_v14_2_1_ruppert_export() -> tuple[int, str, str]:
+    """§2.1 Ruppert refinement wired into multi-hole STL export (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/stl_export.py",
+        r"write_stl_ruppert_multi_hole|ruppert_multi_hole|write_stl_refined_multi_hole",
+        r"write_stl_ruppert_multi_hole|ruppert_multi_hole|refined_multi_hole",
+        8, "Ruppert-export in module, no test", "Ruppert→write_stl + test")
+
+
+def check_v14_2_2_concentric_shell() -> tuple[int, str, str]:
+    """§2.2 Ruppert concentric-shell small-input-angle handling (7 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/stl_export.py",
+        r"concentric_shell|corner_lopping|split_small_angle|small_input_angle",
+        r"concentric_shell|corner_lopping|small_angle|acute",
+        7, "concentric-shell in module, no test", "concentric-shell small-angle + test")
+
+
+def check_v14_3_1_balanced_laminate() -> tuple[int, str, str]:
+    """§3.1 balanced laminate constraint (A₁₆=A₂₆=0) (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/orthotropic_simp.py",
+        r"balanced_laminate|balanced_stack|balanced_sequence|a16_a26",
+        r"balanced_laminate|balanced_stack|balanced|a16",
+        8, "balanced laminate in module, no test", "balanced laminate + test")
+
+
+def check_v14_3_2_angle_selection() -> tuple[int, str, str]:
+    """§3.2 discrete angle-set selection (beyond ordering) (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/orthotropic_simp.py",
+        r"select_ply_angles|angle_set_selection|optimize_ply_angles|discrete_angle_select",
+        r"select_ply_angles|angle_set_selection|optimize_ply_angles|angle_select",
+        8, "angle-selection in module, no test", "angle-set selection + test")
+
+
+def check_v14_3_3_peak_binding() -> tuple[int, str, str]:
+    """§3.3 peak-binding flanking-mode on finer mesh (or honest defer) (8 pts)."""
+    return _mod_and_test(
+        "structure_optimizer/core/freq_response.py",
+        r"flanking_mode|peak_binding|flanking_peak|binding_peak",
+        r"flanking_mode|peak_binding|flanking|binding_peak",
+        8, "peak-binding in module, no test", "peak-binding flanking-mode + test")
+
+
+def check_v14_4_1_test_count_1185() -> tuple[int, str, str]:
+    """§4.1 ≥ 1185 tests (4 pts)."""
+    n = _pytest_collect_count()
+    return (4, "PASS", f"{n} tests collected") if n >= 1185 else (0, "FAIL", f"{n} (need ≥1185)")
+
+
+def check_v14_4_2_core_coverage_95() -> tuple[int, str, str]:
+    """§4.2 core coverage ≥ 95% incl. v14 (4 pts)."""
+    pct = _pytest_coverage("structure_optimizer/core")
+    return (4, "PASS", f"{pct}% coverage") if pct >= 95.0 else (0, "FAIL", f"{pct}% (need ≥95%)")
+
+
+def check_v14_4_3_property_tests_59() -> tuple[int, str, str]:
+    """§4.3 property tests ≥ 59 (3 pts)."""
+    n = _grep_count(r"^def test_property_", "tests/**/*.py")
+    return (3, "PASS", f"{n} property tests") if n >= 59 else (0, "FAIL", f"{n} (need ≥59)")
+
+
+def check_v14_4_4_mutation_75() -> tuple[int, str, str]:
+    """§4.4 mutation kill rate ≥ 75% (3 pts)."""
+    report = REPO_ROOT / "tests/mutation_report.json"
+    if not report.exists():
+        return 0, "FAIL", "mutation_report missing"
+    data = json.loads(report.read_text())
+    rate = data.get("aggregate_kill_rate", data.get("kill_rate", 0.0))
+    return (3, "PASS", f"{rate * 100:.1f}% kill rate") if rate >= 0.75 else (0, "FAIL", f"{rate * 100:.1f}%")
+
+
+def check_v14_4_5_fingerprints_70() -> tuple[int, str, str]:
+    """§4.5 fingerprint DB ≥ 70 (2 pts)."""
+    n = len(list((REPO_ROOT / "tests/fingerprints").glob("*.json")))
+    return (2, "PASS", f"{n} fingerprints") if n >= 70 else (0, "FAIL", f"{n} (need ≥70)")
+
+
+def check_v14_4_6_pytest_gate() -> tuple[int, str, str]:
+    """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
+    has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
+    has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
+    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+
+
+def check_v14_4_7_v14_in_agent_ci() -> tuple[int, str, str]:
+    """§4.7 v14 rubric referenced in agent + CI (2 pts)."""
+    me = (REPO_ROOT / "scripts/test_agent.py").read_text()
+    in_agent = "CHECKS_V14" in me
+    ci = REPO_ROOT / ".github/workflows/test.yml"
+    in_ci = ci.exists() and "v14" in ci.read_text().lower()
+    if in_agent and in_ci:
+        return 2, "PASS", "v14 in agent + CI"
+    if in_agent:
+        return 1, "PARTIAL", "v14 in agent, not CI"
+    return 0, "FAIL", "v14 not wired"
+
+
+def check_v14_5_1_series_demo() -> tuple[int, str, str]:
+    """§5.1 Gumbel-series / Genz-reorder-series demo (3 pts)."""
+    n = _grep_count(r"series_copula_demo|series_reorder_demo", "**/*.py")
+    return (3, "PASS", f"{n} series-demo refs") if n >= 1 else (0, "FAIL", "no series demo")
+
+
+def check_v14_5_2_geometry_demo() -> tuple[int, str, str]:
+    """§5.2 Ruppert-export / concentric-shell demo (3 pts)."""
+    n = _grep_count(r"ruppert_export_demo|concentric_shell_demo", "**/*.py")
+    return (3, "PASS", f"{n} geometry-demo refs") if n >= 1 else (0, "FAIL", "no geometry demo")
+
+
+def check_v14_5_3_laminate_demo() -> tuple[int, str, str]:
+    """§5.3 balanced-laminate / angle-select demo (2 pts)."""
+    n = _grep_count(r"balanced_laminate_demo|angle_select_demo", "**/*.py")
+    return (2, "PASS", f"{n} laminate-demo refs") if n >= 1 else (0, "FAIL", "no laminate demo")
+
+
+def check_v14_5_4_peak_binding_demo() -> tuple[int, str, str]:
+    """§5.4 peak-binding demo (2 pts)."""
+    n = _grep_count(r"peak_binding_demo", "**/*.py")
+    return (2, "PASS", f"{n} peak-demo refs") if n >= 1 else (0, "FAIL", "no peak demo")
+
+
+def check_v14_6_1_blueprint_v14() -> tuple[int, str, str]:
+    """§6.1 blueprint-v14 ≥6 wave ticks (3 pts)."""
+    p = REPO_ROOT / "docs/blueprint-v14.md"
+    if not p.exists():
+        return 0, "FAIL", "blueprint-v14.md missing"
+    ticks = p.read_text().count("[x]")
+    return (3, "PASS", f"{ticks} ticks") if ticks >= 6 else (0, "PARTIAL", f"{ticks} ticks (need ≥6)")
+
+
+def check_v14_6_2_tutorial_v14() -> tuple[int, str, str]:
+    """§6.2 tutorial v14 ≥4 new sections (3 pts)."""
+    p = REPO_ROOT / "docs/tutorial.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    n = len(re.findall(r"^### 24\.\d", p.read_text(), re.MULTILINE))
+    return (3, "PASS", f"{n} v14 subsections") if n >= 4 else (0, "PARTIAL", f"{n} (need ≥4)")
+
+
+def check_v14_6_3_arch_v14() -> tuple[int, str, str]:
+    """§6.3 architecture v14 section (3 pts)."""
+    p = REPO_ROOT / "docs/architecture.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    txt = p.read_text().lower()
+    return (3, "PASS", "v14 section present") if ("## 24." in p.read_text() and "integration" in txt) else (0, "FAIL", "no v14 section")
+
+
+def check_v14_6_4_adrs_v14() -> tuple[int, str, str]:
+    """§6.4 ADRs D098+ ≥ 7 (3 pts)."""
+    files = list((REPO_ROOT / "docs/decisions").glob("D*.md"))
+    new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 98]
+    return (3, "PASS", f"{len(new_adrs)} v14 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+
+
+def check_v14_6_5_anchors_documented() -> tuple[int, str, str]:
+    """§6.5 v14 quantitative anchors present in tests (3 pts)."""
+    n = _grep_count(
+        r"system_reliability_series_copula|series_reorder|ruppert_multi_hole|concentric_shell|balanced_laminate|angle_select|flanking",
+        "tests/**/*.py",
+    )
+    return (3, "PASS", f"{n} v14-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
+
+
+CHECKS_V14 = [
+    ("§1", "1.1", "d-Gumbel 接入 system_reliability_series", 8, check_v14_1_1_gumbel_series),
+    ("§1", "1.2", "Genz 重排接入 series_exact", 8, check_v14_1_2_genz_reorder_series),
+    ("§2", "2.1", "Ruppert 接入 write_stl_cdt_multi_hole", 8, check_v14_2_1_ruppert_export),
+    ("§2", "2.2", "Ruppert concentric-shell 小输入角", 7, check_v14_2_2_concentric_shell),
+    ("§3", "3.1", "balanced laminate 约束 (A₁₆=A₂₆=0)", 8, check_v14_3_1_balanced_laminate),
+    ("§3", "3.2", "离散角集选择", 8, check_v14_3_2_angle_selection),
+    ("§3", "3.3", "peak-binding flanking-mode", 8, check_v14_3_3_peak_binding),
+    ("§4", "4.1", "Test count ≥ 1185", 4, check_v14_4_1_test_count_1185),
+    ("§4", "4.2", "Core coverage ≥ 95% (含 v14)", 4, check_v14_4_2_core_coverage_95),
+    ("§4", "4.3", "Property tests ≥ 59", 3, check_v14_4_3_property_tests_59),
+    ("§4", "4.4", "Mutation kill rate ≥ 75%", 3, check_v14_4_4_mutation_75),
+    ("§4", "4.5", "Fingerprint DB ≥ 70", 2, check_v14_4_5_fingerprints_70),
+    ("§4", "4.6", "pytest gate green (D033)", 2, check_v14_4_6_pytest_gate),
+    ("§4", "4.7", "v14 rubric 写入 agent + CI", 2, check_v14_4_7_v14_in_agent_ci),
+    ("§5", "5.1", "Gumbel-series / Genz-reorder-series demo", 3, check_v14_5_1_series_demo),
+    ("§5", "5.2", "Ruppert-export / concentric-shell demo", 3, check_v14_5_2_geometry_demo),
+    ("§5", "5.3", "balanced-laminate / angle-select demo", 2, check_v14_5_3_laminate_demo),
+    ("§5", "5.4", "peak-binding demo", 2, check_v14_5_4_peak_binding_demo),
+    ("§6", "6.1", "blueprint-v14 ≥6 ticks", 3, check_v14_6_1_blueprint_v14),
+    ("§6", "6.2", "tutorial v14 ≥4 sections", 3, check_v14_6_2_tutorial_v14),
+    ("§6", "6.3", "architecture v14 section", 3, check_v14_6_3_arch_v14),
+    ("§6", "6.4", "ADRs D098+ ≥ 7", 3, check_v14_6_4_adrs_v14),
+    ("§6", "6.5", "v14 anchors documented", 3, check_v14_6_5_anchors_documented),
+]
+
+
+def run_v14(section_filter: str | None = None) -> Scorecard:
+    """Score the v14 rubric in-process."""
+    sc = Scorecard(version="v14.0.0")
+    sc.items = _score(CHECKS_V14, section_filter)
+    return sc
+
+
 def check_v11_no_regression() -> dict:
     """v11 must remain 100/100 for a v12 release (true in-process re-score)."""
     sc_v11 = run_v11()
@@ -2786,6 +3008,16 @@ def check_v12_no_regression() -> dict:
         "score": sc_v12.total_earned,
         "max": sc_v12.total_max,
         "regression": sc_v12.total_earned < 100,
+    }
+
+
+def check_v13_no_regression() -> dict:
+    """v13 must remain 100/100 for a v14 release (true in-process re-score)."""
+    sc_v13 = run_v13()
+    return {
+        "score": sc_v13.total_earned,
+        "max": sc_v13.total_max,
+        "regression": sc_v13.total_earned < 100,
     }
 
 
@@ -2844,29 +3076,33 @@ def run_all(section_filter: str | None = None, rubric: str = "v5", run_pytest_ga
         sc = run_v11(section_filter)
     elif rubric == "v12":
         sc = run_v12(section_filter)
-    else:  # v13
+    elif rubric == "v13":
         sc = run_v13(section_filter)
+    else:  # v14
+        sc = run_v14(section_filter)
     sc.v1_check = check_v1_no_regression()
     sc.v2_check = check_v2_no_regression()
     sc.v3_check = check_v3_no_regression()
-    if rubric in ("v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13"):
+    if rubric in ("v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14"):
         sc.v4_check = check_v4_no_regression()
-    if rubric in ("v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13"):
+    if rubric in ("v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14"):
         sc.v5_check = check_v5_no_regression()
-    if rubric in ("v7", "v8", "v9", "v10", "v11", "v12", "v13"):
+    if rubric in ("v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14"):
         sc.v6_check = check_v6_no_regression()
-    if rubric in ("v8", "v9", "v10", "v11", "v12", "v13"):
+    if rubric in ("v8", "v9", "v10", "v11", "v12", "v13", "v14"):
         sc.v7_check = check_v7_no_regression()
-    if rubric in ("v9", "v10", "v11", "v12", "v13"):
+    if rubric in ("v9", "v10", "v11", "v12", "v13", "v14"):
         sc.v8_check = check_v8_no_regression()
-    if rubric in ("v10", "v11", "v12", "v13"):
+    if rubric in ("v10", "v11", "v12", "v13", "v14"):
         sc.v9_check = check_v9_no_regression()
-    if rubric in ("v11", "v12", "v13"):
+    if rubric in ("v11", "v12", "v13", "v14"):
         sc.v10_check = check_v10_no_regression()
-    if rubric in ("v12", "v13"):
+    if rubric in ("v12", "v13", "v14"):
         sc.v11_check = check_v11_no_regression()
-    if rubric == "v13":
+    if rubric in ("v13", "v14"):
         sc.v12_check = check_v12_no_regression()
+    if rubric == "v14":
+        sc.v13_check = check_v13_no_regression()
     if run_pytest_gate:
         sc.pytest_check = check_pytest_green()
     return sc
@@ -2914,6 +3150,8 @@ def print_summary(sc: Scorecard) -> None:
         print(f"  v11 rubric : {sc.v11_check.get('score')}/{sc.v11_check.get('max', 100)}  regression={sc.v11_check.get('regression')}")
     if sc.v12_check:
         print(f"  v12 rubric : {sc.v12_check.get('score')}/{sc.v12_check.get('max', 100)}  regression={sc.v12_check.get('regression')}")
+    if sc.v13_check:
+        print(f"  v13 rubric : {sc.v13_check.get('score')}/{sc.v13_check.get('max', 100)}  regression={sc.v13_check.get('regression')}")
     if sc.pytest_check:
         pc = sc.pytest_check
         marker = "✓" if pc.get("green") else "✗"
@@ -2935,6 +3173,7 @@ def print_summary(sc: Scorecard) -> None:
         sc.v10_check.get("regression") if sc.v10_check else False,
         sc.v11_check.get("regression") if sc.v11_check else False,
         sc.v12_check.get("regression") if sc.v12_check else False,
+        sc.v13_check.get("regression") if sc.v13_check else False,
         sc.pytest_check.get("regression") if sc.pytest_check else False,
     ]
     if sc.total_earned >= 99 and not any(regressions):
@@ -2952,7 +3191,7 @@ def main() -> int:
     parser.add_argument("--strict", action="store_true", help="exit 1 if total < 99 or any regression")
     parser.add_argument(
         "--rubric",
-        choices=["v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13"],
+        choices=["v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14"],
         default="v5",
         help="which rubric to score (default v5; v4-v12 scorable for regression checks)",
     )
@@ -3003,6 +3242,8 @@ def main() -> int:
         payload["v11_check"] = sc.v11_check
     if sc.v12_check:
         payload["v12_check"] = sc.v12_check
+    if sc.v13_check:
+        payload["v13_check"] = sc.v13_check
     if sc.pytest_check:
         payload["pytest_check"] = sc.pytest_check
     out_path.write_text(json.dumps(payload, indent=2) + "\n")
