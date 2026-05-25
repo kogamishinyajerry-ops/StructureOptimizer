@@ -62,7 +62,7 @@ v13 完成 = `python scripts/test_agent.py --rubric v13` 报告：
 - [x] AAAAA — 屈曲约束 MMA（λ_crit ≥ λ_safety）
 - [x] BBBBB — 半功率带宽自适应窗口（peak-binding-不同设计 claim defer，D091）
 - [x] CCCCC — extent/spread 指标 + range-adaptive ρ（extent 与 spacing 互补：两点极端 Δ 同密集前沿，spacing 却都报 S=0；D092）
-- [ ] DDDDD — d 维交换 Gumbel copula
+- [x] DDDDD — d 维交换 Gumbel copula（ψ^{(k)}=ψ·g_k 精确递推闭式条件 CDF + Kendall τ=1−1/θ + d=2 退化到双变量；D093）
 - [ ] EEEEE — Genz 变量重排序
 - [ ] FFFFF — 铺层顺序优化
 - [ ] GGGGG — Ruppert 质量细化（Steiner 插点）

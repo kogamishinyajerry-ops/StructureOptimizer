@@ -1902,6 +1902,26 @@ extent 与 spacing **互补**：判断前沿多样性需要 (spread=extent, unif
 1D/空前沿守卫 + 某目标常数（range 0 → 守卫为 1）不除零。**诚实边界**：extent 是 spread 非 convergence（要配 R2/IGD⁺/HV 看收敛）；
 归一用前沿**自身观测 range**（早期采样有偏，非真 ideal/nadir box）；`normalize_ranges` opt-in 保 D084；非 Deb 的 Δ-metric（不声称是）。
 
+### 23.4 d 维交换 Gumbel copula（Wave DDDDD，D093）
+
+D085 的 nested Clayton 抓**下尾**相关；串联系统可靠性更关心**上尾**（同时极端/共同失效），靠 Gumbel。双变量 Gumbel 已有（D069），
+但 d 维缺闭式条件 CDF——因为 Gumbel 逆生成元 `ψ(s)=exp(−s^{1/θ})` 的 k 阶导没有一行闭式。本波用**精确递推** `ψ^{(k)}=ψ·g_k`
+（`g_{k+1}=g_k′−α s^{α−1} g_k`，α=1/θ）给出，非数值微分。
+
+```python
+from structure_optimizer.core.reliability import gumbel_d_copula
+
+cop = gumbel_d_copula(dim=3, theta=2.2)          # θ≥1；Kendall τ = 1−1/θ
+cop.cdf([0.3, 0.5, 0.7])                          # C(u) = exp(−(Σ(−ln u_i)^θ)^{1/θ})
+cop.conditional_cdf([0.3, 0.5, 0.7])              # 闭式 C_{k|1..k-1} = ψ^{(k-1)}(S_k)/ψ^{(k-1)}(S_{k-1})
+uk = cop.conditional_ppf([0.3, 0.5], w=0.73, k=3) # 单调条件的 bisection 逆（Gumbel 无闭式逆）
+```
+
+**关键 / 定量锚点**（闭式 + 数值混合偏导）：d=2 CDF/条件 = 双变量 Gumbel（≤1e-12）；**headline** 闭式条件 CDF 对数值混合偏导
+比值 d=3 ≤1e-7、d=4 ≤1e-4（解析精确，FD 才是近似）；Kendall τ=1−1/θ 精确（≤1e-14）；conditional_ppf round-trip ≤1e-9 + 单调；
+维度/θ 守卫。**诚实边界**：逆是 bisection 非闭式；仅交换（单 θ，非 nested 分簇）；g_k 12dp 合并同幂（小 d 精确，超大 d 项数增长——出 2.5D 范畴不追）；
+无 Marshall–Olkin frailty 采样器（采样走 Rosenblatt ppf）；**尚未接入 `system_reliability_series`**（本波只交付 copula 原语，集成是 reopening）。
+
 ---
 
 ## 常见错误

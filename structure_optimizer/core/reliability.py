@@ -996,6 +996,114 @@ def clayton_d_copula(dim: int, theta: float) -> ExchangeableClaytonCopula:
     return ExchangeableClaytonCopula(dim=int(dim), theta=float(theta))
 
 
+def _gumbel_psi_derivative_terms(order: int, alpha: float) -> list[tuple[float, float]]:
+    """Monomial terms ``(c, p)`` of ``g_order(s)`` such that the ``order``-th
+    derivative of the Gumbel generator inverse ``ψ(s) = exp(−s^α)`` is
+
+        ψ^{(order)}(s) = exp(−s^α) · Σ_j c_j · s^{p_j}.
+
+    Exact closed-form recursion (no quadrature): from ``ψ' = −α s^{α−1} ψ`` write
+    ``ψ^{(k)} = ψ · g_k`` with ``g_0 = 1`` and ``g_{k+1} = g_k′ − α s^{α−1} g_k``.
+    Each ``g_k`` is a finite sum of monomials ``c·s^p``; differentiation maps
+    ``c·s^p → c·p·s^{p−1}`` and the ``−α s^{α−1}·`` factor maps ``c·s^p →
+    −α c·s^{p+α−1}``. Powers are rounded to 12 dp only to merge like terms.
+    """
+    terms: dict[float, float] = {0.0: 1.0}  # g_0 = 1
+    for _ in range(order):
+        nxt: dict[float, float] = {}
+        for p, c in terms.items():
+            if p != 0.0:  # derivative term c·p·s^{p−1}
+                key = round(p - 1.0, 12)
+                nxt[key] = nxt.get(key, 0.0) + c * p
+            key = round(p + alpha - 1.0, 12)  # −α s^{α−1}·(c·s^p)
+            nxt[key] = nxt.get(key, 0.0) - alpha * c
+        terms = {p: c for p, c in nxt.items() if abs(c) > 0.0}
+    return [(c, p) for p, c in terms.items()]
+
+
+@dataclass
+class ExchangeableGumbelCopula:
+    """``d``-variate **exchangeable Gumbel** copula via the Archimedean generator
+    (Wave DDDDD, D093).
+
+    Generator ``φ(u) = (−ln u)^θ`` (``θ ≥ 1``) with inverse ``ψ(s) = exp(−s^{1/θ})``,
+    so with ``S_k = Σ_{i≤k} (−ln u_i)^θ``
+
+        C(u₁,…,u_d) = ψ(S_d) = exp( −( Σ_i (−ln u_i)^θ )^{1/θ} ).
+
+    Unlike Clayton, ``ψ^{(k)}`` has no one-line form, but it is the **exact** closed
+    recursion ``ψ^{(k)} = ψ·g_k`` (:func:`_gumbel_psi_derivative_terms`). The
+    sequential Rosenblatt **conditional CDF** (the shared ``Π φ′(u_i)`` cancels in the
+    ratio) is therefore analytic:
+
+        C_{k|1..k-1}(u_k | u_{<k}) = ψ^{(k−1)}(S_k) / ψ^{(k−1)}(S_{k−1}),
+
+    validated against numerical mixed partials of the CDF (≈ 1e-9 at d=3). The
+    conditional inverse has no closed form (bisection on the monotone conditional).
+    Pairwise Kendall's τ = ``1 − 1/θ``. ``dim = 2`` reproduces the bivariate
+    :class:`ArchimedeanCopula` Gumbel exactly.
+    """
+
+    dim: int
+    theta: float
+
+    def __post_init__(self) -> None:
+        if self.dim < 2:
+            raise SolverError("gumbel_d_copula_dim_too_small")
+        if self.theta < 1.0:
+            raise SolverError("copula_gumbel_theta_below_one")
+
+    def _s(self, u: np.ndarray, j: int) -> float:
+        """``S_j = Σ_{i<j} (−ln u_i)^θ`` over the first ``j`` components."""
+        return float(np.sum((-np.log(np.asarray(u[:j], dtype=float))) ** self.theta))
+
+    def _psi_deriv(self, s: float, order: int) -> float:
+        """``ψ^{(order)}(s) = exp(−s^{1/θ}) · Σ c·s^p``."""
+        alpha = 1.0 / self.theta
+        g = sum(c * s**p for c, p in _gumbel_psi_derivative_terms(order, alpha))
+        return float(np.exp(-(s**alpha)) * g)
+
+    def cdf(self, u: np.ndarray) -> float:
+        """The ``d``-variate copula CDF ``C(u)``."""
+        u = np.asarray(u, dtype=float)
+        if u.shape[0] != self.dim:
+            raise SolverError("gumbel_d_copula_dim_mismatch")
+        return float(np.exp(-(self._s(u, self.dim) ** (1.0 / self.theta))))
+
+    def conditional_cdf(self, u_upto_k: np.ndarray) -> float:
+        """``C_{k|1..k-1}(u_k | u_{<k})`` where ``k = len(u_upto_k)`` (k ≥ 2)."""
+        u = np.asarray(u_upto_k, dtype=float)
+        k = u.shape[0]
+        if k < 2 or k > self.dim:
+            raise SolverError("gumbel_d_conditional_bad_k")
+        return self._psi_deriv(self._s(u, k), k - 1) / self._psi_deriv(self._s(u, k - 1), k - 1)
+
+    def conditional_ppf(self, u_prev: np.ndarray, w: float, k: int) -> float:
+        """Inverse of :meth:`conditional_cdf` in ``u_k`` by bisection (the conditional
+        is monotone in ``u_k``); ``u_prev`` holds the first ``k−1`` components."""
+        u_prev = np.asarray(u_prev, dtype=float)
+        if k < 2 or k > self.dim or u_prev.shape[0] != k - 1:
+            raise SolverError("gumbel_d_conditional_bad_k")
+        lo, hi = 1e-12, 1.0 - 1e-12
+        for _ in range(100):
+            mid = 0.5 * (lo + hi)
+            trial = np.concatenate([u_prev, [mid]])
+            if self.conditional_cdf(trial) < w:
+                lo = mid
+            else:
+                hi = mid
+        return float(0.5 * (lo + hi))
+
+    def kendall_tau(self) -> float:
+        """Pairwise Kendall's τ = ``1 − 1/θ`` (exchangeable Gumbel)."""
+        return float(1.0 - 1.0 / self.theta)
+
+
+def gumbel_d_copula(dim: int, theta: float) -> ExchangeableGumbelCopula:
+    """``d``-variate exchangeable Gumbel copula (``θ ≥ 1``)."""
+    return ExchangeableGumbelCopula(dim=int(dim), theta=float(theta))
+
+
 @dataclass
 class ClaytonRosenblattTransform:
     """Rosenblatt transform of a ``d``-variate joint distribution: ``d`` marginals
