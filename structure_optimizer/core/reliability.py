@@ -1512,15 +1512,22 @@ def system_reliability_series_exact(
     correlation: np.ndarray | None = None,
     n_samples: int = 20000,
     seed: int = 0,
+    reorder: bool = False,
 ) -> float:
     """**Exact** (Genz-MC) series-system failure probability with a full
-    correlation matrix (Wave WWW, D078).
+    correlation matrix (Wave WWW, D078; ``reorder`` added Wave BBBBBB, v14, D099).
 
     A series system fails if **any** mode fails, so the safe event is "all modes
     safe": ``P_f = 1 − P(all Z_k < β_k) = 1 − Φ_m(β; R)`` where ``Z ~ N(0, R)`` and
     ``R_ij = α_iᵀα_j`` are the FORM limit-state correlations. Unlike
     :func:`system_reliability_series` (Ditlevsen *bounds*) this returns a single
     value that lies inside those bounds.
+
+    With ``reorder=True`` the Genz **variable reordering** (D094, Genz–Bretz
+    prioritisation) is applied, sharply cutting the estimator variance on
+    poorly-ordered limit-state sets at the same ``n_samples`` while converging to the
+    **same** value. **Default ``reorder=False`` reproduces D078 bit-for-bit** (no
+    regression) — the estimand is unchanged, reordering only reduces variance.
     """
     betas = np.asarray(betas, dtype=float).reshape(-1)
     m = betas.size
@@ -1529,8 +1536,22 @@ def system_reliability_series_exact(
     R = np.eye(m) if correlation is None else np.asarray(correlation, dtype=float)
     if R.shape != (m, m):
         raise SolverError("system_reliability_correlation_shape")
-    p_safe = genz_mvn_cdf(betas, R, n_samples=n_samples, seed=seed)
+    cdf_fn = genz_mvn_cdf_reordered if reorder else genz_mvn_cdf
+    p_safe = cdf_fn(betas, R, n_samples=n_samples, seed=seed)
     return float(np.clip(1.0 - p_safe, 0.0, 1.0))
+
+
+def system_reliability_series_exact_reordered(
+    betas: np.ndarray,
+    correlation: np.ndarray | None = None,
+    n_samples: int = 20000,
+    seed: int = 0,
+) -> float:
+    """Variance-reduced (**Genz-reordered**) exact series-system ``P_f`` (Wave BBBBBB,
+    v14, D099) — convenience alias for
+    :func:`system_reliability_series_exact` with ``reorder=True``. Same estimand as the
+    D078 path, lower randomisation error at the same ``n_samples``."""
+    return system_reliability_series_exact(betas, correlation, n_samples=n_samples, seed=seed, reorder=True)
 
 
 def system_reliability_series_copula(betas, copula) -> float:

@@ -1999,6 +1999,20 @@ p_f = system_reliability_series_copula(betas, gumbel_d_copula(4, theta=3.0))  # 
 **关键 / 定量锚点**（bit-exact 独立复现 + comonotone 极限）：Gumbel θ=1 逐位复现 `1−ΠΦ(β_k)` ≤1e-14（**backward-compat 铁律**）+ 匹配 D078 `series_exact(R=I)` ≤2e-4；θ↑（{1,1.5,3,10}）P_f 单调降（正相依使模态共同失效而非各自失效）；θ→∞ → max_k Φ(−β_k)（最弱模态失效，≤1e-3）；Clayton θ→0 也复现独立 ≤1e-5；dim/空模态守卫。
 **诚实边界**：仅交换单 θ（异质相依要 nested/vine）；仅串联（并联是 reopening）；**无 FORM-相关→copula-θ 标定**（θ 是显式建模选择非从极限态几何推断）；高斯 full-R 能力仍只在 D078 路径。
 
+### 24.2 Genz 重排接入 system_reliability_series_exact（Wave BBBBBB，D099）
+
+D078 的精确串联估计器用 plain Genz MC；坏序极限态集方差偏大。本波把 D094 的 Genz–Bretz 重排接入，opt-in 默认保 D078。
+
+```python
+from structure_optimizer.core.reliability import system_reliability_series_exact, system_reliability_series_exact_reordered
+
+p_f = system_reliability_series_exact(betas, R, n_samples=20000, reorder=True)  # 方差缩减
+p_f = system_reliability_series_exact_reordered(betas, R)                       # 便捷别名
+```
+
+**关键 / 定量锚点**（bit-exact backward-compat + 固定 N 方差缩减）：reorder=False 与 `1−genz_mvn_cdf(...)`（D078 路径）**逐位相同**（`==`，**集成铁律**）+ 与默认调用相同；高 N 重排==未排（≤3e-3）==精确 equicorr 参考；**headline** 固定 N=400、60 seed 重排误差 < ½ 未排（实测 ~0.11，≈9×）；便捷别名 == reorder=True；R=I 两路都 1−ΠΦ(β)（≤2e-4）；shape/空模态守卫。
+**诚实边界**：重排只改收敛不改 estimand（方差结果非精度）；**lattice 路径仍未重排**（D094 另一目标，reopening）；精确参考仅 equicorr；默认 reorder=False 保严格 backward-compat。
+
 ---
 
 ## 常见错误
