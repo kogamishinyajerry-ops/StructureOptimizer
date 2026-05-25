@@ -2054,6 +2054,31 @@ is_balanced_laminate(np.deg2rad([45.0, -45.0]), [2.0, 1.0]) # False（厚度加�
 **关键 / 定量锚点**：balanced [+30,−30,+60,−60] 的 A₁₆,A₂₆=0（abs 1e-7）；symmetric-balanced 同时 A₁₆=A₂₆=0 **且** ‖B‖<1e-7；对照 unbalanced [+45,+45] 有 |A₁₆|,|A₂₆|>1e3；detection True/False（±θ 对、0/π2 self-balanced、孤立 +45）；厚度加权（[2,1] 不平衡且 A₁₆≠0）；guards（空板 / 厚度数不符 → SolverError）。
 **诚实边界**：是 **construction+verification，不是 optimiser 约束**——`make_balanced_laminate` 造一个、`is_balanced_laminate` 检一个，但**没有**把 balanced 接进 `optimize_stacking_sequence`（D095 不变，reopening）。**角度是弧度**（rotate_plane_stress 约定，函数不转换，degree 入参得到错误耦合）。只零 A₁₆/A₂₆（拉-剪），**不**零 D₁₆/D₂₆（弯-剪）——symmetric-balanced 一般仍有 D₁₆,D₂₆≠0。构造器假设等厚。
 
+### 24.5 离散角集选择（非仅排序）（Wave EEEEEE，D102）
+
+D095 优化的是**排序**（固定 ply 清单怎么叠），留下 reopening：**选择**（用哪些角）。复合材料设计师从离散可制造角集（如 {0,±45,90}）选 plies。本波补上 selection，并把它**接到** D095 排序优化器上。
+
+```python
+import numpy as np
+from structure_optimizer.core.orthotropic_simp import select_ply_angles
+
+cands = np.deg2rad([0.0, 45.0, 90.0])  # 离散候选角（弧度）
+# 选 4 plies 最大化 D_11：每个位置独立选最刚角 θ*=argmax Q̄_11 → 全选 θ*（闭式全局）
+res = select_ply_angles(D0, cands, n_plies=4, thickness=0.125, objective="max_bending")
+# res.d_matrix[0,0] == (h³/12)·Q̄_11(θ*)；res.sequence 全 = θ*
+
+# 最小化耦合：brute-force multiset，balanced 选择 → ‖B‖=0
+res = select_ply_angles(D0, np.deg2rad([-45.0, 45.0]), 4, objective="min_coupling")
+# res.objective_value ≈ 0
+```
+
+**原理**：D_11=Σ c_k·Q̄_11(θ_k)，所有 c_k>0，每项独立由 θ*=argmax Q̄_11 最大化 ⟹ **全选 θ*** 是可证全局最优，闭式 D_11=(h³/12)·Q̄_11(θ*)，无需搜索。min_coupling 则 brute-force 枚举 size-n multiset，每个交给 `optimize_stacking_sequence`(D095) 排序，取 ‖B‖ 最小——balanced multiset 对称排列达 ‖B‖=0 下界。
+
+**集成（v14 铁律）**：select 把选好的 multiset **交给 D095 排序**，是真正的 selection→ordering 复合。单候选 [θ] 时 select 结果**逐位复现** `optimize_stacking_sequence([θ]*n)`（sequence/A/B/D 全 `array_equal`，objective `==`）——证明复用不改变 D095。
+
+**关键 / 定量锚点**：闭式 D_11=(h³/12)·max Q̄_11（rel 1e-9）；穷举全部 |C|^n 赋值确认无更优（可证全局）；selection 严格优于 ordering 固定混合清单；min_coupling 达 ‖B‖<1e-7 floor；单候选 bit-exact 复现 D095；guards（空集 / 0 plies / 未知目标 / n=7 太大 → SolverError）。
+**诚实边界**：只选**角度值**，不优化 ply 数 / 每层厚度。`max_bending` 全局最优是退化的（全选一个角）——这是"自由选角最大化 D_11、无 ply 数或耦合约束"的诚实正确答案，测试穷举确认而非伪装多样性；要非退化解需加 balanced/symmetric/D₁₆ 约束（reopening）。`min_coupling` 是 brute-force（n≤6, |C|≤6）；symmetric=True 时 B 已被对称强制为 0，min_coupling 失去意义。角度弧度。未接入弹性 MMA 循环。
+
 ---
 
 ## 常见错误

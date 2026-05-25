@@ -15,7 +15,7 @@ numpy-only; dense assembly (smoke meshes); ``SolverError`` status strings.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import permutations
+from itertools import combinations_with_replacement, permutations
 
 import numpy as np
 
@@ -453,6 +453,70 @@ def is_balanced_laminate(angles: np.ndarray, thicknesses: np.ndarray | None = No
         sign = 1.0 if r < np.pi / 2.0 else -1.0
         net[key] = net.get(key, 0.0) + sign * float(ti)
     return all(abs(v) < tol for v in net.values())
+
+
+def select_ply_angles(
+    d0: np.ndarray,
+    candidate_angles: np.ndarray,
+    n_plies: int,
+    thickness: float = 1.0,
+    objective: str = "max_bending",
+    symmetric: bool = False,
+) -> StackingSequenceResult:
+    """Select **which** angles (a multiset drawn with repetition from a discrete
+    candidate set) to use for ``n_plies``, optimising ``D_11`` (``max_bending``) or
+    ``‖B‖_F`` (``min_coupling``) — the angle-**value** selection problem (Wave EEEEEE,
+    v14, D102).
+
+    Complementary to :func:`optimize_stacking_sequence` (D095), which *orders* a fixed
+    inventory: this picks the inventory. The chosen multiset is then handed to
+    ``optimize_stacking_sequence`` for the final arrangement, so D102 **composes with —
+    and bit-exactly reuses —** the D095 ordering optimiser (selection → ordering).
+
+    - ``max_bending`` — every position's contribution ``c_k·Q̄_11(θ_k)`` has ``c_k > 0``,
+      so each is independently maximised by ``θ* = argmax_{θ∈C} Q̄_11(θ)``. The
+      **provably-global** selection is therefore ``n`` copies of ``θ*`` and
+      ``D_11 = (h³/12)·Q̄_11(θ*)`` in closed form — no search.
+    - ``min_coupling`` — brute-force over the size-``n`` multisets of ``C`` (small
+      ``n``/``|C|``), each arranged by the inner ``optimize_stacking_sequence``; the
+      floor ``‖B‖ = 0`` is reached by a balanced multiset arranged symmetrically.
+
+    With ``symmetric=True`` the selection is the **half-stack** (``n_plies`` plies) and
+    the mirror — hence ``B = 0`` exactly — is built by the inner optimiser; the
+    meaningful symmetric objective is then ``max_bending`` (``min_coupling`` is moot
+    because symmetry already zeros ``B``).
+    """
+    d0 = np.asarray(d0, dtype=float)
+    cand = np.asarray(candidate_angles, dtype=float).reshape(-1)
+    if cand.size == 0:
+        raise SolverError("select_no_candidates")
+    if n_plies <= 0:
+        raise SolverError("select_nonpositive_plies")
+    if thickness <= 0.0:
+        raise SolverError("select_nonpositive_thickness")
+    if objective not in ("max_bending", "min_coupling"):
+        raise SolverError("select_unknown_objective")
+
+    if objective == "max_bending":
+        # Each ply independently picks the stiffest candidate (rearrangement is moot —
+        # all-equal). Provably-global closed form; delegate to D095 for the (trivial)
+        # arrangement so the return type and bookkeeping reuse the ordering optimiser.
+        q = np.array([rotate_plane_stress(d0, float(a))[0, 0] for a in cand])
+        theta_star = float(cand[int(np.argmax(q))])
+        chosen = np.full(n_plies, theta_star)
+        return optimize_stacking_sequence(d0, chosen, thickness, objective, symmetric)
+
+    # min_coupling: brute-force the size-n multiset selection (small n / small C); the
+    # inner optimize_stacking_sequence (D095) orders each candidate multiset.
+    if n_plies > 6 or cand.size > 6:
+        raise SolverError("select_min_coupling_too_large")
+    best: StackingSequenceResult | None = None
+    for combo in combinations_with_replacement(cand.tolist(), n_plies):
+        res = optimize_stacking_sequence(d0, np.array(combo), thickness, "min_coupling", symmetric)
+        if best is None or res.objective_value < best.objective_value:
+            best = res
+    assert best is not None  # combinations_with_replacement(non-empty, n≥1) is non-empty
+    return best
 
 
 def simultaneous_elastic_orientation_mma(

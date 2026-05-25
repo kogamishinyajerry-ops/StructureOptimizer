@@ -62,7 +62,7 @@ v14 完成 = `python scripts/test_agent.py --rubric v14` 报告：
 - [x] BBBBBB — Genz 重排接入 system_reliability_series_exact（reorder opt-in；False bit-exact 复现 D078；True 固定 N 误差降 ~9×；D099）
 - [x] CCCCCC — Ruppert 接入 write_stl_cdt_multi_hole（refine opt-in；False byte-exact 复现 D080；True 最小角≥阈值+面积守恒+水密；**修了 wall-follows-refined-boundary 集成缺陷**；D100）
 - [x] DDDDDD — balanced laminate 约束（+θ/−θ 配对 ⟹ A₁₆=A₂₆=0 精确；symmetric-balanced 同时 B=0；thickness-weighted 检测；0/π2 self-balanced；**construction+verification，未接入 optimize_stacking_sequence**；D101）
-- [ ] EEEEEE — 离散角集选择
+- [x] EEEEEE — 离散角集选择（从离散候选集选 multiset；max_bending 闭式全局=全选最刚角 D_11=(h³/12)·Q̄_11(θ*) + 穷举确认；min_coupling brute-force multiset 达 ‖B‖=0 floor；**复用 optimize_stacking_sequence(D095) 排序，单候选逐位复现 bit-exact**；D102）
 - [ ] FFFFFF — Ruppert concentric-shell 小输入角
 - [ ] GGGGGG — peak-binding flanking-mode（细网格，或诚实 defer）
 - [ ] HHHHHH — v14 收口（rubric ≥ 99）
