@@ -227,6 +227,76 @@ def _continuity_metric(angles: np.ndarray, pairs: list[tuple[int, int]]) -> tupl
     return total / n, {k: v / n for k, v in grad.items()}
 
 
+def period_aware_continuity(
+    angles: np.ndarray, pairs: list[tuple[int, int]]
+) -> tuple[float, dict[int, float]]:
+    """**Period-aware** fibre-continuity metric ``mean_{(e,f)} sin²(θ_e − θ_f)`` +
+    per-element gradient (Wave FFFF, D087).
+
+    D079's :func:`_continuity_metric` penalised ``(θ_e − θ_f)²`` — but a fibre angle
+    is **π-periodic** (θ and θ+π describe the *same* fibre orientation). The squared
+    difference therefore wrongly punishes a +89°/−89° seam as a 178° jump, even
+    though those plies are only 2° apart in orientation. ``sin²(Δθ)`` has period π
+    and vanishes at Δθ = 0 *and* π, so it measures true orientation mismatch:
+    ``sin²(θ_e+π − θ_f) = sin²(θ_e − θ_f)``. For small Δθ, ``sin²(Δ) ≈ Δ²`` so it
+    degenerates to D079's metric. Gradient: ``∂/∂θ_e mean sin²(θ_e−θ_f) =
+    mean sin(2(θ_e−θ_f))`` (and the negative for ``θ_f``).
+    """
+    if not pairs:
+        return 0.0, {}
+    grad: dict[int, float] = {}
+    total = 0.0
+    for e, f in pairs:
+        diff = angles[e] - angles[f]
+        total += float(np.sin(diff) ** 2)
+        g = float(np.sin(2.0 * diff))
+        grad[e] = grad.get(e, 0.0) + g
+        grad[f] = grad.get(f, 0.0) - g
+    n = len(pairs)
+    return total / n, {k: v / n for k, v in grad.items()}
+
+
+def laminate_abd(
+    d0: np.ndarray, angles: np.ndarray, thicknesses: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Classical-lamination-theory **[A, B, D]** stiffness matrices for a stack of
+    plies (Wave FFFF, D087).
+
+    Each ply ``k`` has principal-axis plane-stress stiffness ``D₀`` rotated to its
+    fibre angle ``θ_k`` (:func:`rotate_plane_stress`) and thickness ``t_k``. With the
+    through-thickness coordinates ``z_k`` measured from the **mid-plane** (so the
+    stack is centred, ``z₀ = −h/2``, ``z_N = +h/2``, ``h = Σ t_k``),
+
+        A = Σ_k Q̄_k (z_k − z_{k-1})              (extensional, 3×3)
+        B = ½ Σ_k Q̄_k (z_k² − z_{k-1}²)          (extension–bending coupling)
+        D = ⅓ Σ_k Q̄_k (z_k³ − z_{k-1}³)          (bending)
+
+    Closed-form sanity: a single centred ply gives ``A = Q̄·t``, ``B = 0``,
+    ``D = Q̄·t³/12``; any **mid-plane-symmetric** stack gives ``B = 0`` (the classic
+    decoupling result); an unsymmetric stack (e.g. [0/90]) gives ``B ≠ 0``.
+    """
+    angles = np.asarray(angles, dtype=float).reshape(-1)
+    thicknesses = np.asarray(thicknesses, dtype=float).reshape(-1)
+    n = angles.size
+    if n == 0:
+        raise SolverError("laminate_no_plies")
+    if thicknesses.size != n:
+        raise SolverError("laminate_thickness_count_mismatch")
+    if np.any(thicknesses <= 0.0):
+        raise SolverError("laminate_nonpositive_thickness")
+    h = float(np.sum(thicknesses))
+    z = np.concatenate([[-h / 2.0], -h / 2.0 + np.cumsum(thicknesses)])
+    A = np.zeros((3, 3))
+    B = np.zeros((3, 3))
+    D = np.zeros((3, 3))
+    for k in range(n):
+        qbar = rotate_plane_stress(d0, float(angles[k]))
+        A += qbar * (z[k + 1] - z[k])
+        B += 0.5 * qbar * (z[k + 1] ** 2 - z[k] ** 2)
+        D += (1.0 / 3.0) * qbar * (z[k + 1] ** 3 - z[k] ** 3)
+    return A, B, D
+
+
 def simultaneous_elastic_orientation_mma(
     config: BenchmarkConfig,
     mesh: StructuredMesh,
@@ -237,6 +307,7 @@ def simultaneous_elastic_orientation_mma(
     max_iter: int = 40,
     theta_bound: float = np.pi / 2.0,
     change_tol: float = 1e-3,
+    periodic_continuity: bool = False,
 ) -> OrthotropicTOResult:
     """Minimise elastic compliance over the stacked design ``[ρ; θ]`` by
     **simultaneous** MMA, optionally subject to a **fibre-continuity** constraint
@@ -273,6 +344,8 @@ def simultaneous_elastic_orientation_mma(
     design_ids = np.where(design)[0]
     pos = {int(eid): i for i, eid in enumerate(design_ids)}
 
+    metric_fn = period_aware_continuity if periodic_continuity else _continuity_metric
+
     compliance_history: list[float] = []
     volume_history: list[float] = []
     continuity_history: list[float] = []
@@ -282,7 +355,7 @@ def simultaneous_elastic_orientation_mma(
         angles[design] = x[n_design:]
         compliance, d_rho, d_theta = orthotropic_compliance_sensitivities(config, mesh, rho, angles, d0)
         d_rho = density_filter(mesh, rho, d_rho, opt.filter_radius, opt.min_density)
-        cont, cont_grad = _continuity_metric(angles, pairs)
+        cont, cont_grad = metric_fn(angles, pairs)
 
         compliance_history.append(compliance)
         volume_history.append(float(np.mean(x[:n_design])))
@@ -312,7 +385,7 @@ def simultaneous_elastic_orientation_mma(
     rho[design] = x[:n_design]
     angles[design] = x[n_design:]
     compliance, _, _ = orthotropic_compliance_sensitivities(config, mesh, rho, angles, d0)
-    cont, _ = _continuity_metric(angles, pairs)
+    cont, _ = metric_fn(angles, pairs)
     compliance_history.append(compliance)
     volume_history.append(float(np.mean(x[:n_design])))
     continuity_history.append(cont)

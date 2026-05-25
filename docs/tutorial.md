@@ -1764,6 +1764,29 @@ pf, se = system_reliability_series_lattice(betas, R)   # P_f=1−Φ_m(β;R) + SE
 无 CBC 构造；"标准误"是**随机移位的 MC 标准误、非确定性最坏界**（真 QMC 界需 variation×discrepancy，未算）——criterion 的"error bounds"
 按**报告标准误**交付并如实命名；不做 Genz 变量重排序（两法都未排）；高维/近奇异 R 下点阵优势收窄（SE 仍有效、只是不再声称提速）。
 
+### 22.6 周期感知 fibre 连续性（sin²Δθ）+ laminate [A,B,D]（Wave FFFF，D087）
+
+D079 的 fibre 连续性用 `(θ_e−θ_f)²`，但 fibre 角是 **π 周期**（θ 和 θ+π 是同一纤维朝向）。平方度量错把 +89°/−89°
+缝当 178° 跳变罚，而那俩 ply 朝向只差 2°。`sin²(Δθ)` 周期 π、在 Δθ=0 **和** π 都为零，正确测真实朝向失配。
+
+```python
+from structure_optimizer.core.orthotropic_simp import period_aware_continuity, laminate_abd, simultaneous_elastic_orientation_mma
+
+m, grad = period_aware_continuity(angles, pairs)   # mean sin²(θ_e−θ_f)，梯度 mean sin(2Δ)
+A, B, D = laminate_abd(d0, angles, thicknesses)    # 经典层合理论：A=ΣQ̄Δz, B=½ΣQ̄Δz², D=⅓ΣQ̄Δz³
+r = simultaneous_elastic_orientation_mma(config, mesh, d0, periodic_continuity=True)  # opt-in，默认 False 复现 D079
+```
+
+`sin²` 加 π 不变（`sin²(θ_e+π−θ_f)=sin²(θ_e−θ_f)`）、小角时 `sin²(Δ)≈Δ²` 退化为 D079。laminate `z` 从 `−h/2` 到 `+h/2`
+居中：单层居中 ply → `A=Q̄·t, B=0, D=Q̄·t³/12`；中面对称 stack → `B=0`；非对称 [0/90] → `B≠0`（拉弯耦合）。
+
+**关键 / 定量锚点**（闭式 + FD）：±89° 缝 sin²<2e-3（≈sin²2°）而平方 >9.0 + 加 π 不变（≤1e-12）+ 小角 sin²/平方→1（≤1e-3）
++ 连续性梯度 vs 中心 FD ≤1e-6 + 单层 ABD 闭式精确 + 对称 stack B=0 / 非对称 [0/90] B≠0、A&D 对称 + driver opt-in 在 ±89° 棋盘
+初值上 period-aware 报 <2e-3 而平方报 >1.0 + 守卫。**诚实边界**：`laminate_abd` 是**独立 CLT 计算器、未接进 driver**（不优化铺层
+顺序，正交 SIMP 仍是单层面内问题，laminate 只报告不设计——铺层优化 reopened）；`sin²Δθ` 周期 π **但非圆上度量**，在 Δθ=π/2
+垂直缝有伪驻点（罚函数无碍、真测地距是 refinement）；**默认 opt-in False 保 D079 不变**（不偷改默认）；B≠0/B=0 阈值是 scale-aware
+松散 sanity（精确锚点是单层闭式 + 对称 B=0）。
+
 ---
 
 ## 常见错误

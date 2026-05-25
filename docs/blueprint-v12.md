@@ -65,7 +65,7 @@ v12 完成 = `python scripts/test_agent.py --rubric v12` 报告：
 - [x] CCCC — 增广 Tchebycheff R2 + 多样性指标
 - [x] DDDD — 分层 Archimedean copula（per-cluster θ）
 - [x] EEEE — Korobov 点阵 Genz + 误差界
-- [ ] FFFF — 周期感知 fibre 连续性 + 层合
+- [x] FFFF — 周期感知 fibre 连续性 + 层合
 - [ ] GGGG — flip 约束恢复 CDT + 质量细化
 - [ ] HHHH — v12 收口（rubric ≥ 99）
 
