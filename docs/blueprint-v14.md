@@ -64,7 +64,7 @@ v14 完成 = `python scripts/test_agent.py --rubric v14` 报告：
 - [x] DDDDDD — balanced laminate 约束（+θ/−θ 配对 ⟹ A₁₆=A₂₆=0 精确；symmetric-balanced 同时 B=0；thickness-weighted 检测；0/π2 self-balanced；**construction+verification，未接入 optimize_stacking_sequence**；D101）
 - [x] EEEEEE — 离散角集选择（从离散候选集选 multiset；max_bending 闭式全局=全选最刚角 D_11=(h³/12)·Q̄_11(θ*) + 穷举确认；min_coupling brute-force multiset 达 ‖B‖=0 floor；**复用 optimize_stacking_sequence(D095) 排序，单候选逐位复现 bit-exact**；D102）
 - [x] FFFFFF — Ruppert concentric-shell 小输入角（acute apex 段按 2 的幂半径分裂（concentric shells，isosceles ⟹ 不互相 encroach）+ apex-lock 跳过不可消的 wedge 三角；acute 输入**自然终止**（n_steiner 与 budget 无关）+ 非 apex 区达 20° + 水密；plain midpoint 在同输入 raise not_watertight；非 acute 输入 opt-in flag byte-exact no-op；D103）
-- [ ] GGGGGG — peak-binding flanking-mode（细网格，或诚实 defer）
+- [x] GGGGGG — peak-binding flanking-mode（**关闭 D091 二度 defer**；关键洞察=ω_op 放两模态间的**反共振谷**，min J(ω_op) 此处**抬高** flanking 共振（+55% 24×10/+16% 48×20，D091 放 ω₁ 附近看不到）；`peak_binding_mma` 动态目标+flanking 约束 MMA+in-loop regrid；约束改变设计 + regrid vs stale 差 27%；**诚实：约束非严格 KKT-binding、J 未被牺牲**——约束作 basin selector 非硬 trade-off，严格 binding 留 reopening；D104）
 - [ ] HHHHHH — v14 收口（rubric ≥ 99）
 
 > 注：v14 需在 `docs/quality-rubric-v14.md` + `scripts/test_agent.py` 的 `CHECKS_V14`

@@ -2097,6 +2097,24 @@ pts, tris = constrained_delaunay_ruppert(spike, min_angle_deg=20.0, concentric_s
 **关键 / 定量锚点**：shells 下 n_steiner 在 max_steiner=300 与 600 相同且 <300（自然收敛非 budget 限）；plain midpoint 同输入 raise not_watertight（D096 缺陷）；shells 输出水密 + 非 apex-locked 三角 min 角 ≥20°（实测 33.7°）；**非 acute 输入（方形）flag byte-exact no-op**（apex 集空 → midpoint 路径，pts `array_equal` + tris/cons/n_steiner 全等）；apex 检测只标 <阈值角（尖刺 {4}，90° 角 ∅）；20.7° 安全 guard 不变。
 **诚实边界**：**输入角本身永不被消除**（几何禁止）——apex wedge 三角恒为输入角；交付的是*终止*+*水密*+*能达标处达标*，不是"全部 ≥20°"，所以测试只在**非 apex-locked** 区量角。`shell_angle_deg=60°` 是经典阈值非逐输入调。2 的幂 shell 是趋向 isosceles 的**启发式非任意输入的形式终止证明**——`max_steiner` 兜底保留。**未接入 `write_stl_cdt_multi_hole` 的 refine 路径**（该 writer 仍 concentric_shells=False，byte-identical D100，reopening）。2.5D 挤出非 3D remesh。
 
+### 24.7 peak-binding flanking-mode（Wave GGGGGG，D104，关闭 D091 二度 defer）
+
+D083/D091 两次留下 peak-binding：min J(ω_op) 抬高 flanking 共振、约束 binding、in-loop regrid 改变设计。D091 把 ω_op 放在基频 ω₁ 附近，那里"变刚"会**整体压低**传递函数 → 目标与约束**一致**、约束不 binding，于是诚实 defer。**本波找到缺失要素：把 ω_op 放在两模态间的反共振谷**。
+
+```python
+from structure_optimizer.core.freq_response import peak_binding_mma
+
+w_op = 0.5*(w1 + w2)          # 两模态间反共振谷（不是 ω₁ 附近）
+flo, fhi = 0.85*w2, 1.15*w2   # flanking band 绕模态 2
+r = peak_binding_mma(config, mesh, w_op, flo, fhi, peak_limit, beta=2e-6, regrid=True)
+# regrid=False 把 flanking band 冻结在初始位置（stale）作对照
+```
+
+**原理**：在反共振谷深化 ω_op 处的反共振（pole–zero interlacing）会**抬高**相邻模态的 flanking 共振——probe 实测 min J(ω_op) 使 flanking band 峰 **+55%（24×10）/+16%（48×20）**，而 D091 在 ω₁ 附近只看到整体下降。driver 用动态目标 J(ω_op)（`dynamic_compliance_sensitivity`）+ flanking 峰约束（p-norm）+ 体积，走 D066/D075 MMA 对；`regrid=True` 每轮用 `adaptive_band_sample` 重定位移动的 flanking 共振。
+
+**关键 / 定量锚点**（对独立 dense sweep）：unconstrained min J(ω_op) 降目标但 flanking 峰升过初始（>init·1.05）；约束设计 flanking 峰 <0.7× unconstrained（实测 4.5×）且 ρ 不同；regrid vs stale 设计差 >5%（实测 27%）+ tracked 共振移 >2%；feasible（真峰 ≤limit·1.15）；确定性 bit-identical；guards。
+**诚实边界（关键）**：**约束并非严格 KKT-binding，J 未被牺牲**——0.3/0.5/0.8×init 的 limit 下约束都不 active，约束运行反而到达**更低** J（基非凸目标的 basin 效应）；约束起 **basin/轨迹选择器**作用（把优化器从"抬高 flanking"的路径引开），不是"压 flanking 必牺牲 J"的硬 trade-off。**已交付 vs D091**：(a) 耦合（min J(ω_op) 抬高 flanking）已证 = D091 真正的 blocker；(b) 约束改变设计；(c) in-loop regrid 改变设计。**仍 open**：严格 active 约束 + 可测 J 牺牲（reopening）。tracked drift ~5%（弱于 D075 的 ~100%），故 regrid-vs-stale 的**设计差 27%**是更强证据。smoke 24×10 测（快），48×20 已 probe 确认非细网格 artefact。
+
 ---
 
 ## 常见错误

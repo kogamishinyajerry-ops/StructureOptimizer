@@ -1311,3 +1311,158 @@ def adaptive_peak_constrained_mma(
         omega_range=(float(omega_lo), float(omega_hi)),
         converged=converged,
     )
+
+
+@dataclass
+class PeakBindingTOResult:
+    """Output of :func:`peak_binding_mma` (Wave GGGGGG, v14, D104)."""
+
+    densities: np.ndarray
+    dyn_compliance_history: list[float]  # J(ω_op) each iteration (the objective)
+    flanking_peak_history: list[float]  # in-loop flanking-band peak each iteration
+    flanking_omega_history: list[float]  # tracked flanking resonance each iteration
+    band_history: list[np.ndarray]  # the re-gridded flanking band each iteration
+    omega_op: float
+    peak_limit: float
+    flanking_range: tuple[float, float]
+    converged: bool
+
+
+def peak_binding_mma(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    omega_op: float,
+    flanking_lo: float,
+    flanking_hi: float,
+    peak_limit: float,
+    alpha: float = 0.0,
+    beta: float = 2e-6,
+    vf: float | None = None,
+    max_iter: int = 40,
+    change_tol: float = 1e-3,
+    p: float = 12.0,
+    mass_type: str = "consistent",
+    n_init: int = 7,
+    n_refine: int = 14,
+    band_rel_width: float = 0.05,
+    n_band: int = 5,
+    regrid: bool = True,
+) -> PeakBindingTOResult:
+    """Minimise **dynamic** compliance ``J(ω_op) = |fᵀû(ω_op)|²`` at a fixed operating
+    frequency in an *anti-resonance valley*, subject to an in-loop re-gridded **flanking
+    resonance** peak constraint over ``[flanking_lo, flanking_hi]`` plus a volume
+    fraction, via MMA (Wave GGGGGG, v14, D104). **Closes D091's twice-deferred
+    peak-*binding* criterion.**
+
+    D091 placed ``ω_op`` near the fundamental ``ω₁`` and found minimising the response
+    there *lowered* the whole transfer function — objective and constraint **aligned**,
+    so the constraint never bound and "in-loop changes the design" could not be shown.
+    The missing ingredient is **placing ω_op in the valley between two modes**: deepening
+    the anti-resonance at ``ω_op`` (pole–zero interlacing) then *raises* the neighbouring
+    (flanking) resonance, so the flanking-peak constraint genuinely **conflicts** with the
+    objective. A probe confirms minimising ``J(ω_op)`` raises the flanking band peak by
+    ~16–55 % (fine/coarse mesh) instead of lowering it.
+
+    The two MMA inequalities (the proven D066/D075 pair) are
+
+        ``g₁(x) = J_flank(x) / J_lim − 1 ≤ 0``   (flanking in-band peak, p-norm)
+        ``g₂(x) = mean(x) − vf ≤ 0``             (volume)
+
+    minimising the **dynamic** objective ``J(ω_op)`` (sensitivity from
+    :func:`dynamic_compliance_sensitivity`, scaled by its initial value for MMA
+    conditioning). With ``regrid=True`` the flanking band is re-located each iteration by
+    :func:`adaptive_band_sample` over ``[flanking_lo, flanking_hi]`` (tracking the moving
+    flanking resonance); ``regrid=False`` freezes it at the **initial** flanking location
+    (stale), so the two settings yield different designs — the evidence that in-loop
+    re-gridding changes the design, not just the measurement. All gradients are
+    density-filtered. Returns a :class:`PeakBindingTOResult`.
+    """
+    from structure_optimizer.core.fem2d import solve_linear_elastic  # noqa: F401 (parity w/ siblings)
+    from structure_optimizer.core.mma import MMAState, mma_step
+
+    if not (omega_op > 0.0):
+        raise SolverError("peak_binding_nonpositive_omega")
+    if not (peak_limit > 0.0):
+        raise SolverError("peak_constrained_nonpositive_limit")
+    if not (flanking_hi > flanking_lo):
+        raise SolverError("adaptive_band_invalid_range")
+    if n_band < 1:
+        raise SolverError("adaptive_peak_band_too_few")
+    opt = config.optimization
+    design = mesh.design_mask
+    n_design = max(1, int(np.count_nonzero(design)))
+    vf_target = float(opt.volume_fraction) if vf is None else float(vf)
+    rho = np.where(mesh.void_mask, opt.min_density, vf_target)
+
+    x = rho[design].astype(float).copy()
+    xmin = np.full(n_design, opt.min_density)
+    xmax = np.ones(n_design)
+    state = MMAState()
+
+    def _flanking_band(r: np.ndarray) -> tuple[float, np.ndarray]:
+        ab = adaptive_band_sample(
+            config, mesh, r, flanking_lo, flanking_hi, n_init, n_refine, alpha, beta, mass_type
+        )
+        spread = np.linspace(1.0 - band_rel_width, 1.0 + band_rel_width, n_band)
+        return ab.peak_omega, np.clip(ab.peak_omega * spread, flanking_lo, flanking_hi)
+
+    # Stale band (regrid=False): frozen at the INITIAL flanking resonance.
+    _, frozen_band = _flanking_band(rho)
+    # Objective scale for MMA conditioning (constant ⟹ same optimum).
+    j_scale = max(dynamic_compliance_sensitivity(config, mesh, rho, omega_op, alpha, beta, mass_type).objective, 1e-30)
+
+    dyn_history: list[float] = []
+    flanking_peak_history: list[float] = []
+    flanking_omega_history: list[float] = []
+    band_history: list[np.ndarray] = []
+    converged = False
+
+    for _ in range(max_iter):
+        rho[design] = x
+        rj = dynamic_compliance_sensitivity(config, mesh, rho, omega_op, alpha, beta, mass_type)
+        sens_j = density_filter(mesh, rho, rj.sensitivity, opt.filter_radius, opt.min_density)
+
+        if regrid:
+            flank_omega, band = _flanking_band(rho)
+        else:
+            flank_omega, band = float(0.5 * (frozen_band[0] + frozen_band[-1])), frozen_band
+        peak, dpeak, _ = target_band_peak_sensitivity(config, mesh, rho, band, alpha, beta, p, mass_type)
+        sens_p = density_filter(mesh, rho, dpeak, opt.filter_radius, opt.min_density)
+
+        dyn_history.append(rj.objective)
+        flanking_peak_history.append(peak)
+        flanking_omega_history.append(flank_omega)
+        band_history.append(band)
+
+        df0dx = sens_j[design] / j_scale
+        fval = np.array([peak / peak_limit - 1.0, float(np.mean(x) - vf_target)])
+        dfdx = np.vstack([sens_p[design] / peak_limit, np.full(n_design, 1.0 / n_design)])
+        x_new, _lmbda = mma_step(x, df0dx, fval, dfdx, xmin, xmax, state)
+        change = float(np.max(np.abs(x_new - x)))
+        x = x_new
+        if change < change_tol:
+            converged = True
+            break
+
+    rho[design] = x
+    rj_f = dynamic_compliance_sensitivity(config, mesh, rho, omega_op, alpha, beta, mass_type)
+    if regrid:
+        flank_omega_f, band_f = _flanking_band(rho)
+    else:
+        flank_omega_f, band_f = float(0.5 * (frozen_band[0] + frozen_band[-1])), frozen_band
+    peak_f, _, _ = target_band_peak_sensitivity(config, mesh, rho, band_f, alpha, beta, p, mass_type)
+    dyn_history.append(rj_f.objective)
+    flanking_peak_history.append(peak_f)
+    flanking_omega_history.append(flank_omega_f)
+    band_history.append(band_f)
+    return PeakBindingTOResult(
+        densities=rho,
+        dyn_compliance_history=dyn_history,
+        flanking_peak_history=flanking_peak_history,
+        flanking_omega_history=flanking_omega_history,
+        band_history=band_history,
+        omega_op=float(omega_op),
+        peak_limit=float(peak_limit),
+        flanking_range=(float(flanking_lo), float(flanking_hi)),
+        converged=converged,
+    )
