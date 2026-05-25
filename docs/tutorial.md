@@ -1979,6 +1979,26 @@ pts, tris = constrained_delaunay_ruppert(outer_loop, holes=None, min_angle_deg=2
 水密（边界顶点度全=2）；bound∈{10,15,20} 结果 ≥ bound；6×1 sliver 需更多 Steiner 点；bound>20.7°（或 ≤0）守卫。
 **诚实边界**：上界封 20.7°（Ruppert/Shewchuk 终止保证仅到此，不吹 30°）；**无小输入角处理**（acute 角靠 max_steiner 兜底，concentric-shell 是 reopening）；每插一点全局重三角化 O(n²)；质量仅最小角（无尺寸分级）；2D caps only；**未接入 `write_stl_cdt_multi_hole`**（reopening）。
 
+## 24. v14 — integration & production-wiring：把 v13 孤立原语接入生产驱动器
+
+v14 与 v6-v13 不同——不加孤立新能力，而是把 v13 的原语**接入既有生产函数**（D097 记录的未接入项）。**v14 铁律**：每个改既有生产函数的 wave，新参数 opt-in 默认 + 锚点含 **backward-compat 逐位复现**断言（证明集成不回归）。
+
+### 24.1 d-Gumbel copula 接入 system_reliability_series（Wave AAAAAA，D098）
+
+D078 的 `system_reliability_series_exact` 用**高斯**相关矩阵建模模态相依；但结构失效模态常在**上尾**聚集（共同极端），正是 Gumbel copula 擅长、高斯低估的。本波把 d-Gumbel（D093）接入串联系统估计器。
+
+```python
+from structure_optimizer.core.reliability import system_reliability_series_copula, gumbel_d_copula
+
+# 串联系统安全 ⟺ 所有模态安全；用 copula 建模联合安全 u_k=Φ(β_k)
+# P_f = 1 − C(Φ(β_1),...,Φ(β_m))
+betas = [2.0, 2.5, 3.0, 1.8]
+p_f = system_reliability_series_copula(betas, gumbel_d_copula(4, theta=3.0))  # 上尾相关
+```
+
+**关键 / 定量锚点**（bit-exact 独立复现 + comonotone 极限）：Gumbel θ=1 逐位复现 `1−ΠΦ(β_k)` ≤1e-14（**backward-compat 铁律**）+ 匹配 D078 `series_exact(R=I)` ≤2e-4；θ↑（{1,1.5,3,10}）P_f 单调降（正相依使模态共同失效而非各自失效）；θ→∞ → max_k Φ(−β_k)（最弱模态失效，≤1e-3）；Clayton θ→0 也复现独立 ≤1e-5；dim/空模态守卫。
+**诚实边界**：仅交换单 θ（异质相依要 nested/vine）；仅串联（并联是 reopening）；**无 FORM-相关→copula-θ 标定**（θ 是显式建模选择非从极限态几何推断）；高斯 full-R 能力仍只在 D078 路径。
+
 ---
 
 ## 常见错误

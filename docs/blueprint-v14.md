@@ -58,7 +58,7 @@ v14 完成 = `python scripts/test_agent.py --rubric v14` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] AAAAAA — d-Gumbel 接入 system_reliability_series
+- [x] AAAAAA — d-Gumbel 接入 system_reliability_series（P_f=1−C(Φ(β)); Gumbel θ=1 bit-exact 复现独立串联; θ↑ 单调降至 comonotone max P_i; D098）
 - [ ] BBBBBB — Genz 重排接入 system_reliability_series_exact
 - [ ] CCCCCC — Ruppert 接入 write_stl_cdt_multi_hole
 - [ ] DDDDDD — balanced laminate 约束

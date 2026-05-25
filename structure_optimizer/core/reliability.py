@@ -1533,6 +1533,37 @@ def system_reliability_series_exact(
     return float(np.clip(1.0 - p_safe, 0.0, 1.0))
 
 
+def system_reliability_series_copula(betas, copula) -> float:
+    """**Series**-system failure probability under an arbitrary d-variate Archimedean
+    **dependence copula** (Wave AAAAAA, v14, D098).
+
+    D078's :func:`system_reliability_series_exact` models the mode dependence with a
+    **Gaussian** correlation matrix. D093's reopening criterion asked to wire the
+    d-dim **Gumbel** copula (upper-tail / joint-extreme dependence — the regime where
+    failure modes cluster) into the production series-system estimator. A series
+    system is safe iff **all** modes are safe, so modelling the joint *safety* with a
+    copula ``C`` on the per-mode safe-probabilities ``u_k = Φ(β_k)``::
+
+        P(all safe) = C(u_1, …, u_m),    P_f = 1 − C(Φ(β_1), …, Φ(β_m)).
+
+    ``copula`` is any d-variate copula with ``.dim`` and ``.cdf(u)`` — e.g.
+    :class:`ExchangeableGumbelCopula` (upper-tail, θ ≥ 1) or
+    :class:`ExchangeableClaytonCopula` (lower-tail). With the **independence** copula
+    (Gumbel ``θ = 1``) this reduces *exactly* to ``1 − Π Φ(β_k)``, matching
+    :func:`system_reliability_series_exact` with ``R = I`` — the backward-compatibility
+    anchor. Positive dependence (Gumbel ``θ > 1``) **lowers** ``P_f`` toward the
+    comonotone limit ``max_k Φ(−β_k)`` (the series fails when the weakest mode does).
+    """
+    betas = np.asarray(betas, dtype=float).reshape(-1)
+    m = betas.size
+    if m < 1:
+        raise SolverError("system_reliability_no_modes")
+    if getattr(copula, "dim", None) != m:
+        raise SolverError("system_reliability_copula_dim_mismatch")
+    u = np.array([_standard_normal_cdf(float(b)) for b in betas])  # safe-probabilities Φ(β)
+    return float(np.clip(1.0 - copula.cdf(u), 0.0, 1.0))
+
+
 def _korobov_generating_vector(dim: int, a: int, n_points: int) -> np.ndarray:
     """Rank-1 **Korobov** generating vector ``z = (1, a, a², …, a^{dim−1}) mod N``."""
     z = np.ones(dim, dtype=np.int64)
