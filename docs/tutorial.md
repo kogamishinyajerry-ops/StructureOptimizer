@@ -2201,6 +2201,23 @@ s = kkt_binding_status(config, mesh, r, beta=2e-6, j_reference=J_unconstrained)
 **关键 / 定量锚点**（对 dense sweep）：(1) tight 0.08·init ⟹ active=True（|g₁|≤0.1，实测 −0.03）+ active_multiplier>0（实测 +0.37，J≈1.37×无约束）= **严格 binding**；(2) loose 0.4·init ⟹ inactive（g₁<−0.1）+ mult<0（D104 basin-selector）；(3) active 约束把 flank 压到 <0.5× loose；(4) g₁ 匹配独立 dense sweep；(5) 无 j_reference ⟹ active_multiplier=None；(6) 确定性。
 **诚实边界**：严格 binding 仅在 **tight limit corner**（≲0.1·init），loose 仍是 D104 basin-selector（D109 扩展非推翻 D104）；binding regime **非凸/路径敏感**（0.07·init 探到瞬态 infeasible，active-set 非单调，测试用稳健的 0.08/0.40）；`active_multiplier` 是**相对牺牲 proxy（J/J_ref−1）非精确 MMA 对偶 λ**（断言符号>0=λ>0=KKT binding 判据）；smoke 24×10 单 flanking mode Rayleigh 轻阻尼。
 
+### 25.5 anti-symmetric 弯-剪解耦 D₁₆=D₂₆=0（Wave EEEEEEE，D110）
+
+D101 的 balanced 只零拉-剪（A₁₆=A₂₆），symmetric-balanced 还零拉-弯（B=0）但**弯-剪 D₁₆,D₂₆≠0**。本波加 anti-symmetric 构造零 D₁₆=D₂₆。
+
+```python
+from structure_optimizer.core.orthotropic_simp import make_antisymmetric_laminate
+
+stack = make_antisymmetric_laminate(np.deg2rad([30.0, 60.0]))  # [30,60,−60,−30]
+a, b, d = laminate_abd(d0, stack, thicknesses)
+# d[0,2]=D₁₆≈0, d[1,2]=D₂₆≈0（弯-剪解耦）；a 也平衡 A₁₆=A₂₆=0；但 b[0,2]=B₁₆≠0
+```
+
+**原理**：anti-symmetric = θ(−z)=−θ(+z) = [half, −reversed(half)]。D=Σ Q̄_k(z³_k−z³_{k-1})/3 中镜像层 [z1,z2] 与 [−z2,−z1] **同正 z³ 权**、带 ±θ ⟹ 奇 Q̄₁₆/Q̄₂₆ 抵消 ⟹ D₁₆=D₂₆=0。A（与序无关）同样奇抵消 ⟹ A₁₆=A₂₆=0。B 的 z² 权跨中面**反对称** ⟹ 偶项抵消（B₁₁=B₁₂=B₂₂=0）奇项叠加（B₁₆,B₂₆≠0）。
+
+**关键 / 定量锚点**：(1) D₁₆=D₂₆=0（abs 1e-7，headline）；(2) 也平衡 A₁₆=A₂₆=0；(3) 对照 symmetric-balanced |D₁₆|,|D₂₆|>1e2（anti-symmetric 必要性）；(4) coupling 签名 B₁₁=B₁₂=B₂₂=0 但 |B₁₆|>1e2；(5) is_antisymmetric 检测（构造 True、symmetric-balanced False、奇数 False）；(6) guards。
+**诚实边界**：anti-symmetric **trade coupling 非全消**——D₁₆=D₂₆=0 + A₁₆=A₂₆=0 的代价是 **B₁₆,B₂₆≠0**；无单一层合对任意离轴角同时零 A-shear/B/D-shear，anti-symmetric（D 解耦、B≠0）与 symmetric-balanced（B=0、D 耦合）是互补两选。construction+verification 非 optimizer 约束（嵌入 optimize_stacking_sequence 留 reopening）；弧度；均匀厚。
+
 ---
 
 ## 常见错误

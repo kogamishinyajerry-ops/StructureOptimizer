@@ -483,6 +483,44 @@ def is_balanced_laminate(angles: np.ndarray, thicknesses: np.ndarray | None = No
     return all(abs(v) < tol for v in net.values())
 
 
+def _angle_eq_mod_pi(x: float, y: float, tol: float) -> bool:
+    """``x ≡ y (mod π)`` — fibre angles have period π."""
+    d = (float(x) - float(y)) % np.pi
+    return min(d, np.pi - d) < tol
+
+
+def make_antisymmetric_laminate(angles: np.ndarray) -> np.ndarray:
+    """Build an **anti-symmetric** stacking sequence ``θ(−z) = −θ(+z)`` (radians) from a
+    half-stack of angles (Wave EEEEEEE, v15, D110).
+
+    The full laminate is ``[half, −reversed(half)]``: the ply mirrored across the
+    mid-plane carries the **negated** angle. Anti-symmetry uniquely gives **bending–shear
+    decoupling ``D₁₆ = D₂₆ = 0``** — which a *symmetric-balanced* stack (D101) cannot
+    (it keeps ``D₁₆, D₂₆ ≠ 0``) — because the mirror plies share the same ``z³`` bending
+    weight but carry ``±θ`` whose odd ``Q̄₁₆/Q̄₂₆`` cancel. It is also **balanced**
+    (``A₁₆ = A₂₆ = 0``, same odd-cancellation in the order-independent ``A``) and has
+    ``B₁₁ = B₁₂ = B₂₂ = 0``, but **``B₁₆, B₂₆ ≠ 0``** (the classical anti-symmetric
+    extension–shear/bending coupling — anti-symmetry trades B-coupling for D-decoupling).
+    """
+    half = np.asarray(angles, dtype=float).reshape(-1)
+    if half.size == 0:
+        raise SolverError("antisymmetric_no_plies")
+    return np.concatenate([half, -half[::-1]])
+
+
+def is_antisymmetric_laminate(angles: np.ndarray, tol: float = 1e-9) -> bool:
+    """True iff the stack is **anti-symmetric** about the mid-plane — ``θ_k ≡ −θ_{n-1-k}``
+    (mod π) for every mirror pair (Wave EEEEEEE, v15, D110). Odd ply counts are never
+    anti-symmetric (no self-paired centre is defined here)."""
+    a = np.asarray(angles, dtype=float).reshape(-1)
+    n = a.size
+    if n == 0:
+        raise SolverError("antisymmetric_no_plies")
+    if n % 2 != 0:
+        return False
+    return all(_angle_eq_mod_pi(a[k], -a[n - 1 - k], tol) for k in range(n // 2))
+
+
 def _constrained_select_balanced(
     d0: np.ndarray, cand: np.ndarray, n_plies: int, thickness: float, objective: str, symmetric: bool
 ) -> StackingSequenceResult:
