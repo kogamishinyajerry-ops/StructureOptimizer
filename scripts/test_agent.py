@@ -76,6 +76,7 @@ class Scorecard:
     v12_check: dict = field(default_factory=dict)
     v13_check: dict = field(default_factory=dict)
     v14_check: dict = field(default_factory=dict)
+    v15_check: dict = field(default_factory=dict)
     pytest_check: dict = field(default_factory=dict)
 
     @property
@@ -3235,6 +3236,250 @@ def run_v15(section_filter: str | None = None) -> Scorecard:
     return sc
 
 
+# --- v16 rubric: deep embedding & exact generalization -----------------------
+# Each capability check greps a v16-specific NEW symbol (not a pre-existing v15
+# identifier), so all §1-§3 checks correctly FAIL 0/8 before implementation.
+
+
+def check_v16_1_1_antisym_embed() -> tuple[int, str, str]:
+    """§1.1 anti-symmetric ordering constraint embedded in optimize_stacking_sequence (8 pts).
+
+    v16-specific token ``bending_shear_decoupled`` (not the pre-existing D110
+    ``make_antisymmetric_laminate``) so it only passes when D114 embeds the constraint."""
+    return _mod_and_test(
+        "structure_optimizer/core/orthotropic_simp.py",
+        r"bending_shear_decoupled",
+        r"bending_shear_decoupled",
+        8, "anti-symmetry not embedded in optimizer", "anti-symmetry-embedded optimizer + test")
+
+
+def check_v16_1_2_cbc_genz() -> tuple[int, str, str]:
+    """§1.2 CBC deterministic vector wired into Genz MVN CDF (8 pts).
+
+    v16-specific token ``genz_mvn_cdf_cbc`` (not the pre-existing D112 ``cbc_korobov`` /
+    D086 ``genz_mvn_cdf_lattice``)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"genz_mvn_cdf_cbc|cbc_lattice",
+        r"genz_mvn_cdf_cbc|cbc_lattice",
+        8, "CBC not wired into Genz MVN CDF", "CBC deterministic Genz lattice + test")
+
+
+def check_v16_1_3_copula_marginals() -> tuple[int, str, str]:
+    """§1.3 mixture-copula system reliability with general non-normal marginals (8 pts).
+
+    v16-specific token ``copula_marginals`` (not the pre-existing D111
+    ``multi_family_copula`` / D098 ``system_reliability_series_copula``)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"copula_marginals|general_marginal_series",
+        r"copula_marginals|general_marginal_series",
+        8, "general marginals not wired into copula system reliability", "general-marginal copula + test")
+
+
+def check_v16_2_1_alpha_korobov() -> tuple[int, str, str]:
+    """§2.1 α≥2 higher-smoothness weighted-Korobov worst-case error (8 pts).
+
+    v16-specific token ``_korobov_kernel_omega_alpha`` (not the pre-existing D112
+    ``_korobov_kernel_omega``)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"_korobov_kernel_omega_alpha",
+        r"_korobov_kernel_omega_alpha",
+        8, "higher-smoothness Korobov in module, no test", "α≥2 Korobov worst-case error + test")
+
+
+def check_v16_2_2_fast_cbc() -> tuple[int, str, str]:
+    """§2.2 fast-CBC (FFT) or honest defer (7 pts)."""
+    mod = _grep_count(r"fast_cbc|cbc_fft", "structure_optimizer/core/*.py")
+    test = _grep_count(r"fast_cbc|cbc_fft|fast.*cbc", "tests/**/*.py")
+    if mod >= 1 and test >= 1:
+        return 7, "PASS", "fast-CBC FFT + test"
+    if mod >= 1:
+        return 3, "PARTIAL", "in module, no test"
+    return 0, "FAIL", "no fast-CBC"
+
+
+def check_v16_3_1_exact_multiplier() -> tuple[int, str, str]:
+    """§3.1 exact KKT multiplier for peak-binding (or honest defer) (8 pts).
+
+    v16-specific token ``exact_multiplier`` (not the pre-existing D109 ``active_multiplier``
+    proxy)."""
+    return _mod_and_test(
+        "structure_optimizer/core/freq_response.py",
+        r"exact_multiplier|kkt_exact",
+        r"exact_multiplier|kkt_exact",
+        8, "exact KKT multiplier in module, no test", "exact KKT multiplier + test")
+
+
+def check_v16_3_2_parallel_copula() -> tuple[int, str, str]:
+    """§3.2 copula parallel / general system reliability (8 pts).
+
+    v16-specific token ``parallel_copula`` (not the pre-existing D098 series-only path)."""
+    return _mod_and_test(
+        "structure_optimizer/core/reliability.py",
+        r"parallel_copula|system_reliability_parallel_copula",
+        r"parallel_copula|system_reliability_parallel_copula",
+        8, "parallel-system copula in module, no test", "parallel/general system copula + test")
+
+
+def check_v16_4_1_test_count_1290() -> tuple[int, str, str]:
+    """§4.1 ≥ 1290 tests (4 pts)."""
+    n = _pytest_collect_count()
+    return (4, "PASS", f"{n} tests collected") if n >= 1290 else (0, "FAIL", f"{n} (need ≥1290)")
+
+
+def check_v16_4_2_core_coverage_95() -> tuple[int, str, str]:
+    """§4.2 core coverage ≥ 95% incl. v16 (4 pts)."""
+    pct = _pytest_coverage("structure_optimizer/core")
+    return (4, "PASS", f"{pct}% coverage") if pct >= 95.0 else (0, "FAIL", f"{pct}% (need ≥95%)")
+
+
+def check_v16_4_3_property_tests_65() -> tuple[int, str, str]:
+    """§4.3 property tests ≥ 65 (3 pts)."""
+    n = _grep_count(r"^def test_property_", "tests/**/*.py")
+    return (3, "PASS", f"{n} property tests") if n >= 65 else (0, "FAIL", f"{n} (need ≥65)")
+
+
+def check_v16_4_4_mutation_75() -> tuple[int, str, str]:
+    """§4.4 mutation kill rate ≥ 75% (3 pts)."""
+    report = REPO_ROOT / "tests/mutation_report.json"
+    if not report.exists():
+        return 0, "FAIL", "mutation_report missing"
+    data = json.loads(report.read_text())
+    rate = data.get("aggregate_kill_rate", data.get("kill_rate", 0.0))
+    return (3, "PASS", f"{rate * 100:.1f}% kill rate") if rate >= 0.75 else (0, "FAIL", f"{rate * 100:.1f}%")
+
+
+def check_v16_4_5_fingerprints_80() -> tuple[int, str, str]:
+    """§4.5 fingerprint DB ≥ 80 (2 pts)."""
+    n = len(list((REPO_ROOT / "tests/fingerprints").glob("*.json")))
+    return (2, "PASS", f"{n} fingerprints") if n >= 80 else (0, "FAIL", f"{n} (need ≥80)")
+
+
+def check_v16_4_6_pytest_gate() -> tuple[int, str, str]:
+    """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
+    has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
+    has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
+    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+
+
+def check_v16_4_7_v16_in_agent_ci() -> tuple[int, str, str]:
+    """§4.7 v16 rubric referenced in agent + CI (2 pts)."""
+    me = (REPO_ROOT / "scripts/test_agent.py").read_text()
+    in_agent = "CHECKS_V16" in me
+    ci = REPO_ROOT / ".github/workflows/test.yml"
+    in_ci = ci.exists() and "v16" in ci.read_text().lower()
+    if in_agent and in_ci:
+        return 2, "PASS", "v16 in agent + CI"
+    if in_agent:
+        return 1, "PARTIAL", "v16 in agent, not CI"
+    return 0, "FAIL", "v16 not wired"
+
+
+def check_v16_5_1_embed_demo() -> tuple[int, str, str]:
+    """§5.1 anti-symmetry-embed / cbc-lattice demo (3 pts)."""
+    n = _grep_count(r"antisym_embed_demo|cbc_lattice_demo", "**/*.py")
+    return (3, "PASS", f"{n} embed-demo refs") if n >= 1 else (0, "FAIL", "no embed demo")
+
+
+def check_v16_5_2_general_demo() -> tuple[int, str, str]:
+    """§5.2 general-marginals / parallel-system demo (3 pts)."""
+    n = _grep_count(r"general_marginal_demo|parallel_system_demo", "**/*.py")
+    return (3, "PASS", f"{n} general-demo refs") if n >= 1 else (0, "FAIL", "no general demo")
+
+
+def check_v16_5_3_qmc_demo() -> tuple[int, str, str]:
+    """§5.3 alpha2-korobov / fast-cbc demo (2 pts)."""
+    n = _grep_count(r"alpha_korobov_demo|fast_cbc_demo", "**/*.py")
+    return (2, "PASS", f"{n} qmc-demo refs") if n >= 1 else (0, "FAIL", "no qmc demo")
+
+
+def check_v16_5_4_kkt_demo() -> tuple[int, str, str]:
+    """§5.4 exact-kkt-multiplier demo (2 pts)."""
+    n = _grep_count(r"exact_kkt_demo|exact_multiplier_demo", "**/*.py")
+    return (2, "PASS", f"{n} kkt-demo refs") if n >= 1 else (0, "FAIL", "no kkt demo")
+
+
+def check_v16_6_1_blueprint_v16() -> tuple[int, str, str]:
+    """§6.1 blueprint-v16 ≥6 wave ticks (3 pts)."""
+    p = REPO_ROOT / "docs/blueprint-v16.md"
+    if not p.exists():
+        return 0, "FAIL", "blueprint-v16.md missing"
+    ticks = p.read_text().count("[x]")
+    return (3, "PASS", f"{ticks} ticks") if ticks >= 6 else (0, "PARTIAL", f"{ticks} ticks (need ≥6)")
+
+
+def check_v16_6_2_tutorial_v16() -> tuple[int, str, str]:
+    """§6.2 tutorial v16 ≥4 new sections (3 pts)."""
+    p = REPO_ROOT / "docs/tutorial.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    n = len(re.findall(r"^### 26\.\d", p.read_text(), re.MULTILINE))
+    return (3, "PASS", f"{n} v16 subsections") if n >= 4 else (0, "PARTIAL", f"{n} (need ≥4)")
+
+
+def check_v16_6_3_arch_v16() -> tuple[int, str, str]:
+    """§6.3 architecture v16 section (3 pts)."""
+    p = REPO_ROOT / "docs/architecture.md"
+    if not p.exists():
+        return 0, "FAIL", "missing"
+    txt = p.read_text().lower()
+    return (3, "PASS", "v16 section present") if ("## 26." in p.read_text() and "embedding" in txt) else (0, "FAIL", "no v16 section")
+
+
+def check_v16_6_4_adrs_v16() -> tuple[int, str, str]:
+    """§6.4 ADRs D114+ ≥ 7 (3 pts)."""
+    files = list((REPO_ROOT / "docs/decisions").glob("D*.md"))
+    new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 114]
+    return (3, "PASS", f"{len(new_adrs)} v16 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+
+
+def check_v16_6_5_anchors_documented() -> tuple[int, str, str]:
+    """§6.5 v16 quantitative anchors present in tests (3 pts).
+
+    v16-specific tokens only (the wave-introduced identifiers)."""
+    n = _grep_count(
+        r"bending_shear_decoupled|genz_mvn_cdf_cbc|copula_marginals|_korobov_kernel_omega_alpha|fast_cbc|exact_multiplier|parallel_copula",
+        "tests/**/*.py",
+    )
+    return (3, "PASS", f"{n} v16-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
+
+
+CHECKS_V16 = [
+    ("§1", "1.1", "anti-symmetric 排序约束嵌入 optimize_stacking_sequence", 8, check_v16_1_1_antisym_embed),
+    ("§1", "1.2", "CBC 确定性向量接入 genz_mvn_cdf", 8, check_v16_1_2_cbc_genz),
+    ("§1", "1.3", "mixture-copula 一般非正态边缘", 8, check_v16_1_3_copula_marginals),
+    ("§2", "2.1", "α≥2 高阶光滑 Korobov 最坏情况误差", 8, check_v16_2_1_alpha_korobov),
+    ("§2", "2.2", "fast-CBC FFT（或诚实 defer）", 7, check_v16_2_2_fast_cbc),
+    ("§3", "3.1", "peak-binding 精确 KKT 乘子（或诚实 defer）", 8, check_v16_3_1_exact_multiplier),
+    ("§3", "3.2", "copula 并联/一般系统可靠性", 8, check_v16_3_2_parallel_copula),
+    ("§4", "4.1", "Test count ≥ 1290", 4, check_v16_4_1_test_count_1290),
+    ("§4", "4.2", "Core coverage ≥ 95% (含 v16)", 4, check_v16_4_2_core_coverage_95),
+    ("§4", "4.3", "Property tests ≥ 65", 3, check_v16_4_3_property_tests_65),
+    ("§4", "4.4", "Mutation kill rate ≥ 75%", 3, check_v16_4_4_mutation_75),
+    ("§4", "4.5", "Fingerprint DB ≥ 80", 2, check_v16_4_5_fingerprints_80),
+    ("§4", "4.6", "pytest gate green (D033)", 2, check_v16_4_6_pytest_gate),
+    ("§4", "4.7", "v16 rubric 写入 agent + CI", 2, check_v16_4_7_v16_in_agent_ci),
+    ("§5", "5.1", "anti-symmetry-embed / cbc-lattice demo", 3, check_v16_5_1_embed_demo),
+    ("§5", "5.2", "general-marginals / parallel-system demo", 3, check_v16_5_2_general_demo),
+    ("§5", "5.3", "alpha2-korobov / fast-cbc demo", 2, check_v16_5_3_qmc_demo),
+    ("§5", "5.4", "exact-kkt-multiplier demo", 2, check_v16_5_4_kkt_demo),
+    ("§6", "6.1", "blueprint-v16 ≥6 ticks", 3, check_v16_6_1_blueprint_v16),
+    ("§6", "6.2", "tutorial v16 ≥4 sections", 3, check_v16_6_2_tutorial_v16),
+    ("§6", "6.3", "architecture v16 section", 3, check_v16_6_3_arch_v16),
+    ("§6", "6.4", "ADRs D114+ ≥ 7", 3, check_v16_6_4_adrs_v16),
+    ("§6", "6.5", "v16 anchors documented", 3, check_v16_6_5_anchors_documented),
+]
+
+
+def run_v16(section_filter: str | None = None) -> Scorecard:
+    """Score the v16 rubric in-process."""
+    sc = Scorecard(version="v16.0.0")
+    sc.items = _score(CHECKS_V16, section_filter)
+    return sc
+
+
 def check_v11_no_regression() -> dict:
     """v11 must remain 100/100 for a v12 release (true in-process re-score)."""
     sc_v11 = run_v11()
@@ -3272,6 +3517,16 @@ def check_v14_no_regression() -> dict:
         "score": sc_v14.total_earned,
         "max": sc_v14.total_max,
         "regression": sc_v14.total_earned < 100,
+    }
+
+
+def check_v15_no_regression() -> dict:
+    """v15 must remain 100/100 for a v16 release (true in-process re-score)."""
+    sc_v15 = run_v15()
+    return {
+        "score": sc_v15.total_earned,
+        "max": sc_v15.total_max,
+        "regression": sc_v15.total_earned < 100,
     }
 
 
@@ -3334,33 +3589,37 @@ def run_all(section_filter: str | None = None, rubric: str = "v5", run_pytest_ga
         sc = run_v13(section_filter)
     elif rubric == "v14":
         sc = run_v14(section_filter)
-    else:  # v15
+    elif rubric == "v15":
         sc = run_v15(section_filter)
+    else:  # v16
+        sc = run_v16(section_filter)
     sc.v1_check = check_v1_no_regression()
     sc.v2_check = check_v2_no_regression()
     sc.v3_check = check_v3_no_regression()
-    if rubric in ("v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"):
+    if rubric in ("v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16"):
         sc.v4_check = check_v4_no_regression()
-    if rubric in ("v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"):
+    if rubric in ("v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16"):
         sc.v5_check = check_v5_no_regression()
-    if rubric in ("v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"):
+    if rubric in ("v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16"):
         sc.v6_check = check_v6_no_regression()
-    if rubric in ("v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"):
+    if rubric in ("v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16"):
         sc.v7_check = check_v7_no_regression()
-    if rubric in ("v9", "v10", "v11", "v12", "v13", "v14", "v15"):
+    if rubric in ("v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16"):
         sc.v8_check = check_v8_no_regression()
-    if rubric in ("v10", "v11", "v12", "v13", "v14", "v15"):
+    if rubric in ("v10", "v11", "v12", "v13", "v14", "v15", "v16"):
         sc.v9_check = check_v9_no_regression()
-    if rubric in ("v11", "v12", "v13", "v14", "v15"):
+    if rubric in ("v11", "v12", "v13", "v14", "v15", "v16"):
         sc.v10_check = check_v10_no_regression()
-    if rubric in ("v12", "v13", "v14", "v15"):
+    if rubric in ("v12", "v13", "v14", "v15", "v16"):
         sc.v11_check = check_v11_no_regression()
-    if rubric in ("v13", "v14", "v15"):
+    if rubric in ("v13", "v14", "v15", "v16"):
         sc.v12_check = check_v12_no_regression()
-    if rubric in ("v14", "v15"):
+    if rubric in ("v14", "v15", "v16"):
         sc.v13_check = check_v13_no_regression()
-    if rubric == "v15":
+    if rubric in ("v15", "v16"):
         sc.v14_check = check_v14_no_regression()
+    if rubric == "v16":
+        sc.v15_check = check_v15_no_regression()
     if run_pytest_gate:
         sc.pytest_check = check_pytest_green()
     return sc
@@ -3412,6 +3671,8 @@ def print_summary(sc: Scorecard) -> None:
         print(f"  v13 rubric : {sc.v13_check.get('score')}/{sc.v13_check.get('max', 100)}  regression={sc.v13_check.get('regression')}")
     if sc.v14_check:
         print(f"  v14 rubric : {sc.v14_check.get('score')}/{sc.v14_check.get('max', 100)}  regression={sc.v14_check.get('regression')}")
+    if sc.v15_check:
+        print(f"  v15 rubric : {sc.v15_check.get('score')}/{sc.v15_check.get('max', 100)}  regression={sc.v15_check.get('regression')}")
     if sc.pytest_check:
         pc = sc.pytest_check
         marker = "✓" if pc.get("green") else "✗"
@@ -3452,7 +3713,7 @@ def main() -> int:
     parser.add_argument("--strict", action="store_true", help="exit 1 if total < 99 or any regression")
     parser.add_argument(
         "--rubric",
-        choices=["v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"],
+        choices=["v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16"],
         default="v5",
         help="which rubric to score (default v5; v4-v14 scorable for regression checks)",
     )
@@ -3507,6 +3768,8 @@ def main() -> int:
         payload["v13_check"] = sc.v13_check
     if sc.v14_check:
         payload["v14_check"] = sc.v14_check
+    if sc.v15_check:
+        payload["v15_check"] = sc.v15_check
     if sc.pytest_check:
         payload["pytest_check"] = sc.pytest_check
     out_path.write_text(json.dumps(payload, indent=2) + "\n")
@@ -3530,6 +3793,7 @@ def main() -> int:
                 sc.v12_check.get("regression") if sc.v12_check else False,
                 sc.v13_check.get("regression") if sc.v13_check else False,
                 sc.v14_check.get("regression") if sc.v14_check else False,
+                sc.v15_check.get("regression") if sc.v15_check else False,
                 sc.pytest_check.get("regression") if sc.pytest_check else False,
             ]
         )
