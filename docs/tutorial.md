@@ -2259,6 +2259,29 @@ e = korobov_worst_case_error(z, 89, [0.7,0.5,0.3])   # 确定性误差界
 
 ---
 
+## 26. v16 — deep embedding & exact generalization：把 v15 构造原语再深一层接入生产优化器/估计器 + proxy 升精确
+
+v15 把 v14 浅集成原语接入生产函数作真绑定约束，但留下两类残口：一批仍是 construction+verification 未接优化器（D110 anti-symmetric、D112 CBC），一批用 proxy/受限假设（D109 active_multiplier proxy、D111 正态边缘+仅 series、D112 仅 α=1）。v16 = **deep embedding & exact generalization**：把 standalone 原语再深一层接入 + proxy 升精确 + 受限升一般。
+
+### 26.1 anti-symmetric 排序约束嵌入 optimize_stacking_sequence（Wave AAAAAAAA，D114）
+
+D110 的 anti-symmetric 是**独立构造**，本波把它**嵌进生产排序优化器**（D106 balanced embed 的弯曲侧对应），让**优化后**的铺层 D₁₆=D₂₆=0。
+
+```python
+from structure_optimizer.core.orthotropic_simp import optimize_stacking_sequence
+
+res = optimize_stacking_sequence(d0, half_inventory, 0.125, objective="max_bending",
+                                 bending_shear_decoupled=True)
+# res.sequence = [half, −reversed(half)]（排序后）；res.d_matrix[0,2]=D₁₆≈0, [1,2]=D₂₆≈0
+```
+
+**原理**：输入当**半层**，优化器按 D_11 排序（rearrangement 最刚 ply 靠表面）再建 anti-symmetric `[half, −reversed(half)]`。因 Q̄₁₁ 偶于 θ，镜像层 −θ 贡献同 Q̄₁₁，rearrangement 仍是 anti-symmetric 排序中的**闭式全局** max_bending 最优。与 symmetric/balanced 互斥（anti-symmetric 是自有构造且已平衡）。
+
+**关键 / 定量锚点**：(1) headline——bending_shear_decoupled=True 输出 D₁₆=D₂₆=0（abs 1e-7）；(2) 同时 A₁₆=A₂₆=0；(3) 绑定——plain 优化器同输入 |D₁₆|>1e2（约束改变最优），且 stack 不同（anti-sym 翻倍半层）；(4) bending_shear_decoupled=False 逐位复现 plain D095/D106（序列+目标精确相等）；(5) rearrangement = anti-symmetric 排序中 brute-force 全局 max D_11（abs 1e-9）；(6) guards（与 symmetric/balanced 互斥 + 空层）。
+**诚实边界**：仅 max_bending 闭式（min_coupling 报 anti-symmetric stack 的 ‖B‖ 但非搜索最优排序，留 reopening）；trade B₁₆,B₂₆≠0 保留（同 D110）；输入是半层、等厚、弧度；与 symmetric/balanced 互斥（anti-symmetric+mirror 会逼角度到 0/±π2）。
+
+---
+
 ## 常见错误
 
 | 现象 | 原因 | 解决 |

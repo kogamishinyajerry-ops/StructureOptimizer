@@ -61,7 +61,7 @@ v16 完成 = `python scripts/test_agent.py --rubric v16` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] AAAAAAAA — anti-symmetric 排序约束嵌入 optimize_stacking_sequence
+- [x] AAAAAAAA — anti-symmetric 排序约束嵌入 optimize_stacking_sequence（bending_shear_decoupled 参数；输入当半层 ⟹ rearrangement 排序后建 [half,−reversed(half)] ⟹ 优化输出 D₁₆=D₂₆=0 + A₁₆=A₂₆=0；Q̄₁₁ 偶 ⟹ rearrangement 仍 anti-symmetric 排序闭式全局 max_bending；绑定 [plain 同输入 D₁₆≠0]；=False 逐位复现 D095/D106；与 symmetric/balanced 互斥；诚实：仅 max_bending 闭式、trade B₁₆≠0、min_coupling 搜索留 reopening；D114）
 - [ ] BBBBBBBB — mixture-copula 一般非正态边缘
 - [ ] CCCCCCCC — CBC 向量接入 genz_mvn_cdf_lattice
 - [ ] DDDDDDDD — peak-binding 精确 KKT 乘子（或诚实 defer）

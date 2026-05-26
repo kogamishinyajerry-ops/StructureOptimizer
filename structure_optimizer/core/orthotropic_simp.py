@@ -337,10 +337,11 @@ def optimize_stacking_sequence(
     objective: str = "max_bending",
     symmetric: bool = False,
     balanced: bool = False,
+    bending_shear_decoupled: bool = False,
 ) -> StackingSequenceResult:
     """Optimise the **stacking sequence** (ordering) of a fixed ply inventory under
     classical lamination theory (Wave FFFFF, D095; ``balanced`` added Wave AAAAAAA,
-    v15, D106).
+    v15, D106; ``bending_shear_decoupled`` added Wave AAAAAAAA, v16, D114).
 
     Two discrete objectives over the *arrangement* of the given plies (uniform
     ``thickness``):
@@ -368,6 +369,19 @@ def optimize_stacking_sequence(
     extensional ``A`` is order-independent, so the subsequent objective ordering never
     breaks it; combined with ``symmetric=True`` the output is **symmetric-balanced**
     (``A₁₆=A₂₆=0`` *and* ``B=0``). ``balanced=False`` (default) reproduces D095 exactly.
+
+    With ``bending_shear_decoupled=True`` (D114) the input ``ply_angles`` is the
+    **bottom half-stack**; the full laminate is built **anti-symmetrically** as
+    ``[half, −reversed(half)]`` (:func:`make_antisymmetric_laminate`), which makes the
+    **bending–shear coupling ``D₁₆ = D₂₆ = 0``** exactly (mirror plies share the ``z³``
+    weight but carry ``±θ`` whose odd ``Q̄₁₆/Q̄₂₆`` cancel) **and** ``A₁₆ = A₂₆ = 0``
+    (anti-symmetric is also balanced — D110). This embeds D110's reopening criterion
+    *inside* the production optimiser, the bending-side analogue of D106. Because
+    ``Q̄₁₁`` is **even** in ``θ``, the ``max_bending`` rearrangement (stiffest half-plies
+    at the surfaces) is still the **closed-form global** optimum *among anti-symmetric
+    orderings*. Mutually exclusive with ``symmetric``/``balanced`` (anti-symmetry is its
+    own construction and already implies balance). ``bending_shear_decoupled=False``
+    (default) leaves the D095/D106 paths byte-for-byte unchanged.
     """
     d0 = np.asarray(d0, dtype=float)
     angles = np.asarray(ply_angles, dtype=float).reshape(-1)
@@ -377,6 +391,8 @@ def optimize_stacking_sequence(
         raise SolverError("stacking_nonpositive_thickness")
     if objective not in ("max_bending", "min_coupling"):
         raise SolverError("stacking_unknown_objective")
+    if bending_shear_decoupled and (symmetric or balanced):
+        raise SolverError("stacking_antisym_exclusive")
     if balanced:
         # Embed the balanced constraint: replace the inventory with its +θ/−θ paired
         # multiset, then let the existing objective ordering proceed (A-balance is
@@ -385,6 +401,18 @@ def optimize_stacking_sequence(
 
     def _abd(seq: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         return laminate_abd(d0, seq, np.full(seq.size, thickness))
+
+    if bending_shear_decoupled:
+        # ply_angles is the half-stack; build the anti-symmetric stack ⟹ D₁₆=D₂₆=0.
+        # Q̄_11 is even in θ, so the rearrangement (stiffest half-ply nearest a surface)
+        # is the closed-form global max_bending optimum among anti-symmetric orderings.
+        q_half = np.array([rotate_plane_stress(d0, float(a))[0, 0] for a in angles])
+        order = np.argsort(-q_half)
+        half = angles[order]
+        seq = make_antisymmetric_laminate(half)
+        a_m, b_m, d_m = _abd(seq)
+        obj = float(np.linalg.norm(b_m)) if objective == "min_coupling" else float(d_m[0, 0])
+        return StackingSequenceResult(seq, a_m, b_m, d_m, obj)
 
     if symmetric:
         # ply_angles is the half-stack; mirror about the mid-plane ⟹ B = 0 exactly.
