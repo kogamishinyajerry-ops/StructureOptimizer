@@ -1525,3 +1525,39 @@ def kkt_binding_status(
         j_objective=float(j_obj),
         active_multiplier=(float(mult) if mult is not None else None),
     )
+
+
+def peak_binding_exact_multiplier(j_star_fn, limit: float, rel_delta: float = 0.01) -> float:
+    """**Exact KKT (Lagrange / shadow-price) multiplier** ``λ = −dJ*/d(limit)`` of the
+    flanking-peak constraint, via the **envelope theorem** (Wave DDDDDDDD, v16, D117).
+
+    For the constrained problem ``min J(ρ) s.t. flank(ρ) ≤ limit``, the KKT multiplier on
+    the limit equals the negative sensitivity of the **optimal** objective to the limit:
+
+        λ = −dJ*/d(limit)   (the shadow price; envelope theorem).
+
+    This central-differences it from a caller-supplied re-solve ``j_star_fn(limit) → J*``
+    (e.g. ``lambda L: peak_binding_mma(..., peak_limit=L, ...).dyn_compliance_history[-1]``).
+    ``λ > 0`` ⟺ the constraint is **active** (relaxing the limit lowers ``J*``); ``λ ≈ 0``
+    ⟺ inactive. This is the **exact Lagrange multiplier** for a differentiable value
+    function — upgrading D109's *relative-sacrifice proxy* ``J/J_ref − 1`` to the true
+    shadow price.
+
+    **Honest scope** (closes D109's reopening only in the firmly-active regime): for the
+    production :func:`peak_binding_mma` — a non-convex MMA with in-loop band re-gridding —
+    ``J*(limit)`` is smooth and the shadow price is well-defined and positive where the
+    constraint is **firmly active** (tight limit). In the **inactive** regime ``J*`` is
+    dominated by optimiser path-noise (the true ``λ = 0`` is below the noise floor; a probe
+    saw inactive central-FD swings exceed the active signal), so a *cross-regime* stable
+    exact ``λ`` is **honestly deferred** — D109's proxy remains the robust active/inactive
+    indicator. ``λ`` here is exact for a differentiable ``J*`` and is the genuine multiplier
+    in the active regime where a multiplier matters.
+    """
+    if not 0.0 < rel_delta < 1.0:
+        raise SolverError("kkt_shadow_rel_delta_range")
+    if limit <= 0.0:
+        raise SolverError("kkt_shadow_nonpositive_limit")
+    dl = rel_delta * limit
+    j_plus = float(j_star_fn(limit + dl))
+    j_minus = float(j_star_fn(limit - dl))
+    return -(j_plus - j_minus) / (2.0 * dl)

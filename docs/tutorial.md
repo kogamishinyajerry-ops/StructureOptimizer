@@ -2313,6 +2313,24 @@ r = genz_mvn_cdf_cbc(b, R, n_points=1021)   # 无 seed 参数
 **关键 / 定量锚点**：(1) headline——两次调用 value + 生成向量逐位相同（无 seed）；(2) m=1 精确 = Φ(b/√R) + e(z)=0；(3) 收敛到独立 one-factor Gauss–Hermite 参考（N≈2039 abs<5e-4 且随 N 缩小）；(4) 生成向量==cbc_korobov + e(z)==korobov_worst_case_error 且 ≤ Korobov；(5) e(z) 随 N 单调降；(6) guards（非 SPD R / N<2）。
 **诚实边界**：e(z) 证 lattice **规则**最坏情况质量（空间单位球上）**非**本 Genz 被积函数的紧后验误差界（未算其空间范数）——估计的实际保证是收敛+确定性；单不移位 lattice ⟹ 无统计误差估计（要 std_error 用 D086，保留不动）；plain Cholesky（非 D094 重排，组合留 reopening）；默认权重是 CBC 调参非 estimand。
 
+### 26.4 peak-binding 精确 KKT 影子价乘子（Wave DDDDDDDD，D117）
+
+D109 的 active_multiplier=J/J_ref−1 是相对牺牲 proxy。本波升级为**精确 Lagrange 乘子**——约束影子价 λ=−dJ*/d(limit)（包络定理）。
+
+```python
+from structure_optimizer.core.freq_response import peak_binding_exact_multiplier
+
+# j_star_fn(limit) 返回该 limit 下优化的 J*（如 peak_binding_mma 收敛 J）
+lam = peak_binding_exact_multiplier(j_star_fn, limit, rel_delta=0.01)  # λ>0⟺active, ≈0⟺inactive
+```
+
+**原理**：约束 min J s.t. flank≤limit 的 KKT 乘子 = 最优目标对 limit 的负敏感度 λ=−dJ*/d(limit)（包络定理），中心差分 caller 的重解函数。对可微 J* **精确**（线性 J* 精确、否则 O(δ²)）。
+
+**探针（为何 cross-regime 诚实 defer，不伪造）**：active регime（tight 0.08·init）λ=+0.73 干净正影子价（可靠）；inactive（loose 0.40·init）真 λ=0 但 J* 在 0.39→0.41 摆动 ~40%（regrid+非凸 path-noise > active 信号）⟹ 无稳定影子价可取。故**仅 active regime 可靠**，cross-regime 稳定精确 λ **诚实 defer**（沿用 D074/D091 先例），D109 proxy 保留为 cross-regime active/inactive 指示器。
+
+**关键 / 定量锚点**：(1) headline J*=A/L 闭式 λ=A/L² 中心差分还原（abs 1e-2）；(2) 线性 J*=c−mL ⟹ λ=m 机器精度；(3) inactive（limit 无关 J*）⟹ λ=0 精确；(4) active（feasible-monotone）⟹ λ>0；(5) rel_delta 收敛 O(δ²)；(6) guards；(7)(--run-slow) 生产 active regime peak_binding_mma 影子价 >0（确定性）。
+**诚实边界**：对可微 value function 精确（包络定理精确、线性 FD 精确、否则 O(δ²)）；生产可靠性**分 regime**（firmly-active 可信、inactive 噪声主导真 λ=0，明示探针数字不抹平）；是 value-function 影子价**非** MMA 子问题对偶（真 KKT 点重合，包络路径无需 MMA 内部）；D109 proxy 保留不删。
+
 ---
 
 ## 常见错误

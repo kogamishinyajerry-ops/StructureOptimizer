@@ -64,7 +64,7 @@ v16 完成 = `python scripts/test_agent.py --rubric v16` 报告：
 - [x] AAAAAAAA — anti-symmetric 排序约束嵌入 optimize_stacking_sequence（bending_shear_decoupled 参数；输入当半层 ⟹ rearrangement 排序后建 [half,−reversed(half)] ⟹ 优化输出 D₁₆=D₂₆=0 + A₁₆=A₂₆=0；Q̄₁₁ 偶 ⟹ rearrangement 仍 anti-symmetric 排序闭式全局 max_bending；绑定 [plain 同输入 D₁₆≠0]；=False 逐位复现 D095/D106；与 symmetric/balanced 互斥；诚实：仅 max_bending 闭式、trade B₁₆≠0、min_coupling 搜索留 reopening；D114）
 - [x] BBBBBBBB — mixture-copula 一般非正态边缘（system_reliability_series_copula_marginals：u_k=F_k(x_k)=Φ(Marginal.to_standard_normal(x_k)) per-mode 任意边缘[normal/lognormal/weibull/gumbel]+copula 耦合；正态(0,1)+β 逐位复现 D098[normal.to_standard_normal(β)=β 无 round-trip]；独立 copula ⟹ 1−∏F_k 对闭式 1e-10；非正态改变 P_f；copula 仍绑定；诚实：Sklar 分离非 Nataf 物理联合 Rosenblatt、CDF 级 series、仅 4 边缘；D115）
 - [x] CCCCCCCC — CBC 向量接入 genz_mvn_cdf（genz_mvn_cdf_cbc + GenzCBCResult：CBC 生成向量 + 单不移位 lattice ⟹ 无 seed 逐位可复现 + 报告确定性 e(z) 证书；m=1 精确；收敛到 GH 参考[N≈2039 abs<5e-4]；z==cbc_korobov + e(z)≤Korobov；e(z) 随 N 降；纯新增 D086/D078 不动；诚实：e(z) 证规则质量非本被积函数紧界、单不移位无统计误差、plain Cholesky；D116）
-- [ ] DDDDDDDD — peak-binding 精确 KKT 乘子（或诚实 defer）
+- [x] DDDDDDDD — peak-binding 精确 KKT 影子价乘子（peak_binding_exact_multiplier：λ=−dJ*/d(limit) 包络定理精确 Lagrange 乘子，升级 D109 J/J_ref proxy；对可微 J* 精确[线性精确/否则 O(δ²)]；**探针**：active 0.08·init λ=+0.73 可靠，inactive 0.40·init 真 λ=0 但 MMA regrid path-noise J* 摆动 40%>信号 ⟹ **cross-regime 稳定 λ 诚实 defer**[D074/D091 先例]，D109 proxy 保留为指示器；6 fast 锚点[A/L 闭式还原/线性精确/inactive λ=0/active λ>0/FD 收敛/guards]+1 --run-slow 生产 active λ>0；D117）
 - [ ] EEEEEEEE — α≥2 高阶光滑 Korobov 最坏情况误差
 - [ ] FFFFFFFF — copula 并联/一般系统可靠性
 - [ ] GGGGGGGG — fast-CBC FFT（或诚实 defer）
