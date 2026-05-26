@@ -1684,6 +1684,83 @@ def system_reliability_series_copula_marginals(margins: list[Marginal], points, 
     return float(np.clip(1.0 - copula.cdf(u), 0.0, 1.0))
 
 
+def _subset_all_fail_prob(u: np.ndarray, copula, subset) -> float:
+    """``P(all modes in ``subset`` fail)`` = the joint upper-orthant probability of the
+    safe-copula, by inclusion–exclusion (Wave FFFFFFFF, v16, D119)::
+
+        P(⋂_{i∈subset} {U_i > u_i}) = Σ_{S⊆subset} (−1)^{|S|} C(w^S),
+        w^S_k = u_k if k∈S else 1.
+
+    Setting a coordinate to 1 marginalises the copula over it, so this uses only ``C.cdf``.
+    """
+    from itertools import combinations
+
+    m = u.shape[0]
+    sub = list(subset)
+    total = 0.0
+    for r in range(len(sub) + 1):
+        for s in combinations(sub, r):
+            w = np.ones(m)
+            for k in s:
+                w[k] = u[k]
+            total += ((-1.0) ** r) * float(copula.cdf(w))
+    return total
+
+
+def system_reliability_parallel_copula(betas, copula) -> float:
+    """**Parallel**-system failure probability under a d-variate dependence copula — the
+    system fails **iff all** modes fail (Wave FFFFFFFF, v16, D119).
+
+    D098's :func:`system_reliability_series_copula` modelled the **series** system (safe iff
+    *all* safe ⟹ ``P_f = 1 − C(u)``). A parallel/redundant system fails only when **every**
+    mode fails, so ``P_f = P(all fail)`` — the joint upper-orthant probability of the
+    safe-copula (:func:`_subset_all_fail_prob` over all modes). With the **independence**
+    copula this reduces to ``∏_k (1 − Φ(β_k)) = ∏ P(fail)``; for any copula
+    ``P_f_parallel ≤ P_f_series`` (a parallel system is at least as reliable).
+    """
+    betas = np.asarray(betas, dtype=float).reshape(-1)
+    m = betas.size
+    if m < 1:
+        raise SolverError("system_reliability_no_modes")
+    if getattr(copula, "dim", None) != m:
+        raise SolverError("system_reliability_copula_dim_mismatch")
+    u = np.array([_standard_normal_cdf(float(b)) for b in betas])
+    return float(np.clip(_subset_all_fail_prob(u, copula, range(m)), 0.0, 1.0))
+
+
+def system_reliability_k_out_of_n_copula(betas, copula, k: int) -> float:
+    """**k-out-of-m** system failure probability: the system fails **iff at least ``k``** of
+    the ``m`` modes fail (Wave FFFFFFFF, v16, D119).
+
+    Unifies series and parallel: ``k=1`` ⟹ *series* (fails if **any** fails ⟹ ``1 − C(u)``);
+    ``k=m`` ⟹ *parallel* (:func:`system_reliability_parallel_copula`). Uses the
+    Schuette–Nesbitt "at-least-k" identity over the joint fail-subset probabilities
+    ``S_j = Σ_{|T|=j} P(all in T fail)`` (each from :func:`_subset_all_fail_prob`)::
+
+        P(≥k fail) = Σ_{j=k}^{m} (−1)^{j−k} · C(j−1, k−1) · S_j.
+
+    For ``k=1`` this is exactly inclusion–exclusion for the union (series). Exact for the
+    small ``m`` (≤ ~6) of 2.5-D reliability; ``O(Σ_j C(m,j) 2^j)`` copula evaluations.
+    """
+    from itertools import combinations
+    from math import comb
+
+    betas = np.asarray(betas, dtype=float).reshape(-1)
+    m = betas.size
+    if m < 1:
+        raise SolverError("system_reliability_no_modes")
+    if getattr(copula, "dim", None) != m:
+        raise SolverError("system_reliability_copula_dim_mismatch")
+    if not 1 <= k <= m:
+        raise SolverError("system_reliability_k_out_of_range")
+    u = np.array([_standard_normal_cdf(float(b)) for b in betas])
+    pf = 0.0
+    for j in range(k, m + 1):
+        s_j = sum(_subset_all_fail_prob(u, copula, t) for t in combinations(range(m), j))
+        pf += ((-1.0) ** (j - k)) * comb(j - 1, k - 1) * s_j
+    return float(np.clip(pf, 0.0, 1.0))
+
+
 def _korobov_generating_vector(dim: int, a: int, n_points: int) -> np.ndarray:
     """Rank-1 **Korobov** generating vector ``z = (1, a, a², …, a^{dim−1}) mod N``."""
     z = np.ones(dim, dtype=np.int64)

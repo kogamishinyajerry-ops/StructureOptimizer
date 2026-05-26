@@ -2345,6 +2345,23 @@ e2 = korobov_worst_case_error(z, n_points, weights, smoothness=2)  # α=2，B₄
 **关键 / 定量锚点**：(1) α=1 逐位复现 D112（同代码路径）；(2) α=2 spatial e² == O(N²) 通用 RKHS 双和（B₄ 核，abs 1e-12）+ e²≥0；(3) headline——更高 α 更快衰减（每 N-翻倍误差比随 α 严格增：实测 α=1 ~1.68×、α=2 ~2.94×、α=3 ~5.21×）；(4) α=3（B₆）有限非负；(5) 核闭式（ω_1=2π²B₂、ω_2=−(2π)⁴/4!·B₄）；(6) guards（smoothness<1 / α≥4 不支持）。
 **诚实边界**：仅 α∈{1,2,3}（闭式 B₂/B₄/B₆ 保 numpy-only，α≥4 raise 不静默退化）；证 lattice 规则质量非特定被积函数紧界；O(N^{−α+δ}) 是渐近率（测有限 N 阶梯衰减比增）；CBC 仍 α=1（smoothness-aware CBC 留 reopening）。
 
+### 26.6 copula 并联 / k-out-of-n 系统可靠性（Wave FFFFFFFF，D119）
+
+D098 只建 series 系统（1−C(u)）。本波加**并联**（fails iff all fail）与统一的 **k-out-of-m**（fails iff ≥k fail），k=1⟹series、k=m⟹parallel。
+
+```python
+from structure_optimizer.core.reliability import (
+    system_reliability_parallel_copula, system_reliability_k_out_of_n_copula)
+
+pf_par = system_reliability_parallel_copula(betas, copula)        # 全失效
+pf_k   = system_reliability_k_out_of_n_copula(betas, copula, k=2) # ≥2 失效
+```
+
+**原理**：P(all in T fail)=Σ_{S⊆T}(−1)^{|S|}C(w^S)（safe-copula 上 orthant 容斥，置 1 即边缘化）。k-out-of-n 用 Schuette–Nesbitt：P(≥k fail)=Σ_{j=k}^m(−1)^{j−k}C(j−1,k−1)S_j，S_j=Σ_{|T|=j}P(all in T fail)。
+
+**关键 / 定量锚点**：(1) headline 独立 ⟹ parallel=∏(1−Φ(β_k))=∏P(fail)（abs 1e-14）；(2) k=1≡series 1−C(u)（abs 1e-12，任意 copula）；(3) k=m≡parallel（abs 1e-12）；(4) parallel ≤ series（任意 copula）；(5) P(≥k fail) 随 k 非增 + ∈[0,1]；(6) guards（dim/no-modes/k∉[1,m]）。
+**诚实边界**：O(Σ_j C(m,j)2^j) 容斥精确但 m 指数（仅 2.5D 小 m≤6，大 m 估计留 reopening）；标准正态 safe-prob u_k=Φ(β_k)（与 D115 一般边缘组合是 trivial follow-up 未接）；交替和浮点抵消对小 m benign（独立锚点验到 1e-14）；safe-copula 建 safe-event 相关（survival copula 等价不单列）。
+
 ---
 
 ## 常见错误

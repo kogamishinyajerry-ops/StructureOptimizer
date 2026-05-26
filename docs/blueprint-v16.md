@@ -66,7 +66,7 @@ v16 完成 = `python scripts/test_agent.py --rubric v16` 报告：
 - [x] CCCCCCCC — CBC 向量接入 genz_mvn_cdf（genz_mvn_cdf_cbc + GenzCBCResult：CBC 生成向量 + 单不移位 lattice ⟹ 无 seed 逐位可复现 + 报告确定性 e(z) 证书；m=1 精确；收敛到 GH 参考[N≈2039 abs<5e-4]；z==cbc_korobov + e(z)≤Korobov；e(z) 随 N 降；纯新增 D086/D078 不动；诚实：e(z) 证规则质量非本被积函数紧界、单不移位无统计误差、plain Cholesky；D116）
 - [x] DDDDDDDD — peak-binding 精确 KKT 影子价乘子（peak_binding_exact_multiplier：λ=−dJ*/d(limit) 包络定理精确 Lagrange 乘子，升级 D109 J/J_ref proxy；对可微 J* 精确[线性精确/否则 O(δ²)]；**探针**：active 0.08·init λ=+0.73 可靠，inactive 0.40·init 真 λ=0 但 MMA regrid path-noise J* 摆动 40%>信号 ⟹ **cross-regime 稳定 λ 诚实 defer**[D074/D091 先例]，D109 proxy 保留为指示器；6 fast 锚点[A/L 闭式还原/线性精确/inactive λ=0/active λ>0/FD 收敛/guards]+1 --run-slow 生产 active λ>0；D117）
 - [x] EEEEEEEE — α≥2 高阶光滑 Korobov 最坏情况误差（korobov_worst_case_error 加 smoothness 参数 + _korobov_kernel_omega_alpha：ω_α=(−1)^{α+1}(2π)^{2α}/(2α)!·B_{2α} 闭式 B₂/B₄/B₆ numpy-only；α=1 默认走 D112 同代码路径逐位；α=2 spatial==O(N²)RKHS 1e-12+e²≥0；headline 更高 α 更快衰减[每翻倍比 α=1 1.68×→α=2 2.94×→α=3 5.21×]；核闭式验证；诚实：仅 α∈{1,2,3}保 numpy-only、证规则质量非特定被积函数紧界、CBC 仍 α=1；D118）
-- [ ] FFFFFFFF — copula 并联/一般系统可靠性
+- [x] FFFFFFFF — copula 并联/一般系统可靠性（system_reliability_parallel_copula[fails iff all fail = safe-copula 上 orthant 容斥]+system_reliability_k_out_of_n_copula[Schuette–Nesbitt P(≥k fail)，k=1⟹series/k=m⟹parallel]；独立 parallel=∏(1−Φ(β_k)) 1e-14；k=1≡series 1e-12；k=m≡parallel 1e-12；parallel≤series；P(≥k) 随 k 非增∈[0,1]；诚实：O(Σ C(m,j)2^j) 容斥仅小 m≤6、标准正态 u_k、大 m 估计留 reopening；D119）
 - [ ] GGGGGGGG — fast-CBC FFT（或诚实 defer）
 - [ ] HHHHHHHH — v16 收口（rubric ≥ 99）
 
