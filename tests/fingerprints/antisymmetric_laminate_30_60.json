@@ -1,0 +1,16 @@
+{
+  "benchmark": "laminate",
+  "preset": "smoke",
+  "rubric_version": "v15.0-wave-HHHHHHH",
+  "kind": "antisymmetric_laminate",
+  "angles_deg": [
+    30.0,
+    60.0
+  ],
+  "thickness": 0.125,
+  "d16": 0.0,
+  "d26": 0.0,
+  "b16": -2193.1287872504354,
+  "a16": 9.094947017729282e-13,
+  "abd_sha256": "sha256:b7e83331f27db8802f26b9df0d051f76fffeed0a8f77169c00970872ae9ce690"
+}

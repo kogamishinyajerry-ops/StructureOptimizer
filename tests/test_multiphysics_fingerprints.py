@@ -778,6 +778,90 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         checks = [("n_triangles", rec["n_triangles"], len(tris)), ("n_points", rec["n_points"], len(pts))]
         return flat, ("tris_sha256", rec["tris_sha256"]), checks
 
+    if kind == "antisymmetric_laminate":
+        from structure_optimizer.core.orthotropic_simp import (
+            laminate_abd,
+            make_antisymmetric_laminate,
+            orthotropic_plane_stress_matrix,
+        )
+
+        d0 = orthotropic_plane_stress_matrix(140e3, 10e3, 0.3, 5e3)
+        stack = make_antisymmetric_laminate(np.deg2rad(rec["angles_deg"]))
+        A, B, D = laminate_abd(d0, stack, np.full(len(stack), rec["thickness"]))
+        full = np.concatenate([A.ravel(), B.ravel(), D.ravel()])
+        checks = [
+            ("d16", rec["d16"], float(D[0, 2])),
+            ("d26", rec["d26"], float(D[1, 2])),
+            ("b16", rec["b16"], float(B[0, 2])),
+            ("a16", rec["a16"], float(A[0, 2])),
+        ]
+        return full, ("abd_sha256", rec["abd_sha256"]), checks
+
+    if kind == "balanced_stacking":
+        from structure_optimizer.core.orthotropic_simp import (
+            optimize_stacking_sequence,
+            orthotropic_plane_stress_matrix,
+        )
+
+        d0 = orthotropic_plane_stress_matrix(140e3, 10e3, 0.3, 5e3)
+        res = optimize_stacking_sequence(
+            d0, np.deg2rad(rec["inventory_deg"]), rec["thickness"], objective=rec["objective"], balanced=True
+        )
+        checks = [
+            ("d11", rec["d11"], res.objective_value),
+            ("b_absmax", rec["b_absmax"], float(np.abs(res.b_matrix).max())),
+        ]
+        return np.asarray(res.sequence, dtype=float), ("sequence_sha256", rec["sequence_sha256"]), checks
+
+    if kind == "constrained_select":
+        from structure_optimizer.core.orthotropic_simp import (
+            orthotropic_plane_stress_matrix,
+            select_ply_angles,
+        )
+
+        d0 = orthotropic_plane_stress_matrix(140e3, 10e3, 0.3, 5e3)
+        res = select_ply_angles(
+            d0, np.deg2rad(rec["candidates_deg"]), rec["n_plies"],
+            thickness=rec["thickness"], objective=rec["objective"], balanced=True,
+        )
+        checks = [("d11", rec["d11"], res.objective_value)]
+        return np.asarray(res.sequence, dtype=float), ("sequence_sha256", rec["sequence_sha256"]), checks
+
+    if kind == "multi_family_copula":
+        from structure_optimizer.core.reliability import (
+            clayton_d_copula,
+            gumbel_d_copula,
+            multi_family_copula,
+            system_reliability_series_copula,
+        )
+
+        m = len(rec["betas"])
+        w = rec["weight"]
+        mix = multi_family_copula(
+            [gumbel_d_copula(m, rec["theta_gumbel"]), clayton_d_copula(m, rec["theta_clayton"])], [w, 1.0 - w]
+        )
+        pf = system_reliability_series_copula(np.array(rec["betas"]), mix)
+        return np.array([pf]), ("p_f_sha256", rec["p_f_sha256"]), [("p_f", rec["p_f"], pf)]
+
+    if kind == "cbc_korobov":
+        from structure_optimizer.core.reliability import (
+            _korobov_generating_vector,
+            cbc_korobov_generating_vector,
+            korobov_worst_case_error,
+        )
+
+        z = cbc_korobov_generating_vector(rec["dim"], rec["n_points"], rec["weights"])
+        e = korobov_worst_case_error(z, rec["n_points"], rec["weights"])
+        e_kor = korobov_worst_case_error(
+            _korobov_generating_vector(rec["dim"], 33, rec["n_points"]), rec["n_points"], rec["weights"]
+        )
+        checks = [
+            ("z", rec["z"], np.asarray(z).tolist()),
+            ("e_cbc", rec["e_cbc"], e),
+            ("e_korobov", rec["e_korobov"], e_kor),
+        ]
+        return np.asarray(z, dtype=float), ("z_sha256", rec["z_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -871,6 +955,12 @@ def test_multiphysics_fingerprint_set_present():
         "balanced_laminate_sym",
         "angle_selection_max_bending",
         "concentric_shell_spike",
+        # v15 embedded constraints & rigorous closure (Wave HHHHHHH closure)
+        "antisymmetric_laminate_30_60",
+        "balanced_stacking_max_bending",
+        "constrained_select_balanced",
+        "multi_family_copula_gumbel_clayton",
+        "cbc_korobov_3d",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

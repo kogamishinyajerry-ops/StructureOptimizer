@@ -1,0 +1,21 @@
+{
+  "benchmark": "reliability",
+  "preset": "smoke",
+  "rubric_version": "v15.0-wave-HHHHHHH",
+  "kind": "cbc_korobov",
+  "dim": 3,
+  "n_points": 89,
+  "weights": [
+    0.7,
+    0.5,
+    0.3
+  ],
+  "z": [
+    1,
+    34,
+    25
+  ],
+  "e_cbc": 0.2033555311241391,
+  "e_korobov": 0.22252116014587703,
+  "z_sha256": "sha256:27efe786dbf56c7041813517997f6725ed2616a7ca11f16b762b26c67a36aab1"
+}

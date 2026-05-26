@@ -51,10 +51,10 @@ v14 把 v13 孤立原语**接入既有生产函数**（integration），但多�
 
 v15 完成 = `python scripts/test_agent.py --rubric v15` 报告：
 
-- [ ] v15 rubric total ≥ 99 / 100
-- [ ] v14/v13/v12/v11/v10/v9/v8/v7/v6/v5/v4 regression = False（各 = 100）
-- [ ] **pytest gate green**（D033 — 0 failed / 0 errors）
-- [ ] 全红线保持
+- [x] v15 rubric total ≥ 99 / 100 → **100/100**（authoritative `--rubric v15 --strict`，D113）
+- [x] v14/v13/v12/v11/v10/v9/v8/v7/v6/v5/v4 regression = False（各 = 100）
+- [x] **pytest gate green**（D033 — 0 failed / 0 errors）
+- [x] 全红线保持
 
 ## 进度（wave 勾选）
 
@@ -65,7 +65,7 @@ v15 完成 = `python scripts/test_agent.py --rubric v15` 报告：
 - [x] EEEEEEE — anti-symmetric 弯-剪解耦（make_antisymmetric_laminate θ(−z)=−θ(+z)=[half,−reversed(half)] ⟹ D₁₆=D₂₆=0 精确 + A₁₆=A₂₆=0 + B₁₁=B₁₂=B₂₂=0 但 B₁₆,B₂₆≠0；对照 symmetric-balanced D₁₆≠0；is_antisymmetric_laminate 检测；诚实：trade B-coupling for D-decoupling 非全消；D110）
 - [x] FFFFFFF — copula 系统可靠性多 family 混合（MixtureCopula C(u)=Σw_k C_k(u) + multi_family_copula 工厂；凸组合 ⟹ 合法 copula 直接接入 D098 既有 system_reliability_series_copula 不改；headline P_f(混合)=Σw_k·P_f(C_k) 精确 1e-14；单分量/零权逐位复现纯 family（subsumes D098）；0<w<1 严格介于两 family 间[绑定]；边缘均匀；≥3 family；诚实：仅 CDF 级非混合 Rosenblatt 采样、边缘仍正态、纯新增不改生产函数；D111）
 - [x] GGGGGGG — 确定性 CBC-lattice 最坏情况误差界（取 QMC 路径；**多-apex 几何已被 D107 覆盖**——多分离 apex 截面 concentric=True watertight=True vs plain ruppert_not_watertight，仅 degenerate"两 apex 共边"构造不出留 reopening）：korobov_worst_case_error 确定性证书 e(z)（α=1 加权 Korobov，O(N) 空间形式）+ cbc_korobov_generating_vector（Sloan–Reztsov 贪心）；headline O(N) 空间=O(N²) 通用 RKHS 双和 1e-12 + e²≥0；CBC 改变并改进 Korobov e(CBC)≤e(Korobov)[绑定] + 逐位确定性无 RNG；Koksma–Hlawka |Q_N f−1|≤e·‖f‖ 实测成立；e 随 N 单调降；零权 e=0；诚实：确定性界非新估计器（未接入 genz_mvn_cdf_lattice 留 reopening）、仅 α=1 乘积权重、naive O(dN²) CBC、纯新增不改生产函数；D112）
-- [ ] HHHHHHH — v15 收口（rubric ≥ 99）
+- [x] HHHHHHH — v15 收口（scripts/v15_demos.py 8 真实 demo；+5 fingerprints 70→75 bit-exact；+3 property 60→63；architecture §25 embedded；CI v15 --strict step；§2.2 scaffold-token 对齐真实符号 cbc_korobov；authoritative `--rubric v15 --strict` = **100/100**，v4-v14 无回归，pytest gate green，scorecard tests/v15_scorecard.json；D113）
 
 > 注：v15 需在 `docs/quality-rubric-v15.md` + `scripts/test_agent.py` 的 `CHECKS_V15`
 > 落地评分项后才能 `--rubric v15` 打分（与 v14 同构：6 section / 100 分 / D033 gate /

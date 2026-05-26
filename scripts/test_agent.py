@@ -3044,7 +3044,7 @@ def check_v15_2_1_concentric_export() -> tuple[int, str, str]:
 
 def check_v15_2_2_multi_apex_or_qmc() -> tuple[int, str, str]:
     """§2.2 multi-apex concentric-shell / deterministic QMC bound (or honest defer) (7 pts)."""
-    mod = _grep_count(r"multi_apex|two_apex|cbc_lattice|deterministic_qmc|cbc_genz", "structure_optimizer/core/*.py")
+    mod = _grep_count(r"multi_apex|two_apex|cbc_korobov|korobov_worst_case|deterministic_qmc", "structure_optimizer/core/*.py")
     test = _grep_count(r"multi_apex|two_apex|cbc|deterministic_qmc|deterministic_bound", "tests/**/*.py")
     if mod >= 1 and test >= 1:
         return 7, "PASS", "multi-apex / QMC-bound + test"

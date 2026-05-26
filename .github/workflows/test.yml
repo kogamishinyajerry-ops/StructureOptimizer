@@ -155,6 +155,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
         run: python scripts/test_agent.py --rubric v14 --strict
 
+      - name: v15 test agent — embedded-constraints-&-rigorous-closure rubric scorecard
+        # v15 §4.7: v15 rubric scored after v14. The v15 run enforces the D033
+        # pytest-green no-regression gate and the v4-v14 regression checks.
+        # Strict: v15 reached 100/100 at closure (Wave HHHHHHH, D113).
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --rubric v15 --strict
+
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
     runs-on: ubuntu-latest

@@ -816,3 +816,28 @@ v14 多数 wave **修改既有生产函数**（不是只加新函数），所以
 - D103 concentric-shell：输入角本身不可消（apex wedge 恒为输入角）；shell 是启发式趋 isosceles **非任意输入形式终止证明**（max_steiner 兜底保留）；**未接 write_stl_cdt_multi_hole 的 refine 路径**。
 - D104 peak-binding：约束**非严格 KKT-binding、J 未被牺牲**（basin selector）；tracked drift ~5%（弱于 D075）；单 flanking mode；Rayleigh 轻阻尼。
 - 详见 D098-D105 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 25. v15 — embedded constraints & rigorous closure：把 v14 浅集成原语接入生产优化器作真约束 + 关闭诚实 defer
+
+v14 把 v13 孤立原语接入既有生产函数，但多数是**浅集成**（construction+verification，未真正绑定优化器循环），并留下若干诚实 defer（D101 balanced 未接 optimize_stacking_sequence、D103 concentric 未接 STL writer refine、D104 peak-binding 非严格 KKT-binding）。v15 的主题是 **embedded constraints & rigorous closure**：把这些原语**接入生产优化器/写出器作真正绑定的约束**，并用**更严格的表述关闭 v14 的诚实 defer**（AAAAAAA-GGGGGGG 七个能力 wave，HHHHHHH 收口 = D106-D113）。
+
+### 25.1 v15 设计原则 — "约束真绑定"铁律
+
+v15 多数 wave **把约束嵌入既有优化器循环**（不是只加新函数也不是浅 wiring），所以每个 embedding wave 的锚点测试**必须证明约束真绑定**——(a) 约束开启时结果满足约束（feasible），(b) 约束**改变**了无约束最优（design 不同 / 目标有可测代价 / 退化解被消除），(c) 关闭约束（opt-in 默认）**逐位复现**原行为（沿用 v14 integration 铁律）。这条铁律叠加在"定量解析锚点"+"backward-compat 逐位复现"之上。
+
+- **铺层约束嵌入优化器**：D106 把 balanced 约束嵌入 `optimize_stacking_sequence(balanced=)`（A 与序无关 ⟹ 配对 multiset 构造 ⟹ A₁₆=A₂₆=0；balanced=False byte-exact 复现 D095）；D108 把 balanced 约束嵌入 `select_ply_angles(balanced=)`（±候选过滤到 balanced ⟹ 移除 D102 退化 all-one-angle 最优 ⟹ 非退化 ≥2 distinct + D_11 零代价；balanced=False 复现 D102）。
+- **几何接入写出器**：D107 把 concentric shells 接入 `write_stl_cdt_multi_hole(concentric_shells=)`（acute 截面 refine+concentric ⟹ 水密 STL 端到端，plain-refine 同输入 raise not_watertight；concentric=False byte-exact 复现 D100/D080）。
+- **弯-剪全解耦**：D110 anti-symmetric 层合 `θ(−z)=−θ(+z)` ⟹ D₁₆=D₂₆=0 精确（镜像层共享 z³ 权、带 ±θ ⟹ 奇 Q̄₁₆ 抵消）+ A₁₆=A₂₆=0 + B₁₁=B₁₂=B₂₂=0 但 B₁₆≠0（诚实：trade B-coupling for D-decoupling 非全消）。
+- **多 family 可靠性**：D111 `MixtureCopula`/`multi_family_copula` 凸组合 ⟹ 合法 copula 直接接入 D098 `system_reliability_series_copula`（P_f(混合)=Σw_k·P_f(C_k) 精确；单分量逐位复现纯 family）。
+- **诚实优于吹嘘 — 关闭 defer**：D109 peak-binding **关闭 D104 defer**——`kkt_binding_status` 诊断 tight limit（≲0.1·init）⟹ 约束 active（g₁≈0）+ J 牺牲（正乘子），loose limit = D104 basin-selector；D112 取 QMC 路径（多-apex 几何已被 D107 覆盖——多分离 apex 截面 watertight），`korobov_worst_case_error`/`cbc_korobov_generating_vector` 确定性 a-priori 误差证书（O(N) 空间形式=O(N²) RKHS 双和；CBC 改进 Korobov；Koksma–Hlawka 界成立）。
+
+### 25.2 v15 已知限制（诚实范围）
+
+- D106 balanced 嵌入：A 与序无关，故 balanced 是构造（配对 multiset）非搜索空间裁剪；max_bending 仍闭式全局。
+- D108 constrained select：±候选 multiset 过滤 brute-force（n_plies/|C| 小）；balanced 下 D_11 零代价仅因 Q̄₁₁ 偶。
+- D110 anti-symmetric：construction+verification **未接 optimize_stacking_sequence**（留 reopening，类比 D106）；trade B₁₆≠0；角度弧度；等厚。
+- D107 concentric export：仅 acute 输入受益；wall 法向沿用 D100 启发式；**both-endpoints-apex 边几何残留**（构造不出有效简单多边形，留 reopening）。
+- D109 KKT-binding：严格 binding 仅 tight limit corner（≲0.1·init），loose 仍 D104 basin-selector；binding regime 非凸/路径敏感；`active_multiplier` 是相对牺牲 proxy（J/J_ref−1）非精确 MMA 对偶 λ；单 flanking mode。
+- D111 multi-family：仅 **CDF 级**（够 series 用），**未**做混合 Rosenblatt 采样；边缘仍标准正态（general non-normal-marginal Rosenblatt 留 reopening）。
+- D112 deterministic QMC：是确定性**界**非新估计器（未接入 `genz_mvn_cdf_lattice` 留 reopening）；仅 α=1 乘积权重；naive O(d·N²) CBC（非 fast-CBC FFT）。
+- 详见 D106-D113 各自 "Honest scope notes" + "Reopening criteria"。

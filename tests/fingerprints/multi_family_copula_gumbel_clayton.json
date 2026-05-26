@@ -1,0 +1,17 @@
+{
+  "benchmark": "reliability",
+  "preset": "smoke",
+  "rubric_version": "v15.0-wave-HHHHHHH",
+  "kind": "multi_family_copula",
+  "betas": [
+    2.0,
+    2.5,
+    3.0,
+    1.8
+  ],
+  "theta_gumbel": 3.0,
+  "theta_clayton": 2.0,
+  "weight": 0.65,
+  "p_f": 0.04709334548324651,
+  "p_f_sha256": "sha256:76a475f7463f7b9130b6e4ff7bc2e4086e4ae49dba61f68b96ec0b42d78dded9"
+}

@@ -1,0 +1,26 @@
+{
+  "benchmark": "laminate",
+  "preset": "smoke",
+  "rubric_version": "v15.0-wave-HHHHHHH",
+  "kind": "balanced_stacking",
+  "inventory_deg": [
+    0.0,
+    30.0,
+    -30.0,
+    45.0
+  ],
+  "thickness": 0.125,
+  "objective": "max_bending",
+  "sequence": [
+    0.0,
+    -0.5235987755982988,
+    0.5235987755982988,
+    -0.7853981633974483,
+    0.7853981633974483,
+    -0.5235987755982988,
+    0.5235987755982988
+  ],
+  "d11": 5636.043955375329,
+  "b_absmax": 3264.428693386051,
+  "sequence_sha256": "sha256:1c1f40112b89bc2ea3a99625cae8ab3202b54e840f2dbd26146665fa78f34e0b"
+}

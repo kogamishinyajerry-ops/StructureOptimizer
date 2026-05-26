@@ -104,3 +104,5 @@ def test_multi_family_copula_guards():
         multi_family_copula([gum, clayton_d_copula(3, 2.0)], [0.5, 0.5])
     with pytest.raises(SolverError, match="mixture_copula_no_components"):
         multi_family_copula([], [])
+    with pytest.raises(SolverError, match="mixture_copula_dim_mismatch"):
+        multi_family_copula([gum, cla], [0.5, 0.5]).cdf(np.full(_M + 1, 0.5))  # wrong-length u

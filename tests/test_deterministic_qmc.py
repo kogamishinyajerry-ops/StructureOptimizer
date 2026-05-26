@@ -108,3 +108,7 @@ def test_deterministic_qmc_guards():
         cbc_korobov_generating_vector(0, _N, np.array([]))
     with pytest.raises(SolverError, match="cbc_weights_dim_mismatch"):
         cbc_korobov_generating_vector(3, _N, np.array([0.5, 0.5]))
+    with pytest.raises(SolverError, match="korobov_wce_too_few_points"):
+        cbc_korobov_generating_vector(3, 1, np.array([0.5, 0.5, 0.5]))
+    with pytest.raises(SolverError, match="korobov_wce_negative_weight"):
+        cbc_korobov_generating_vector(3, _N, np.array([0.5, -0.1, 0.5]))
