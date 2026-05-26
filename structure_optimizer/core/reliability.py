@@ -1907,7 +1907,31 @@ def _korobov_kernel_omega(x: np.ndarray) -> np.ndarray:
     return 2.0 * np.pi**2 * (t * t - t + 1.0 / 6.0)
 
 
-def korobov_worst_case_error(z: np.ndarray, n_points: int, weights: np.ndarray) -> float:
+def _korobov_kernel_omega_alpha(x: np.ndarray, alpha: int) -> np.ndarray:
+    """Higher-smoothness weighted-Korobov kernel piece (Wave EEEEEEEE, v16, D118):
+
+        ω_α(x) = (−1)^{α+1} (2π)^{2α} / (2α)! · B_{2α}({x}),
+
+    with ``B_{2α}`` the Bernoulli polynomial of degree ``2α`` on the fractional part. The
+    space's reproducing kernel ``K(x,y) = Π_j (1 + γ_j ω_α({x_j − y_j}))`` is
+    positive-definite (Fourier coefficients ``γ_j / |h|^{2α} ≥ 0``) and ``∫₀¹ ω_α = 0``
+    (even Bernoulli polynomials of degree ≥ 2 have zero mean). Higher ``α`` = smoother
+    space = faster lattice decay ``O(N^{−α+δ})``. ``α=1`` matches
+    :func:`_korobov_kernel_omega`. Supported ``α ∈ {1, 2, 3}`` (closed-form Bernoulli
+    polynomials; numpy-only, no special-function dependency)."""
+    t = x - np.floor(x)
+    if alpha == 1:
+        return 2.0 * np.pi**2 * (t * t - t + 1.0 / 6.0)  # 2π² B₂
+    if alpha == 2:
+        b4 = t**4 - 2.0 * t**3 + t**2 - 1.0 / 30.0
+        return (-((2.0 * np.pi) ** 4) / 24.0) * b4  # −(2π)⁴/4! B₄
+    if alpha == 3:
+        b6 = t**6 - 3.0 * t**5 + 2.5 * t**4 - 0.5 * t**2 + 1.0 / 42.0
+        return ((2.0 * np.pi) ** 6 / 720.0) * b6  # +(2π)⁶/6! B₆
+    raise SolverError("korobov_smoothness_unsupported")
+
+
+def korobov_worst_case_error(z: np.ndarray, n_points: int, weights: np.ndarray, smoothness: int = 1) -> float:
     """**Deterministic worst-case error** ``e(z)`` of the rank-1 lattice rule with
     generating vector ``z`` over ``N = n_points`` points, in the weighted Korobov space
     of smoothness α=1 with product weights ``γ`` (Wave GGGGGGG, v15, D112).
@@ -1924,9 +1948,14 @@ def korobov_worst_case_error(z: np.ndarray, n_points: int, weights: np.ndarray) 
         e²(z) = −1 + (1/N) Σ_{k=0}^{N−1} Π_j (1 + γ_j ω(frac(k z_j / N))),
 
     with ``ω`` from :func:`_korobov_kernel_omega`. ``e²(z) ≥ 0`` always; for a good
-    lattice it decays like ``O(N^{−1+δ})``. Fully deterministic — **no RNG, no seed** —
+    lattice it decays like ``O(N^{−α+δ})``. Fully deterministic — **no RNG, no seed** —
     so the certificate is byte-exact reproducible. Raises ``SolverError`` for
     ``N < 2``, a ``z``/``weights`` length mismatch, or negative weights.
+
+    ``smoothness`` (α, added Wave EEEEEEEE, v16, D118) selects the space's smoothness via
+    the ``B_{2α}`` kernel (:func:`_korobov_kernel_omega_alpha`): ``α=1`` (default) is the
+    D112 space and uses the **exact same** ``_korobov_kernel_omega`` code path (byte-exact);
+    ``α≥2`` certifies a smoother space whose good lattices decay faster (``O(N^{−α+δ})``).
     """
     z = np.asarray(z, dtype=np.int64).reshape(-1)
     gamma = np.asarray(weights, dtype=float).reshape(-1)
@@ -1937,9 +1966,12 @@ def korobov_worst_case_error(z: np.ndarray, n_points: int, weights: np.ndarray) 
         raise SolverError("korobov_wce_dim_mismatch")
     if np.any(gamma < -1e-15):
         raise SolverError("korobov_wce_negative_weight")
+    if smoothness < 1:
+        raise SolverError("korobov_smoothness_unsupported")
     k = np.arange(n)[:, None]  # (N, 1)
     frac = np.mod(k * z[None, :] / float(n), 1.0)  # (N, d)
-    prod = np.prod(1.0 + gamma[None, :] * _korobov_kernel_omega(frac), axis=1)  # (N,)
+    omega = _korobov_kernel_omega(frac) if smoothness == 1 else _korobov_kernel_omega_alpha(frac, smoothness)
+    prod = np.prod(1.0 + gamma[None, :] * omega, axis=1)  # (N,)
     e2 = -1.0 + float(prod.mean())
     return float(np.sqrt(max(e2, 0.0)))
 

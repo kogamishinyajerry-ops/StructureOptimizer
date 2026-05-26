@@ -2331,6 +2331,20 @@ lam = peak_binding_exact_multiplier(j_star_fn, limit, rel_delta=0.01)  # λ>0⟺
 **关键 / 定量锚点**：(1) headline J*=A/L 闭式 λ=A/L² 中心差分还原（abs 1e-2）；(2) 线性 J*=c−mL ⟹ λ=m 机器精度；(3) inactive（limit 无关 J*）⟹ λ=0 精确；(4) active（feasible-monotone）⟹ λ>0；(5) rel_delta 收敛 O(δ²)；(6) guards；(7)(--run-slow) 生产 active regime peak_binding_mma 影子价 >0（确定性）。
 **诚实边界**：对可微 value function 精确（包络定理精确、线性 FD 精确、否则 O(δ²)）；生产可靠性**分 regime**（firmly-active 可信、inactive 噪声主导真 λ=0，明示探针数字不抹平）；是 value-function 影子价**非** MMA 子问题对偶（真 KKT 点重合，包络路径无需 MMA 内部）；D109 proxy 保留不删。
 
+### 26.5 α≥2 高阶光滑 Korobov 最坏情况误差（Wave EEEEEEEE，D118）
+
+D112 的 korobov_worst_case_error 是 α=1（B₂ 核）。本波泛化到 B_{2α} 核，证书更光滑空间的更快 lattice 衰减 O(N^{−α+δ})。
+
+```python
+from structure_optimizer.core.reliability import korobov_worst_case_error
+e2 = korobov_worst_case_error(z, n_points, weights, smoothness=2)  # α=2，B₄ 核
+```
+
+**原理**：ω_α(x)=(−1)^{α+1}(2π)^{2α}/(2α)!·B_{2α}({x})，闭式 Bernoulli 多项式 B₂/B₄/B₆（numpy-only），核正定（Fourier 系数 γ_j/|h|^{2α}≥0）。α=1 默认走 D112 同一代码路径（逐位）。
+
+**关键 / 定量锚点**：(1) α=1 逐位复现 D112（同代码路径）；(2) α=2 spatial e² == O(N²) 通用 RKHS 双和（B₄ 核，abs 1e-12）+ e²≥0；(3) headline——更高 α 更快衰减（每 N-翻倍误差比随 α 严格增：实测 α=1 ~1.68×、α=2 ~2.94×、α=3 ~5.21×）；(4) α=3（B₆）有限非负；(5) 核闭式（ω_1=2π²B₂、ω_2=−(2π)⁴/4!·B₄）；(6) guards（smoothness<1 / α≥4 不支持）。
+**诚实边界**：仅 α∈{1,2,3}（闭式 B₂/B₄/B₆ 保 numpy-only，α≥4 raise 不静默退化）；证 lattice 规则质量非特定被积函数紧界；O(N^{−α+δ}) 是渐近率（测有限 N 阶梯衰减比增）；CBC 仍 α=1（smoothness-aware CBC 留 reopening）。
+
 ---
 
 ## 常见错误
