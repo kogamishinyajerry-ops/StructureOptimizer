@@ -1466,3 +1466,62 @@ def peak_binding_mma(
         flanking_range=(float(flanking_lo), float(flanking_hi)),
         converged=converged,
     )
+
+
+@dataclass
+class PeakBindingKKTStatus:
+    """KKT active-set status of a :func:`peak_binding_mma` result (Wave DDDDDDD, v15, D109)."""
+
+    active: bool  # constraint active (true flank ≈ limit, |g₁| ≤ tol)
+    flank_peak: float  # dense-sweep true flanking peak of the design
+    peak_limit: float
+    constraint_value: float  # g₁ = flank_peak / peak_limit − 1 (≈0 when active)
+    j_objective: float  # J(ω_op) at the design
+    active_multiplier: float | None  # J/J_reference − 1 (>0 ⟺ objective sacrificed) if a reference is given
+
+
+def kkt_binding_status(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    result: PeakBindingTOResult,
+    alpha: float = 0.0,
+    beta: float = 2e-6,
+    mass_type: str = "consistent",
+    n_dense: int = 120,
+    tol: float = 0.1,
+    j_reference: float | None = None,
+) -> PeakBindingKKTStatus:
+    """Diagnose whether the flanking-peak constraint is **strictly KKT-binding** in a
+    :func:`peak_binding_mma` result (Wave DDDDDDD, v15, D109) — **closes D104's deferral**.
+
+    Recomputes the design's true flanking peak by a dense sweep over the flanking range,
+    forms the constraint value ``g₁ = flank/limit − 1`` and flags the constraint
+    **active** when ``|g₁| ≤ tol`` (the flank sits at the limit). D104 found the
+    constraint *inactive* (a "basin selector": at loose limits the J-optimum basin already
+    has a low flank, so the flank stays well below the limit and J is not sacrificed). A
+    **tight enough limit** (empirically ≲ 0.1·initial flank) drives the flank below that
+    basin's natural level, so ``g₁ → 0`` (active) **and** ``J(ω_op)`` is forced up — a
+    strictly binding constraint with a positive KKT multiplier (a genuine objective
+    trade-off, not just a design change).
+
+    With ``j_reference`` (the unconstrained min ``J(ω_op)``) the ``active_multiplier``
+    field reports the relative objective sacrifice ``J/J_ref − 1`` — strictly positive iff
+    the constraint genuinely costs the objective (the KKT multiplier is > 0).
+    """
+    lo, hi = result.flanking_range
+    rho = result.densities
+    flank = max(
+        _dynamic_compliance_objective(config, mesh, rho, float(w), alpha, beta, mass_type)
+        for w in np.linspace(lo, hi, n_dense)
+    )
+    g1 = flank / result.peak_limit - 1.0
+    j_obj = result.dyn_compliance_history[-1] if result.dyn_compliance_history else float("nan")
+    mult = (j_obj / j_reference - 1.0) if (j_reference is not None and j_reference > 0.0) else None
+    return PeakBindingKKTStatus(
+        active=bool(abs(g1) <= tol),
+        flank_peak=float(flank),
+        peak_limit=float(result.peak_limit),
+        constraint_value=float(g1),
+        j_objective=float(j_obj),
+        active_multiplier=(float(mult) if mult is not None else None),
+    )

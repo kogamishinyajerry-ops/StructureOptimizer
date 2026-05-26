@@ -61,7 +61,7 @@ v15 完成 = `python scripts/test_agent.py --rubric v15` 报告：
 - [x] AAAAAAA — balanced 约束嵌入 optimize_stacking_sequence（balanced=True ⟹ 输入 +θ/−θ 配对 multiset 再排序 ⟹ A₁₆=A₂₆=0；symmetric+balanced 同时 B=0；balanced=False byte-exact 复现 D095；约束改变设计[balanced=False 同输入 A₁₆≠0]；A 与序无关故构造非搜索限制；D106）
 - [x] BBBBBBB — concentric shells 接入 write_stl_cdt_multi_hole(refine)（write_stl_cdt_multi_hole 加 concentric_shells 参数 + write_stl_concentric_export 包装；acute 截面 refine+concentric ⟹ 水密 STL 端到端，plain-refine 同输入 raise not_watertight；concentric_shells=False+refine byte-exact 复现 D100，refine=False 复现 D080；guard concentric-requires-refine；D107）
 - [x] CCCCCCC — 约束化离散角选择（select_ply_angles 加 balanced；±候选 multiset 过滤到 balanced ⟹ 移除 D102 退化 all-one-angle 最优；非退化 ≥2 distinct + A₁₆=A₂₆=0；**D_11 零代价**（Q̄₁₁ 偶）；balanced=False byte-exact 复现 D102；D108）
-- [ ] DDDDDDD — 严格 KKT-binding peak-binding（或诚实 defer）
+- [x] DDDDDDD — 严格 KKT-binding peak-binding（**关闭 D104 defer**！）：kkt_binding_status 诊断（g₁=flank/limit−1，|g₁|≤tol ⟹ active；active_multiplier=J/J_ref−1>0 ⟹ 目标被牺牲）；**tight limit ≲0.1·init ⟹ 约束 active + J 牺牲**（实测 0.08·init: g₁≈−0.03 active, mult +0.37）；loose limit = D104 basin-selector（inactive, mult<0）；D109
 - [ ] EEEEEEE — anti-symmetric 弯-剪解耦
 - [ ] FFFFFFF — copula 系统可靠性 general Rosenblatt / 多 family
 - [ ] GGGGGGG — 多-apex concentric-shell / 确定性 QMC 界（或诚实 defer）

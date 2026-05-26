@@ -2184,6 +2184,23 @@ r = select_ply_angles(d0, cand, 4, objective="max_bending", balanced=True)
 **关键 / 定量锚点（约束真绑定）**：(a) feasible + 非退化 — balanced ⟹ A₁₆=A₂₆=0 且 ≥2 distinct；(b) 改变设计 — balanced=False 全 1 角（distinct=1, A₁₆>1e3）；(c) **D_11 零代价** balanced==unconstr（rel 1e-9）；byte-exact balanced=False 复现 D102；min_coupling 仍达 ‖B‖=0；guards（奇数 size 离轴无 balanced multiset / too-large）。
 **诚实边界**：平衡对 D_11 **免费**（偶 Q̄₁₁）⟹ 约束去**退化非牺牲目标**（不是真 Pareto trade-off）；候选含 0/90 时 all-one-angle 本就平衡、约束不咬（demo 故意用离轴）；brute-force n≤6/|cand|≤6；只 A₁₆/A₂₆ 非 D₁₆/D₂₆（D110）。
 
+### 25.4 严格 KKT-binding peak-binding（Wave DDDDDDD，D109，关闭 D104 defer）
+
+D104 证了耦合（min J(ω_op) 抬高 flanking）但诚实记录约束**非严格 KKT-binding**（basin selector：loose limit 下 J-optimum basin 本就低 flank，约束不 active、J 不牺牲）。本波找到 binding regime 并加诊断。
+
+```python
+from structure_optimizer.core.freq_response import peak_binding_mma, kkt_binding_status
+
+r = peak_binding_mma(config, mesh, w_op, flo, fhi, peak_limit=0.08*init_flank, beta=2e-6)
+s = kkt_binding_status(config, mesh, r, beta=2e-6, j_reference=J_unconstrained)
+# s.active=True（g₁=flank/limit−1≈0）, s.active_multiplier>0（J 被牺牲）⟹ 严格 binding
+```
+
+**关键洞察**：**tight limit（≲0.1·初始 flank）**把 flank 压到 J-optimum basin 自然水平**以下** ⟹ 约束 active（g₁→0）**且** J(ω_op) 被迫升 ⟹ 真 Pareto trade-off（正 KKT 乘子）。D104 只是没探够紧。
+
+**关键 / 定量锚点**（对 dense sweep）：(1) tight 0.08·init ⟹ active=True（|g₁|≤0.1，实测 −0.03）+ active_multiplier>0（实测 +0.37，J≈1.37×无约束）= **严格 binding**；(2) loose 0.4·init ⟹ inactive（g₁<−0.1）+ mult<0（D104 basin-selector）；(3) active 约束把 flank 压到 <0.5× loose；(4) g₁ 匹配独立 dense sweep；(5) 无 j_reference ⟹ active_multiplier=None；(6) 确定性。
+**诚实边界**：严格 binding 仅在 **tight limit corner**（≲0.1·init），loose 仍是 D104 basin-selector（D109 扩展非推翻 D104）；binding regime **非凸/路径敏感**（0.07·init 探到瞬态 infeasible，active-set 非单调，测试用稳健的 0.08/0.40）；`active_multiplier` 是**相对牺牲 proxy（J/J_ref−1）非精确 MMA 对偶 λ**（断言符号>0=λ>0=KKT binding 判据）；smoke 24×10 单 flanking mode Rayleigh 轻阻尼。
+
 ---
 
 ## 常见错误
