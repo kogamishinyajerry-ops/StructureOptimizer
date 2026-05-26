@@ -1526,10 +1526,11 @@ def write_stl_cdt_multi_hole(
     solid_name: str = "topology_cdt_multi_hole",
     refine: bool = False,
     min_angle_deg: float = 20.0,
+    concentric_shells: bool = False,
 ) -> dict:
     """Extrude a smooth multiply-connected polygon (outer + **arbitrary** holes) to
     a watertight STL prism via constrained-Delaunay caps (Wave YYY, D080; ``refine``
-    added Wave CCCCCC, v14, D100).
+    added Wave CCCCCC, v14, D100; ``concentric_shells`` added Wave BBBBBBB, v15, D107).
 
     Unlike D072's annulus ribbon (exactly one hole), this handles any number of
     holes. Optional ``n_samples`` resamples every ring to equal arc-length spacing
@@ -1539,18 +1540,29 @@ def write_stl_cdt_multi_hole(
     :func:`constrained_delaunay_ruppert`) — Steiner points raise the minimum cap angle
     to ``≥ min_angle_deg`` (better-conditioned export faces) while preserving the
     cross-section and watertightness. **Default ``refine=False`` reproduces D080's
-    plain constrained-Delaunay cap byte-for-byte** (no regression). Returns
+    plain constrained-Delaunay cap byte-for-byte** (no regression).
+
+    With ``concentric_shells=True`` (D107, requires ``refine=True``) the refinement uses
+    **concentric-shell splitting** (D103) so cross-sections with **acute input corners**
+    (where plain midpoint Ruppert fails to terminate / breaks watertightness) refine to a
+    watertight cap end-to-end through the production STL writer — closing D100/D103's
+    "expose concentric_shells through write_stl_cdt_multi_hole" reopening.
+    ``concentric_shells=False`` (default) reproduces D100 byte-for-byte. Returns
     ``n_triangles`` / ``cross_section_area`` / ``n_holes`` / ``is_watertight`` /
     ``out_path``.
     """
     if z_thickness <= 0:
         raise SolverError("stl_export_nonpositive_thickness")
+    if concentric_shells and not refine:
+        raise SolverError("stl_export_concentric_requires_refine")
     outer = _resample_closed_ring(outer_loop, n_samples) if n_samples else _clean_ring(outer_loop)
     hole_rings = [
         _resample_closed_ring(h, n_samples) if n_samples else _clean_ring(h) for h in (holes or [])
     ]
     if refine:
-        pts, tris = constrained_delaunay_ruppert(outer, hole_rings, min_angle_deg=min_angle_deg)
+        pts, tris = constrained_delaunay_ruppert(
+            outer, hole_rings, min_angle_deg=min_angle_deg, concentric_shells=concentric_shells
+        )
     else:
         pts, tris = constrained_delaunay_triangulate(outer, hole_rings)
 
@@ -1647,4 +1659,32 @@ def write_stl_ruppert_multi_hole(
         solid_name=solid_name,
         refine=True,
         min_angle_deg=min_angle_deg,
+    )
+
+
+def write_stl_concentric_export(
+    outer_loop,
+    holes=None,
+    out_path: str | Path = "concentric_multi_hole.stl",
+    z_thickness: float = 1.0,
+    n_samples: int | None = None,
+    solid_name: str = "topology_concentric_export",
+    min_angle_deg: float = 20.0,
+) -> dict:
+    """**concentric_export** — quality-refined multi-hole STL extrusion that terminates
+    and stays watertight on cross-sections with **acute input corners** (Wave BBBBBBB,
+    v15, D107) — convenience alias for :func:`write_stl_cdt_multi_hole` with
+    ``refine=True, concentric_shells=True`` (D103 concentric-shell splitting). Plain
+    midpoint Ruppert (``concentric_shells=False``) fails to make an acute-cornered cap
+    watertight; this wires the concentric-shell fix through the production STL writer."""
+    return write_stl_cdt_multi_hole(
+        outer_loop,
+        holes,
+        out_path=out_path,
+        z_thickness=z_thickness,
+        n_samples=n_samples,
+        solid_name=solid_name,
+        refine=True,
+        min_angle_deg=min_angle_deg,
+        concentric_shells=True,
     )

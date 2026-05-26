@@ -2151,6 +2151,21 @@ r = optimize_stacking_sequence(d0, np.deg2rad([30.0, 60.0]), 0.125, objective="m
 **关键 / 定量锚点（约束真绑定）**：(a) feasible — balanced=True ⟹ A₁₆=A₂₆=0（abs 1e-7）；(b) 改变设计 — balanced=False 同输入 |A₁₆|>1e3（raw inventory 不平衡）且序列不同；(c) **byte-exact** — balanced=False 逐位复现 D095 默认路径（sequence/A/B/D array_equal + objective ==）；order-independent（max_bending & min_coupling 都平衡）；guard（配对翻倍 ⟹ min_coupling n≤8 仍触发）。
 **诚实边界**：平衡靠**构造非搜索限制**（A 与序无关，无序可限）；balanced=True **改变 ply 数**（非自平衡角翻倍）；只零 A₁₆/A₂₆ 非 D₁₆/D₂₆（弯-剪是 D110 anti-symmetric）；角度弧度；均匀厚。
 
+### 25.2 concentric shells 接入 write_stl_cdt_multi_hole（Wave BBBBBBB，D107）
+
+D103 给三角化加了 concentric-shell（acute 输入角自然终止+水密），但只在 `constrained_delaunay_ruppert` 可达——D100 的 STL writer 用 `concentric_shells=False`，acute 截面导不出（raise not_watertight）。本波把开关接进 writer。
+
+```python
+from structure_optimizer.core.stl_export import write_stl_concentric_export, write_stl_cdt_multi_hole
+
+spike = [[0,0],[30,0],[30,10],[0,10],[-120,5]]  # ~4.8° 尖角截面
+write_stl_concentric_export(spike, out_path="cap.stl")   # 端到端水密细化导出
+# = write_stl_cdt_multi_hole(spike, refine=True, concentric_shells=True)
+```
+
+**关键 / 定量锚点（约束真绑定）**：(a) feasible — acute 截面 concentric_export ⟹ 水密 + 面积守恒 900.0；(b) necessary — refine 不带 concentric 同输入 raise not_watertight（开关改变结果）；(c) **byte-exact** — concentric_shells=False+refine 逐字节复现 D100、refine=False 复现 D080；guard concentric-requires-refine；wrapper 等价。
+**诚实边界**：继承 D103 限制（输入角本身不可消、shell 是启发式非任意输入形式证明、max_steiner 兜底保留）；wall 法向 apex-away 启发式；多-apex 干涉留 D112；**纯 wiring 非新算法**，价值在端到端 acute 角导出。
+
 ---
 
 ## 常见错误
