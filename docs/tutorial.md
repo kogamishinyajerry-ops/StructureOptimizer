@@ -2240,6 +2240,23 @@ pf = system_reliability_series_copula(betas, mix)   # 直接接入 D098 既有�
 **关键 / 定量锚点**：(1) headline 凸组合恒等式 P_f(混合)=Σw_k·P_f(C_k)（abs 1e-14）；(2) 单分量（w=1）/ 零权分量逐位复现纯 family `system_reliability_series_copula`（**精确相等**，subsumes D098）；(3) 0<w<1 时混合 P_f **严格介于**两纯 family 之间且≠任一（绑定证据）；(4) 边缘均匀 C(1,…,u_i,…,1)=u_i（合法 copula）；(5) ≥3 family 凸组合；(6) guards。
 **诚实边界**：只做 **CDF 级**多 family（够 `system_reliability_series_copula` 用），**未**做混合 Rosenblatt 采样（需各分量条件密度，更重，留 reopening）；边缘仍标准正态 β→Φ(β)，泛化的是**相关结构**非边缘分布（general non-normal-marginal Rosenblatt 留 reopening）；凸性是唯一数学主张（初等 Sklar），恒等式数值验证非符号推导；纯新增不改生产函数。
 
+### 25.7 确定性 CBC-lattice 最坏情况误差界（Wave GGGGGGG，D112）
+
+`genz_mvn_cdf_lattice` 的 `std_error` 是**随机移位**的统计估计。本波加**确定性 a-priori 证书** `e(z)`：对加权 Korobov 空间（α=1，乘积权重 γ）的单位球内**任意** f，`|Q_N(f) − ∫f| ≤ e(z)·‖f‖`（Koksma–Hlawka / RKHS 不等式）。**无 RNG、无 seed**，逐位可复现。
+
+```python
+from structure_optimizer.core.reliability import (
+    cbc_korobov_generating_vector, korobov_worst_case_error)
+
+z = cbc_korobov_generating_vector(dim=3, n_points=89, weights=[0.7,0.5,0.3])  # CBC 最优
+e = korobov_worst_case_error(z, 89, [0.7,0.5,0.3])   # 确定性误差界
+```
+
+**原理**：lattice 平移不变性把 O(N²) 双核求和坍缩成 O(N) 空间形式 `e²(z) = −1 + (1/N)Σ_k Π_j(1+γ_j ω(frac(k z_j/N)))`，`ω(x)=2π²B₂({x})`。CBC（Sloan–Reztsov）逐分量贪心最小化 `e(z)`。
+
+**关键 / 定量锚点**：(1) headline——O(N) 空间形式 = O(N²) 通用 RKHS 双和形式（abs 1e-12，证书正确性）+ e²≥0；(2) CBC 改变并改进 Korobov 向量 e(CBC)≤e(Korobov)（绑定）+ 逐位确定性（无 RNG）；(3) Koksma–Hlawka 界对 f=K(·,t) 实测成立 |Q_N f−1|≤e·‖f‖；(4) e 随 N 单调下降（确定性 O(N^{−1+δ})）；(5) 零权 ⟹ e=0；(6) guards。
+**诚实边界**：是确定性**界**非新估计器（未接入 `genz_mvn_cdf_lattice`，留 reopening）；仅 α=1 乘积权重（α≥2 / 非乘积权重 out of scope）；naive O(d·N²) CBC（非 fast-CBC FFT，测试用小素数 N≤257；N 素数推荐但不强制）；多-apex 几何残留（both-endpoints-apex 边——realistic 多分离 apex 已被 D107 覆盖[两-spike 截面 watertight=True]，仅"两 apex 共边"degenerate 构造不出，留 reopening 不做投机修复）；公式是标准 QMC 理论数值验证非符号推导；纯新增不改生产函数。
+
 ---
 
 ## 常见错误

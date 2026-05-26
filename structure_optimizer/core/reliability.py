@@ -1863,3 +1863,89 @@ def system_reliability_series_lattice(
         raise SolverError("system_reliability_correlation_shape")
     res = genz_mvn_cdf_lattice(betas, R, n_points=n_points, n_shifts=n_shifts, a=a, seed=seed)
     return float(np.clip(1.0 - res.value, 0.0, 1.0)), res.std_error
+
+
+def _korobov_kernel_omega(x: np.ndarray) -> np.ndarray:
+    """Shift-invariant weighted-Korobov kernel piece ``ω(x) = 2π² B₂({x})`` (α=1).
+
+    ``B₂(t) = t² − t + 1/6`` is the second Bernoulli polynomial on the fractional part.
+    The space's reproducing kernel is ``K(x,y) = Π_j (1 + γ_j ω({x_j − y_j}))`` and
+    ``∫₀¹ ω = 0`` (so ``∫ K dx = 1``), ``ω(0) = π²/3``.
+    """
+    t = x - np.floor(x)
+    return 2.0 * np.pi**2 * (t * t - t + 1.0 / 6.0)
+
+
+def korobov_worst_case_error(z: np.ndarray, n_points: int, weights: np.ndarray) -> float:
+    """**Deterministic worst-case error** ``e(z)`` of the rank-1 lattice rule with
+    generating vector ``z`` over ``N = n_points`` points, in the weighted Korobov space
+    of smoothness α=1 with product weights ``γ`` (Wave GGGGGGG, v15, D112).
+
+    Unlike :func:`genz_mvn_cdf_lattice`'s *randomised* standard error (a statistical
+    estimate from random shifts), this is a **deterministic, a-priori certificate**: for
+    **every** ``f`` in the unit ball of the space the quadrature error is bounded,
+
+        |Q_N(f) − ∫f| ≤ e(z) · ‖f‖   (a Koksma–Hlawka / RKHS inequality).
+
+    Computed by the exact O(N·d) **spatial** form (lattice shift-invariance collapses the
+    O(N²) double kernel sum to a single sum over ``t_k = frac(k z / N)``)::
+
+        e²(z) = −1 + (1/N) Σ_{k=0}^{N−1} Π_j (1 + γ_j ω(frac(k z_j / N))),
+
+    with ``ω`` from :func:`_korobov_kernel_omega`. ``e²(z) ≥ 0`` always; for a good
+    lattice it decays like ``O(N^{−1+δ})``. Fully deterministic — **no RNG, no seed** —
+    so the certificate is byte-exact reproducible. Raises ``SolverError`` for
+    ``N < 2``, a ``z``/``weights`` length mismatch, or negative weights.
+    """
+    z = np.asarray(z, dtype=np.int64).reshape(-1)
+    gamma = np.asarray(weights, dtype=float).reshape(-1)
+    n = int(n_points)
+    if n < 2:
+        raise SolverError("korobov_wce_too_few_points")
+    if z.shape[0] != gamma.shape[0]:
+        raise SolverError("korobov_wce_dim_mismatch")
+    if np.any(gamma < -1e-15):
+        raise SolverError("korobov_wce_negative_weight")
+    k = np.arange(n)[:, None]  # (N, 1)
+    frac = np.mod(k * z[None, :] / float(n), 1.0)  # (N, d)
+    prod = np.prod(1.0 + gamma[None, :] * _korobov_kernel_omega(frac), axis=1)  # (N,)
+    e2 = -1.0 + float(prod.mean())
+    return float(np.sqrt(max(e2, 0.0)))
+
+
+def cbc_korobov_generating_vector(dim: int, n_points: int, weights: np.ndarray) -> np.ndarray:
+    """**Component-by-component (CBC)** construction of a rank-1 lattice generating
+    vector ``z`` that greedily minimises the deterministic worst-case error
+    :func:`korobov_worst_case_error` (Wave GGGGGGG, v15, D112).
+
+    Fixes ``z_1 = 1`` and, for each subsequent component ``j``, picks ``z_j ∈
+    {1,…,N−1}`` minimising ``e(z_1,…,z_j)`` with the earlier components frozen — the
+    classic Sloan–Reztsov CBC algorithm. The result is **deterministic** (no RNG) and
+    its worst-case error is **≤** that of the textbook Korobov vector ``(1, a, …,
+    a^{d−1})`` for the same ``N`` (greedy optimality), so it gives a *certified-better*
+    deterministic bound. Naive O(d·N²); use modest ``N`` (a prime is best for the theory).
+    Raises ``SolverError`` for ``dim < 1``, ``N < 2``, or a ``weights`` length mismatch.
+    """
+    d = int(dim)
+    n = int(n_points)
+    gamma = np.asarray(weights, dtype=float).reshape(-1)
+    if d < 1:
+        raise SolverError("cbc_dim_too_small")
+    if n < 2:
+        raise SolverError("korobov_wce_too_few_points")
+    if gamma.shape[0] != d:
+        raise SolverError("cbc_weights_dim_mismatch")
+    if np.any(gamma < -1e-15):
+        raise SolverError("korobov_wce_negative_weight")
+    z = np.ones(d, dtype=np.int64)
+    for j in range(1, d):
+        best_e = None
+        best_g = 1
+        for g in range(1, n):
+            z[j] = g
+            e = korobov_worst_case_error(z[: j + 1], n, gamma[: j + 1])
+            if best_e is None or e < best_e:
+                best_e = e
+                best_g = g
+        z[j] = best_g
+    return z

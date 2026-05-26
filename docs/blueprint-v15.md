@@ -64,7 +64,7 @@ v15 完成 = `python scripts/test_agent.py --rubric v15` 报告：
 - [x] DDDDDDD — 严格 KKT-binding peak-binding（**关闭 D104 defer**！）：kkt_binding_status 诊断（g₁=flank/limit−1，|g₁|≤tol ⟹ active；active_multiplier=J/J_ref−1>0 ⟹ 目标被牺牲）；**tight limit ≲0.1·init ⟹ 约束 active + J 牺牲**（实测 0.08·init: g₁≈−0.03 active, mult +0.37）；loose limit = D104 basin-selector（inactive, mult<0）；D109
 - [x] EEEEEEE — anti-symmetric 弯-剪解耦（make_antisymmetric_laminate θ(−z)=−θ(+z)=[half,−reversed(half)] ⟹ D₁₆=D₂₆=0 精确 + A₁₆=A₂₆=0 + B₁₁=B₁₂=B₂₂=0 但 B₁₆,B₂₆≠0；对照 symmetric-balanced D₁₆≠0；is_antisymmetric_laminate 检测；诚实：trade B-coupling for D-decoupling 非全消；D110）
 - [x] FFFFFFF — copula 系统可靠性多 family 混合（MixtureCopula C(u)=Σw_k C_k(u) + multi_family_copula 工厂；凸组合 ⟹ 合法 copula 直接接入 D098 既有 system_reliability_series_copula 不改；headline P_f(混合)=Σw_k·P_f(C_k) 精确 1e-14；单分量/零权逐位复现纯 family（subsumes D098）；0<w<1 严格介于两 family 间[绑定]；边缘均匀；≥3 family；诚实：仅 CDF 级非混合 Rosenblatt 采样、边缘仍正态、纯新增不改生产函数；D111）
-- [ ] GGGGGGG — 多-apex concentric-shell / 确定性 QMC 界（或诚实 defer）
+- [x] GGGGGGG — 确定性 CBC-lattice 最坏情况误差界（取 QMC 路径；**多-apex 几何已被 D107 覆盖**——多分离 apex 截面 concentric=True watertight=True vs plain ruppert_not_watertight，仅 degenerate"两 apex 共边"构造不出留 reopening）：korobov_worst_case_error 确定性证书 e(z)（α=1 加权 Korobov，O(N) 空间形式）+ cbc_korobov_generating_vector（Sloan–Reztsov 贪心）；headline O(N) 空间=O(N²) 通用 RKHS 双和 1e-12 + e²≥0；CBC 改变并改进 Korobov e(CBC)≤e(Korobov)[绑定] + 逐位确定性无 RNG；Koksma–Hlawka |Q_N f−1|≤e·‖f‖ 实测成立；e 随 N 单调降；零权 e=0；诚实：确定性界非新估计器（未接入 genz_mvn_cdf_lattice 留 reopening）、仅 α=1 乘积权重、naive O(dN²) CBC、纯新增不改生产函数；D112）
 - [ ] HHHHHHH — v15 收口（rubric ≥ 99）
 
 > 注：v15 需在 `docs/quality-rubric-v15.md` + `scripts/test_agent.py` 的 `CHECKS_V15`
