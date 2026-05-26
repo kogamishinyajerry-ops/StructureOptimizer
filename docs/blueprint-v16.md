@@ -62,7 +62,7 @@ v16 完成 = `python scripts/test_agent.py --rubric v16` 报告：
 ## 进度（wave 勾选）
 
 - [x] AAAAAAAA — anti-symmetric 排序约束嵌入 optimize_stacking_sequence（bending_shear_decoupled 参数；输入当半层 ⟹ rearrangement 排序后建 [half,−reversed(half)] ⟹ 优化输出 D₁₆=D₂₆=0 + A₁₆=A₂₆=0；Q̄₁₁ 偶 ⟹ rearrangement 仍 anti-symmetric 排序闭式全局 max_bending；绑定 [plain 同输入 D₁₆≠0]；=False 逐位复现 D095/D106；与 symmetric/balanced 互斥；诚实：仅 max_bending 闭式、trade B₁₆≠0、min_coupling 搜索留 reopening；D114）
-- [ ] BBBBBBBB — mixture-copula 一般非正态边缘
+- [x] BBBBBBBB — mixture-copula 一般非正态边缘（system_reliability_series_copula_marginals：u_k=F_k(x_k)=Φ(Marginal.to_standard_normal(x_k)) per-mode 任意边缘[normal/lognormal/weibull/gumbel]+copula 耦合；正态(0,1)+β 逐位复现 D098[normal.to_standard_normal(β)=β 无 round-trip]；独立 copula ⟹ 1−∏F_k 对闭式 1e-10；非正态改变 P_f；copula 仍绑定；诚实：Sklar 分离非 Nataf 物理联合 Rosenblatt、CDF 级 series、仅 4 边缘；D115）
 - [ ] CCCCCCCC — CBC 向量接入 genz_mvn_cdf_lattice
 - [ ] DDDDDDDD — peak-binding 精确 KKT 乘子（或诚实 defer）
 - [ ] EEEEEEEE — α≥2 高阶光滑 Korobov 最坏情况误差

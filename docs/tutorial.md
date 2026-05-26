@@ -2280,6 +2280,23 @@ res = optimize_stacking_sequence(d0, half_inventory, 0.125, objective="max_bendi
 **关键 / 定量锚点**：(1) headline——bending_shear_decoupled=True 输出 D₁₆=D₂₆=0（abs 1e-7）；(2) 同时 A₁₆=A₂₆=0；(3) 绑定——plain 优化器同输入 |D₁₆|>1e2（约束改变最优），且 stack 不同（anti-sym 翻倍半层）；(4) bending_shear_decoupled=False 逐位复现 plain D095/D106（序列+目标精确相等）；(5) rearrangement = anti-symmetric 排序中 brute-force 全局 max D_11（abs 1e-9）；(6) guards（与 symmetric/balanced 互斥 + 空层）。
 **诚实边界**：仅 max_bending 闭式（min_coupling 报 anti-symmetric stack 的 ‖B‖ 但非搜索最优排序，留 reopening）；trade B₁₆,B₂₆≠0 保留（同 D110）；输入是半层、等厚、弧度；与 symmetric/balanced 互斥（anti-symmetric+mirror 会逼角度到 0/±π2）。
 
+### 26.2 mixture-copula 系统可靠性接入一般非正态边缘（Wave BBBBBBBB，D115）
+
+D098/D111 把每模态安全概率固定为标准正态尾 u_k=Φ(β_k)。真实极限态裕度常非正态（Weibull 强度 / Gumbel 极值载荷 / lognormal）。本波泛化到任意 `Marginal`：u_k=F_k(x_k)，copula 耦合。
+
+```python
+from structure_optimizer.core.reliability import (
+    Marginal, gumbel_d_copula, system_reliability_series_copula_marginals)
+
+mg = [Marginal("weibull",2.0,3.0), Marginal("gumbel",1.0,0.5)]
+pf = system_reliability_series_copula_marginals(mg, points=[2.5,1.2], copula=gumbel_d_copula(2,2.5))
+```
+
+**原理**：u_k=F_k(x_k)=Φ(Marginal.to_standard_normal(x_k))（复用引擎既有 Nataf 边缘映射），P_f=1−C(u)。正态(0,1)边缘+points=β ⟹ u_k=Φ(β_k) ⟹ **逐位复现** `system_reliability_series_copula`（normal.to_standard_normal(β)=β 无 round-trip）。
+
+**关键 / 定量锚点**：(1) 正态边缘+β 逐位复现 D098（精确相等）；(2) 独立 copula(Gumbel θ=1) ⟹ P_f=1−∏F_k(x_k) 对 Weibull/Gumbel 闭式 CDF（abs 1e-10）；(3) 非正态改变 P_f（Weibull vs normal 同点 >1e-3，尾部要紧）；(4) copula 仍绑定（Gumbel θ>1 降 P_f vs 独立，在一般边缘上）；(5) 单调（升点 ⟹ 升 u_k ⟹ 降 P_f）；(6) guards。
+**诚实边界**：边缘只经 u_k 进入、copula 在 uniform 尺度建模相关（Sklar 分离），**非** Nataf-相关物理联合 Rosenblatt（直接指定 copula 非从物理 R_x 导，留 reopening）；u_k 走 Φ∘Φ⁻¹ round-trip（非正态 ≤1e-12，正态无 round-trip）；仅 CDF 级 series 系统（采样/并联另算 D119）；仅 4 种引擎边缘。
+
 ---
 
 ## 常见错误

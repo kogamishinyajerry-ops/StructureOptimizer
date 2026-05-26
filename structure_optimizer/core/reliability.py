@@ -1653,6 +1653,37 @@ def multi_family_copula(components: list, weights) -> MixtureCopula:
     return MixtureCopula(components=list(components), weights=np.asarray(weights, dtype=float))
 
 
+def system_reliability_series_copula_marginals(margins: list[Marginal], points, copula) -> float:
+    """Series-system failure probability under arbitrary **per-mode non-normal marginals**
+    coupled by a d-variate copula (Wave BBBBBBBB, v16, D115).
+
+    D098/D111's :func:`system_reliability_series_copula` fixes each mode's safe-probability
+    to the **standard-normal** tail ``u_k = Φ(β_k)``. Real limit-state margins are often
+    non-normal — Weibull material strength, Gumbel extreme load, lognormal. This generalises
+    the safe-probability to **any** :class:`Marginal`: ``u_k = F_k(x_k)`` (the CDF of mode
+    ``k``'s safety margin at its evaluation point ``x_k``, computed as
+    ``Φ(Marginal.to_standard_normal(x_k))`` — the engine's existing Nataf marginal map),
+    then ``P_f = 1 − C(u_1,…,u_m)``.
+
+    The **dependence** ``C`` is any d-variate copula with ``.dim`` and ``.cdf`` (Gumbel /
+    Clayton / a :class:`MixtureCopula`). With all ``margins`` standard-normal ``N(0,1)`` and
+    ``points`` the reliability indices ``β_k``, ``u_k = Φ(β_k)`` and this reduces
+    **bit-exactly** to :func:`system_reliability_series_copula` — the backward-compatibility
+    anchor (``Marginal("normal",0,1).to_standard_normal(β) = β`` with no round-trip).
+    """
+    margins = list(margins)
+    pts = np.asarray(points, dtype=float).reshape(-1)
+    m = len(margins)
+    if m < 1:
+        raise SolverError("system_reliability_no_modes")
+    if pts.size != m:
+        raise SolverError("system_reliability_marginals_point_mismatch")
+    if getattr(copula, "dim", None) != m:
+        raise SolverError("system_reliability_copula_dim_mismatch")
+    u = np.array([_standard_normal_cdf(margins[k].to_standard_normal(float(pts[k]))) for k in range(m)])
+    return float(np.clip(1.0 - copula.cdf(u), 0.0, 1.0))
+
+
 def _korobov_generating_vector(dim: int, a: int, n_points: int) -> np.ndarray:
     """Rank-1 **Korobov** generating vector ``z = (1, a, a², …, a^{dim−1}) mod N``."""
     z = np.ones(dim, dtype=np.int64)
