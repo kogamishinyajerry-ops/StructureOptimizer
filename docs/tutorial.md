@@ -2362,6 +2362,23 @@ pf_k   = system_reliability_k_out_of_n_copula(betas, copula, k=2) # ≥2 失效
 **关键 / 定量锚点**：(1) headline 独立 ⟹ parallel=∏(1−Φ(β_k))=∏P(fail)（abs 1e-14）；(2) k=1≡series 1−C(u)（abs 1e-12，任意 copula）；(3) k=m≡parallel（abs 1e-12）；(4) parallel ≤ series（任意 copula）；(5) P(≥k fail) 随 k 非增 + ∈[0,1]；(6) guards（dim/no-modes/k∉[1,m]）。
 **诚实边界**：O(Σ_j C(m,j)2^j) 容斥精确但 m 指数（仅 2.5D 小 m≤6，大 m 估计留 reopening）；标准正态 safe-prob u_k=Φ(β_k)（与 D115 一般边缘组合是 trivial follow-up 未接）；交替和浮点抵消对小 m benign（独立锚点验到 1e-14）；safe-copula 建 safe-event 相关（survival copula 等价不单列）。
 
+### 26.7 fast-CBC（Nuyens–Cools FFT）点阵构造（Wave GGGGGGGG，D120）
+
+D112 的 naive `cbc_korobov_generating_vector` 是 O(d·N²)（每分量重扫 N−1 候选）。本波加 **fast-CBC**：对**素数** N，按原根 ρ 重排 `(Z/N)^×` 后，每分量的 CBC 目标变成长度 N−1 的**循环相关**，一次 FFT 对全部候选 O(N log N) 求值，总 O(d·N·log N)。
+
+```python
+from structure_optimizer.core.reliability import fast_cbc_korobov_generating_vector
+
+gamma = np.array([1.0 / (i + 1) ** 2 for i in range(5)])
+z = fast_cbc_korobov_generating_vector(5, 1021, gamma)   # 确定性，无 RNG；N 须素数
+```
+
+**原理**：每分量要 min over g 的是 worst-case error 的 g-相关部分 `T(g)=Σ_k P(k)ω(frac(kg/N))`（P=已定分量的 running product）。令 k=ρ^a、g=ρ^b ⟹ `T̃(b)=Σ_a P(ρ^a)ω(frac(ρ^{a+b}/N))` 是循环相关 ⟹ 一对 `rfft/irfft` 全候选并行求值。
+
+**关键 / 定量锚点**：(1) headline FFT 相关 == 直接 O(N²) 相关（abs<1e-10，"fast 算的就是 naive 那个量"）；(2) e(fast_cbc) ≤ e(教科书 Korobov)（6 素数，CBC 贪心最优证书）；(3) e(fast_cbc) ≤ min(30 随机向量)；(4) 确定性（两次调用逐位一致，z[0]=1）；(5) 相邻 naive 仍在同最优类；(6) guards（非素数 N / dim<1 / 权重不匹配）；(7) [--run-slow] N=1021 ≥10× 加速且落同最优类。
+
+**诚实边界**（核心 — 决定 implement 而非照搬 blueprint anchor）：fast-CBC z **不是** naive z 的逐位复现，而且**可证不可能**——核 `B₂(1−t)=B₂(t)` ⟹ g 与 N−g 给**精确**相等的 worst-case error ⟹ 最优是 2^{d−1} 成员的对称集；naive 靠浮点求和顺序选成员、fast 靠 canonical min-g tie-break 选，二者**等优**（同 worst-case-error 类、同 ≤ 教科书 Korobov）。强行逐位匹配试到 20/21、第 21 例需任意 rounding 粒度 = 伪精度。**仅素数 N**（合数非循环群留 reopening）；**本仓库加速是学术性**（唯一消费者 genz N≤1021 naive 仅 ~0.35s，O(NlogN) 优势要 N≳10⁴）。
+
 ---
 
 ## 常见错误

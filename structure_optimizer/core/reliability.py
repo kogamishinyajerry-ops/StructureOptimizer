@@ -2091,6 +2091,110 @@ def cbc_korobov_generating_vector(dim: int, n_points: int, weights: np.ndarray) 
     return z
 
 
+def _is_prime(n: int) -> bool:
+    """Trial-division primality test (numpy-free, exact for the modest ``N`` used here)."""
+    if n < 2:
+        return False
+    if n % 2 == 0:
+        return n == 2
+    i = 3
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 2
+    return True
+
+
+def _smallest_primitive_root(n: int) -> int:
+    """Smallest primitive root (generator of ``(Z/nZ)^×``) modulo a prime ``n``.
+
+    Found by testing ``g = 2, 3, …`` against ``g^{(n−1)/q} ≢ 1`` for every prime factor
+    ``q`` of ``n−1`` (the standard order test). Used to re-index the multiplicative group
+    so the CBC per-component objective becomes a cyclic correlation (see
+    :func:`fast_cbc_korobov_generating_vector`)."""
+    phi = n - 1
+    factors: list[int] = []
+    m, p = phi, 2
+    while p * p <= m:
+        if m % p == 0:
+            factors.append(p)
+            while m % p == 0:
+                m //= p
+        p += 1
+    if m > 1:
+        factors.append(m)
+    for g in range(2, n):
+        if all(pow(g, phi // q, n) != 1 for q in factors):
+            return g
+    raise SolverError("fast_cbc_no_primitive_root")  # unreachable for prime n
+
+
+def fast_cbc_korobov_generating_vector(dim: int, n_points: int, weights: np.ndarray) -> np.ndarray:
+    """**Fast component-by-component (fast-CBC)** lattice generating vector via the
+    Nuyens–Cools FFT recurrence — the ``O(d·N·log N)`` accelerator of the naive
+    ``O(d·N²)`` :func:`cbc_korobov_generating_vector` (Wave GGGGGGGG, v16, D120).
+
+    For **prime** ``N`` the multiplicative group ``(Z/N)^×`` is cyclic with primitive root
+    ``ρ``. The CBC per-component objective — minimise over ``g`` the ``g``-dependent part
+    ``T(g) = Σ_{k} P(k) ω(frac(k g / N))`` of the worst-case error (``P`` the running
+    product of the already-fixed components, ``ω`` from :func:`_korobov_kernel_omega``) —
+    is, after re-indexing ``k = ρ^a`` and ``g = ρ^b``, a **cyclic correlation**
+    ``T̃(b) = Σ_a P(ρ^a) ω(frac(ρ^{a+b}/N))`` of length ``N−1``. One FFT pair evaluates it
+    for **all** candidates at once in ``O(N log N)`` instead of the naive ``O(N²)`` rescan
+    per component. Deterministic (no RNG). Requires **prime** ``N``.
+
+    Honest scope (see D120): this is **not** byte-identical to
+    :func:`cbc_korobov_generating_vector`'s ``z``. The kernel satisfies ``B₂(1−t) =
+    B₂(t)`` so ``g`` and ``N−g`` give an **exact** worst-case-error tie — the optimum is a
+    ``2^{d−1}``-member symmetric set. The naive routine resolves each tie by
+    floating-point summation order; fast-CBC resolves it by a **canonical** symmetrised
+    min-``g`` tie-break. Both are equally optimal (identical worst-case-error class, both
+    certified ``≤`` the textbook Korobov vector); forcing bit-equality would be fake
+    precision. Raises ``SolverError`` for ``dim < 1``, non-prime ``N``, ``N < 2``, or a
+    ``weights`` length mismatch."""
+    d = int(dim)
+    n = int(n_points)
+    gamma = np.asarray(weights, dtype=float).reshape(-1)
+    if d < 1:
+        raise SolverError("cbc_dim_too_small")
+    if n < 2:
+        raise SolverError("korobov_wce_too_few_points")
+    if not _is_prime(n):
+        raise SolverError("fast_cbc_n_not_prime")
+    if gamma.shape[0] != d:
+        raise SolverError("cbc_weights_dim_mismatch")
+    if np.any(gamma < -1e-15):
+        raise SolverError("korobov_wce_negative_weight")
+    el = n - 1
+    root = _smallest_primitive_root(n)
+    # group exponent tables: gexp[a] = ρ^a mod n (a = 0..N−2) enumerates (Z/N)^×
+    gexp = np.empty(el, dtype=np.int64)
+    cur = 1
+    for a in range(el):
+        gexp[a] = cur
+        cur = (cur * root) % n
+    inv = np.empty(n, dtype=np.int64)
+    inv[gexp] = np.arange(el)
+    partner = inv[(n - gexp) % n]  # index of the symmetric twin N−g of each candidate g
+    omega_grp = _korobov_kernel_omega(gexp.astype(float) / float(n))
+    fft_omega = np.fft.rfft(omega_grp)
+    z = np.ones(d, dtype=np.int64)
+    # running product over the group, seeded with component 0 (z_0 = 1); k=0 term is
+    # g-independent (drops out of the per-component argmin) so only k ∈ (Z/N)^× is kept.
+    p_grp = 1.0 + float(gamma[0]) * _korobov_kernel_omega(gexp.astype(float) / float(n))
+    for j in range(1, d):
+        gam = float(gamma[j])
+        rev = np.empty(el, dtype=float)
+        rev[0] = p_grp[0]
+        rev[1:] = p_grp[1:][::-1]
+        corr = np.fft.irfft(np.fft.rfft(rev) * fft_omega, n=el)  # T̃(b) for every candidate
+        corr = 0.5 * (corr + corr[partner])  # exact g↔N−g symmetry → canonical tie-break
+        best = int(gexp[np.lexsort((gexp, corr))[0]])  # min objective, smaller g breaks ties
+        z[j] = best
+        p_grp = p_grp * (1.0 + gam * _korobov_kernel_omega(((gexp * best) % n).astype(float) / float(n)))
+    return z
+
+
 @dataclass
 class GenzCBCResult:
     """Output of :func:`genz_mvn_cdf_cbc` (Wave CCCCCCCC, v16, D116)."""
