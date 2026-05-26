@@ -1,0 +1,288 @@
+{
+  "version": "v14.0.0",
+  "total_max": 100,
+  "total_earned": 100,
+  "items": [
+    {
+      "section": "\u00a71",
+      "code": "1.1",
+      "title": "d-Gumbel \u63a5\u5165 system_reliability_series",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "Gumbel\u2192series + test"
+    },
+    {
+      "section": "\u00a71",
+      "code": "1.2",
+      "title": "Genz \u91cd\u6392\u63a5\u5165 series_exact",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "Genz-reorder\u2192series + test"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.1",
+      "title": "Ruppert \u63a5\u5165 write_stl_cdt_multi_hole",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "Ruppert\u2192write_stl + test"
+    },
+    {
+      "section": "\u00a72",
+      "code": "2.2",
+      "title": "Ruppert concentric-shell \u5c0f\u8f93\u5165\u89d2",
+      "max_points": 7,
+      "earned": 7,
+      "status": "PASS",
+      "evidence": "concentric-shell small-angle + test"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.1",
+      "title": "balanced laminate \u7ea6\u675f (A\u2081\u2086=A\u2082\u2086=0)",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "balanced laminate + test"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.2",
+      "title": "\u79bb\u6563\u89d2\u96c6\u9009\u62e9",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "angle-set selection + test"
+    },
+    {
+      "section": "\u00a73",
+      "code": "3.3",
+      "title": "peak-binding flanking-mode",
+      "max_points": 8,
+      "earned": 8,
+      "status": "PASS",
+      "evidence": "peak-binding flanking-mode + test"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.1",
+      "title": "Test count \u2265 1185",
+      "max_points": 4,
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "1222 tests collected"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.2",
+      "title": "Core coverage \u2265 95% (\u542b v14)",
+      "max_points": 4,
+      "earned": 4,
+      "status": "PASS",
+      "evidence": "95.5% coverage"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.3",
+      "title": "Property tests \u2265 59",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "60 property tests"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.4",
+      "title": "Mutation kill rate \u2265 75%",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "80.0% kill rate"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.5",
+      "title": "Fingerprint DB \u2265 70",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "70 fingerprints"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.6",
+      "title": "pytest gate green (D033)",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "D033 gate + ADR"
+    },
+    {
+      "section": "\u00a74",
+      "code": "4.7",
+      "title": "v14 rubric \u5199\u5165 agent + CI",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "v14 in agent + CI"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.1",
+      "title": "Gumbel-series / Genz-reorder-series demo",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "5 series-demo refs"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.2",
+      "title": "Ruppert-export / concentric-shell demo",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "5 geometry-demo refs"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.3",
+      "title": "balanced-laminate / angle-select demo",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "5 laminate-demo refs"
+    },
+    {
+      "section": "\u00a75",
+      "code": "5.4",
+      "title": "peak-binding demo",
+      "max_points": 2,
+      "earned": 2,
+      "status": "PASS",
+      "evidence": "6 peak-demo refs"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.1",
+      "title": "blueprint-v14 \u22656 ticks",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "8 ticks"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.2",
+      "title": "tutorial v14 \u22654 sections",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "8 v14 subsections"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.3",
+      "title": "architecture v14 section",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "v14 section present"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.4",
+      "title": "ADRs D098+ \u2265 7",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "8 v14 ADRs"
+    },
+    {
+      "section": "\u00a76",
+      "code": "6.5",
+      "title": "v14 anchors documented",
+      "max_points": 3,
+      "earned": 3,
+      "status": "PASS",
+      "evidence": "74 v14-anchor refs"
+    }
+  ],
+  "v1_check": {
+    "score": 100,
+    "regression": false,
+    "missing": []
+  },
+  "v2_check": {
+    "score": 97,
+    "regression": false,
+    "missing": []
+  },
+  "v3_check": {
+    "score": 99,
+    "regression": false,
+    "missing": []
+  },
+  "v4_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v5_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v6_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v7_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v8_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v9_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v10_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v11_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v12_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "v13_check": {
+    "score": 100,
+    "max": 100,
+    "regression": false
+  },
+  "pytest_check": {
+    "passed": 1218,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 4,
+    "returncode": 0,
+    "green": true,
+    "regression": false
+  }
+}
