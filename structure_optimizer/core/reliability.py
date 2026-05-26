@@ -1980,3 +1980,66 @@ def cbc_korobov_generating_vector(dim: int, n_points: int, weights: np.ndarray) 
                 best_g = g
         z[j] = best_g
     return z
+
+
+@dataclass
+class GenzCBCResult:
+    """Output of :func:`genz_mvn_cdf_cbc` (Wave CCCCCCCC, v16, D116)."""
+
+    value: float  # MVN CDF estimate Φ_m(b; R) — deterministic (seed-free)
+    worst_case_error: float  # deterministic CBC-lattice worst-case error certificate e(z)
+    n_points: int  # lattice points
+    generating_vector: np.ndarray  # the CBC generating vector z used
+
+
+def genz_mvn_cdf_cbc(
+    upper: np.ndarray,
+    correlation: np.ndarray,
+    n_points: int = 1021,
+    weights: np.ndarray | None = None,
+) -> GenzCBCResult:
+    """Multivariate-normal CDF ``Φ_m(b; R)`` by a **deterministic CBC rank-1 lattice**
+    rule applied to the Genz separation-of-variables integrand (Wave CCCCCCCC, v16, D116).
+
+    D086's :func:`genz_mvn_cdf_lattice` uses a textbook Korobov vector ``(1,a,…)`` under
+    **random shifts** and reports a *statistical* ``std_error``. This wires D112's
+    deterministic machinery into the estimator: the generating vector is built **CBC**
+    (:func:`cbc_korobov_generating_vector`, greedily minimising the worst-case error), a
+    **single unshifted** lattice ``w_k = frac(k·z/N)`` is used (so the estimate is
+    **seed-free / byte-exact reproducible** — no RNG), and the rule's **deterministic
+    worst-case error certificate** ``e(z)`` (:func:`korobov_worst_case_error`) is reported
+    instead of a randomisation ``std_error``.
+
+    ``weights`` are the product weights of the α=1 weighted-Korobov space the CBC vector is
+    optimised for (default ``γ_j = 1/(j+1)²``, a standard decaying product weight). As
+    ``N → ∞`` the estimate converges to the **exact** CDF, the same estimand as
+    :func:`genz_mvn_cdf_lattice` / :func:`genz_mvn_cdf` (D086/D078, both **unchanged**).
+    Raises ``SolverError`` for a non-SPD ``R`` or ``n_points < 2``.
+    """
+    b = np.asarray(upper, dtype=float).reshape(-1)
+    m = b.size
+    R = np.asarray(correlation, dtype=float)
+    if R.shape != (m, m):
+        raise SolverError("genz_cbc_correlation_shape")
+    if n_points < 2:
+        raise SolverError("genz_cbc_too_few_points")
+    try:
+        chol = np.linalg.cholesky(R)
+    except np.linalg.LinAlgError as exc:
+        raise SolverError("genz_cbc_not_positive_definite") from exc
+    if m == 1:
+        # no integration dimension: the CDF is exact; the (empty) lattice is trivial
+        return GenzCBCResult(
+            value=float(_standard_normal_cdf(b[0] / chol[0, 0])),
+            worst_case_error=0.0,
+            n_points=int(n_points),
+            generating_vector=np.ones(0, dtype=np.int64),
+        )
+    d = m - 1
+    gamma = (1.0 / (np.arange(1, d + 1, dtype=float) ** 2)) if weights is None else np.asarray(weights, dtype=float)
+    z = cbc_korobov_generating_vector(d, n_points, gamma)
+    k = np.arange(n_points)[:, None]
+    w = np.mod(k * z[None, :] / float(n_points), 1.0)  # single unshifted lattice
+    value = float(np.clip(_genz_product_estimate(b, chol, w), 0.0, 1.0))
+    e_cert = korobov_worst_case_error(z, n_points, gamma)
+    return GenzCBCResult(value=value, worst_case_error=e_cert, n_points=int(n_points), generating_vector=z)

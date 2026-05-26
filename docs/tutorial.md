@@ -2297,6 +2297,22 @@ pf = system_reliability_series_copula_marginals(mg, points=[2.5,1.2], copula=gum
 **关键 / 定量锚点**：(1) 正态边缘+β 逐位复现 D098（精确相等）；(2) 独立 copula(Gumbel θ=1) ⟹ P_f=1−∏F_k(x_k) 对 Weibull/Gumbel 闭式 CDF（abs 1e-10）；(3) 非正态改变 P_f（Weibull vs normal 同点 >1e-3，尾部要紧）；(4) copula 仍绑定（Gumbel θ>1 降 P_f vs 独立，在一般边缘上）；(5) 单调（升点 ⟹ 升 u_k ⟹ 降 P_f）；(6) guards。
 **诚实边界**：边缘只经 u_k 进入、copula 在 uniform 尺度建模相关（Sklar 分离），**非** Nataf-相关物理联合 Rosenblatt（直接指定 copula 非从物理 R_x 导，留 reopening）；u_k 走 Φ∘Φ⁻¹ round-trip（非正态 ≤1e-12，正态无 round-trip）；仅 CDF 级 series 系统（采样/并联另算 D119）；仅 4 种引擎边缘。
 
+### 26.3 CBC 确定性向量接入 Genz MVN CDF（Wave CCCCCCCC，D116）
+
+D086 的 `genz_mvn_cdf_lattice` 用教科书 Korobov 向量 + 随机移位（统计 std_error）。本波把 D112 确定性 CBC 机制接入估计器：**无 seed、逐位可复现**，报告确定性最坏情况误差证书 e(z)。
+
+```python
+from structure_optimizer.core.reliability import genz_mvn_cdf_cbc
+
+r = genz_mvn_cdf_cbc(b, R, n_points=1021)   # 无 seed 参数
+# r.value（MVN CDF Φ_m(b;R) 确定性估计）, r.worst_case_error（e(z) 证书）, r.generating_vector（CBC z）
+```
+
+**原理**：生成向量 CBC 构造（`cbc_korobov_generating_vector` 贪心最小化 e(z)），单个**不移位** lattice `w_k=frac(k·z/N)` ⟹ 估计无 RNG。默认权重 γ_j=1/(j+1)²。N→∞ 收敛到精确 CDF（同 D086/D078 estimand，二者不动）。
+
+**关键 / 定量锚点**：(1) headline——两次调用 value + 生成向量逐位相同（无 seed）；(2) m=1 精确 = Φ(b/√R) + e(z)=0；(3) 收敛到独立 one-factor Gauss–Hermite 参考（N≈2039 abs<5e-4 且随 N 缩小）；(4) 生成向量==cbc_korobov + e(z)==korobov_worst_case_error 且 ≤ Korobov；(5) e(z) 随 N 单调降；(6) guards（非 SPD R / N<2）。
+**诚实边界**：e(z) 证 lattice **规则**最坏情况质量（空间单位球上）**非**本 Genz 被积函数的紧后验误差界（未算其空间范数）——估计的实际保证是收敛+确定性；单不移位 lattice ⟹ 无统计误差估计（要 std_error 用 D086，保留不动）；plain Cholesky（非 D094 重排，组合留 reopening）；默认权重是 CBC 调参非 estimand。
+
 ---
 
 ## 常见错误
