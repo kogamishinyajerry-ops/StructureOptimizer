@@ -2218,6 +2218,28 @@ a, b, d = laminate_abd(d0, stack, thicknesses)
 **关键 / 定量锚点**：(1) D₁₆=D₂₆=0（abs 1e-7，headline）；(2) 也平衡 A₁₆=A₂₆=0；(3) 对照 symmetric-balanced |D₁₆|,|D₂₆|>1e2（anti-symmetric 必要性）；(4) coupling 签名 B₁₁=B₁₂=B₂₂=0 但 |B₁₆|>1e2；(5) is_antisymmetric 检测（构造 True、symmetric-balanced False、奇数 False）；(6) guards。
 **诚实边界**：anti-symmetric **trade coupling 非全消**——D₁₆=D₂₆=0 + A₁₆=A₂₆=0 的代价是 **B₁₆,B₂₆≠0**；无单一层合对任意离轴角同时零 A-shear/B/D-shear，anti-symmetric（D 解耦、B≠0）与 symmetric-balanced（B=0、D 耦合）是互补两选。construction+verification 非 optimizer 约束（嵌入 optimize_stacking_sequence 留 reopening）；弧度；均匀厚。
 
+### 25.6 多 family 混合 copula 系统可靠性（Wave FFFFFFF，D111）
+
+D098 的 `system_reliability_series_copula` 只收**单个** exchangeable Archimedean family——Gumbel（上尾，联合极值聚集）**或** Clayton（下尾，联合存活），不能同时。真实失效模式系统可能两尾**同时**存在。本波加**多 family 混合**。
+
+```python
+from structure_optimizer.core.reliability import (
+    multi_family_copula, gumbel_d_copula, clayton_d_copula,
+    system_reliability_series_copula)
+
+mix = multi_family_copula([gumbel_d_copula(4, 3.0), clayton_d_copula(4, 2.0)], [0.65, 0.35])
+pf = system_reliability_series_copula(betas, mix)   # 直接接入 D098 既有函数（不改）
+```
+
+**原理**：混合 copula `C(u)=Σ_k w_k C_k(u)`（`w_k≥0`，`Σw_k=1`）本身是合法 copula（copula 类是凸的：每分量边缘均匀 ⟹ 混合边缘也均匀）。因 `P_f=1−C` 且 `Σw_k=1`：
+
+    P_f(混合) = 1 − Σ w_k C_k(u) = Σ w_k (1 − C_k(u)) = Σ w_k · P_f(C_k)
+
+即混合系统失效概率 = **各分量失效概率的凸组合**（精确，非数值）。
+
+**关键 / 定量锚点**：(1) headline 凸组合恒等式 P_f(混合)=Σw_k·P_f(C_k)（abs 1e-14）；(2) 单分量（w=1）/ 零权分量逐位复现纯 family `system_reliability_series_copula`（**精确相等**，subsumes D098）；(3) 0<w<1 时混合 P_f **严格介于**两纯 family 之间且≠任一（绑定证据）；(4) 边缘均匀 C(1,…,u_i,…,1)=u_i（合法 copula）；(5) ≥3 family 凸组合；(6) guards。
+**诚实边界**：只做 **CDF 级**多 family（够 `system_reliability_series_copula` 用），**未**做混合 Rosenblatt 采样（需各分量条件密度，更重，留 reopening）；边缘仍标准正态 β→Φ(β)，泛化的是**相关结构**非边缘分布（general non-normal-marginal Rosenblatt 留 reopening）；凸性是唯一数学主张（初等 Sklar），恒等式数值验证非符号推导；纯新增不改生产函数。
+
 ---
 
 ## 常见错误

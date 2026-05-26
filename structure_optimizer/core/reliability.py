@@ -1585,6 +1585,74 @@ def system_reliability_series_copula(betas, copula) -> float:
     return float(np.clip(1.0 - copula.cdf(u), 0.0, 1.0))
 
 
+@dataclass
+class MixtureCopula:
+    """Convex combination of ``d``-variate copulas (Wave FFFFFFF, v15, D111).
+
+    D098's :func:`system_reliability_series_copula` accepts a **single** exchangeable
+    Archimedean family — Gumbel (upper-tail) *or* Clayton (lower-tail), never both. A
+    real failure-mode system can show **both** joint-extreme clustering (upper tail) and
+    joint-survival dependence (lower tail), which no single one-parameter Archimedean
+    copula represents. D098's reopening criterion asked for "other families / general
+    dependence". A finite **mixture** ``C(u) = Σ_k w_k C_k(u)`` with ``w_k ≥ 0`` and
+    ``Σ w_k = 1`` is itself a valid copula (the copula class is convex: each component
+    has uniform margins ``C_k(1,…,u_i,…,1)=u_i`` so the mixture does too), so it drops
+    straight into :func:`system_reliability_series_copula` via ``.dim`` and ``.cdf``.
+
+    The estimator is **exact, not numerical**: because the failure probability is
+    ``P_f = 1 − C(u)`` and ``Σ w_k = 1``,
+
+        P_f(mixture) = 1 − Σ_k w_k C_k(u) = Σ_k w_k (1 − C_k(u)) = Σ_k w_k P_f(C_k),
+
+    i.e. the mixture series-``P_f`` is the **convex combination of the component**
+    ``P_f``'s. This is the headline analytical anchor. A single-component mixture
+    (``w=1``) reproduces the pure-family path **bit-exactly**, so the mixture *subsumes*
+    D098 (the opt-in / backward-compat reproduction).
+    """
+
+    components: list
+    weights: np.ndarray
+
+    def __post_init__(self) -> None:
+        self.weights = np.asarray(self.weights, dtype=float).reshape(-1)
+        if len(self.components) == 0:
+            raise SolverError("mixture_copula_no_components")
+        if self.weights.shape[0] != len(self.components):
+            raise SolverError("mixture_copula_weight_count_mismatch")
+        if np.any(self.weights < -1e-12):
+            raise SolverError("mixture_copula_negative_weight")
+        if abs(float(self.weights.sum()) - 1.0) > 1e-9:
+            raise SolverError("mixture_copula_weights_not_normalised")
+        dims = {int(c.dim) for c in self.components}
+        if len(dims) != 1:
+            raise SolverError("mixture_copula_component_dim_mismatch")
+        self._dim = dims.pop()
+
+    @property
+    def dim(self) -> int:
+        return self._dim
+
+    def cdf(self, u: np.ndarray) -> float:
+        """Mixture copula CDF ``Σ_k w_k C_k(u)`` (a valid copula; uniform margins)."""
+        u = np.asarray(u, dtype=float)
+        if u.shape[0] != self._dim:
+            raise SolverError("mixture_copula_dim_mismatch")
+        return float(
+            sum(float(w) * float(c.cdf(u)) for w, c in zip(self.weights, self.components, strict=True))
+        )
+
+
+def multi_family_copula(components: list, weights) -> MixtureCopula:
+    """``d``-variate **multi-family mixture** copula (Wave FFFFFFF, v15, D111).
+
+    ``components`` is a list of copulas (each with ``.dim`` and ``.cdf``, e.g. a
+    :func:`gumbel_d_copula` and a :func:`clayton_d_copula` of equal ``dim``); ``weights``
+    are non-negative and sum to 1. The result plugs into
+    :func:`system_reliability_series_copula` unchanged — see :class:`MixtureCopula`.
+    """
+    return MixtureCopula(components=list(components), weights=np.asarray(weights, dtype=float))
+
+
 def _korobov_generating_vector(dim: int, a: int, n_points: int) -> np.ndarray:
     """Rank-1 **Korobov** generating vector ``z = (1, a, a², …, a^{dim−1}) mod N``."""
     z = np.ones(dim, dtype=np.int64)
