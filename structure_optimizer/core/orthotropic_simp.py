@@ -483,6 +483,40 @@ def is_balanced_laminate(angles: np.ndarray, thicknesses: np.ndarray | None = No
     return all(abs(v) < tol for v in net.values())
 
 
+def _constrained_select_balanced(
+    d0: np.ndarray, cand: np.ndarray, n_plies: int, thickness: float, objective: str, symmetric: bool
+) -> StackingSequenceResult:
+    """``constrained_select``: choose a size-``n`` **balanced** (A₁₆=A₂₆=0) multiset from
+    ``±candidates`` optimising the objective (Wave CCCCCCC, v15, D108).
+
+    Removes D102's **degenerate** all-one-angle ``max_bending`` optimum: the candidate set
+    is augmented with negatives, the size-``n`` multiset search is **filtered to balanced
+    multisets** (:func:`is_balanced_laminate`, equal +θ/−θ counts), and the best is
+    arranged by :func:`optimize_stacking_sequence`. Because ``Q̄₁₁`` is **even** in θ, the
+    max-``D_11`` balanced pick (±θ* of the stiffest magnitude) attains the *same* ``D_11``
+    as the unconstrained all-θ* — so the constraint zeros A₁₆/A₂₆ and de-degenerates the
+    design at **no bending-stiffness cost**, while the all-one-angle solution is excluded
+    (it is not balanced when θ* is off the 0/π2 axes)."""
+    if n_plies > 6 or cand.size > 6:
+        raise SolverError("select_min_coupling_too_large")
+    aug = np.unique(np.concatenate([cand, -cand]))
+    best: StackingSequenceResult | None = None
+    for combo in combinations_with_replacement(aug.tolist(), n_plies):
+        arr = np.array(combo)
+        if not is_balanced_laminate(arr):
+            continue
+        res = optimize_stacking_sequence(d0, arr, thickness, objective, symmetric)
+        if best is None or (
+            res.objective_value > best.objective_value
+            if objective == "max_bending"
+            else res.objective_value < best.objective_value
+        ):
+            best = res
+    if best is None:
+        raise SolverError("select_no_balanced_multiset")
+    return best
+
+
 def select_ply_angles(
     d0: np.ndarray,
     candidate_angles: np.ndarray,
@@ -490,11 +524,12 @@ def select_ply_angles(
     thickness: float = 1.0,
     objective: str = "max_bending",
     symmetric: bool = False,
+    balanced: bool = False,
 ) -> StackingSequenceResult:
     """Select **which** angles (a multiset drawn with repetition from a discrete
     candidate set) to use for ``n_plies``, optimising ``D_11`` (``max_bending``) or
     ``‖B‖_F`` (``min_coupling``) — the angle-**value** selection problem (Wave EEEEEE,
-    v14, D102).
+    v14, D102; ``balanced`` constraint added Wave CCCCCCC, v15, D108).
 
     Complementary to :func:`optimize_stacking_sequence` (D095), which *orders* a fixed
     inventory: this picks the inventory. The chosen multiset is then handed to
@@ -513,6 +548,11 @@ def select_ply_angles(
     the mirror — hence ``B = 0`` exactly — is built by the inner optimiser; the
     meaningful symmetric objective is then ``max_bending`` (``min_coupling`` is moot
     because symmetry already zeros ``B``).
+
+    With ``balanced=True`` (D108) the selection is restricted to **balanced** multisets
+    (A₁₆=A₂₆=0; :func:`_constrained_select_balanced`), which removes D102's degenerate
+    all-one-angle ``max_bending`` optimum — at no ``D_11`` cost because ``Q̄₁₁`` is even
+    in θ. ``balanced=False`` (default) reproduces D102 exactly.
     """
     d0 = np.asarray(d0, dtype=float)
     cand = np.asarray(candidate_angles, dtype=float).reshape(-1)
@@ -524,6 +564,9 @@ def select_ply_angles(
         raise SolverError("select_nonpositive_thickness")
     if objective not in ("max_bending", "min_coupling"):
         raise SolverError("select_unknown_objective")
+
+    if balanced:
+        return _constrained_select_balanced(d0, cand, n_plies, thickness, objective, symmetric)
 
     if objective == "max_bending":
         # Each ply independently picks the stiffest candidate (rearrangement is moot —

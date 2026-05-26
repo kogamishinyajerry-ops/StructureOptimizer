@@ -2166,6 +2166,24 @@ write_stl_concentric_export(spike, out_path="cap.stl")   # 端到端水密细化
 **关键 / 定量锚点（约束真绑定）**：(a) feasible — acute 截面 concentric_export ⟹ 水密 + 面积守恒 900.0；(b) necessary — refine 不带 concentric 同输入 raise not_watertight（开关改变结果）；(c) **byte-exact** — concentric_shells=False+refine 逐字节复现 D100、refine=False 复现 D080；guard concentric-requires-refine；wrapper 等价。
 **诚实边界**：继承 D103 限制（输入角本身不可消、shell 是启发式非任意输入形式证明、max_steiner 兜底保留）；wall 法向 apex-away 启发式；多-apex 干涉留 D112；**纯 wiring 非新算法**，价值在端到端 acute 角导出。
 
+### 25.3 约束化离散角选择（Wave CCCCCCC，D108）
+
+D102 的 max_bending 选择最优是**退化**的（全选最刚一个角，且离轴时 A₁₆≠0）。本波给 select_ply_angles 加 balanced 约束，移除退化。
+
+```python
+from structure_optimizer.core.orthotropic_simp import select_ply_angles
+
+cand = np.deg2rad([30.0, 60.0])  # 离轴候选（无 0/90）
+# balanced=True：限制在 balanced multiset，±候选过滤
+r = select_ply_angles(d0, cand, 4, objective="max_bending", balanced=True)
+# r.sequence = ±30（非退化、2 distinct），A₁₆=A₂₆=0；D_11 与无约束 all-30 相同
+```
+
+**原理**：±候选增广 → 按 `is_balanced_laminate` 过滤到 balanced multiset（±θ 等数）→ 取最优。**Q̄₁₁ 在 θ 上偶** ⟹ 最大 D_11 balanced 取 ±θ*（最刚幅值）与无约束 all-θ* **同 D_11**；而 all-one-angle 离轴时不平衡被排除 ⟹ 约束在**零 D_11 代价**下去退化 + 零 A₁₆/A₂₆。
+
+**关键 / 定量锚点（约束真绑定）**：(a) feasible + 非退化 — balanced ⟹ A₁₆=A₂₆=0 且 ≥2 distinct；(b) 改变设计 — balanced=False 全 1 角（distinct=1, A₁₆>1e3）；(c) **D_11 零代价** balanced==unconstr（rel 1e-9）；byte-exact balanced=False 复现 D102；min_coupling 仍达 ‖B‖=0；guards（奇数 size 离轴无 balanced multiset / too-large）。
+**诚实边界**：平衡对 D_11 **免费**（偶 Q̄₁₁）⟹ 约束去**退化非牺牲目标**（不是真 Pareto trade-off）；候选含 0/90 时 all-one-angle 本就平衡、约束不咬（demo 故意用离轴）；brute-force n≤6/|cand|≤6；只 A₁₆/A₂₆ 非 D₁₆/D₂₆（D110）。
+
 ---
 
 ## 常见错误
