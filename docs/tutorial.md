@@ -2129,6 +2129,30 @@ python scripts/test_agent.py --rubric v14 --strict # 权威评分（~6h，跑 v4
 
 ---
 
+## 25. v15 — embedded constraints & rigorous closure
+
+> v15 把 v14 standalone/construction 原语**嵌进生产优化器作真约束** + 关闭 v14 诚实 defer。
+> **约束真绑定铁律**：每个 embedding wave 证 (a) 约束开启 feasible、(b) 约束**改变**无约束最优、(c) opt-in 默认逐位复现。
+
+### 25.1 balanced 约束嵌入 optimize_stacking_sequence（Wave AAAAAAA，D106）
+
+D101 把 balanced 做成 standalone 检查器（`make_balanced_laminate`/`is_balanced_laminate`），留下 reopening：接进生产排序优化器。本波把 balanced 嵌进 `optimize_stacking_sequence`，输出即 A₁₆=A₂₆=0。
+
+```python
+from structure_optimizer.core.orthotropic_simp import optimize_stacking_sequence
+
+# balanced=True：输入角先 +θ/−θ 配对，再按目标排序 ⟹ 输出 A₁₆=A₂₆=0
+r = optimize_stacking_sequence(d0, np.deg2rad([30.0, 60.0]), 0.125, objective="max_bending", balanced=True)
+# r.a_matrix[0,2]=A₁₆≈0；配 symmetric=True ⟹ 同时 ‖B‖≈0（symmetric-balanced）
+```
+
+**原理**：扩展刚度 A=Σ Q̄_k t_k **与顺序无关**、Q̄₁₆/Q̄₂₆ 在 θ 上奇 ⟹ +θ/−θ 配对 multiset 对**任意**排序都 A₁₆=A₂₆=0。所以 balanced=True 把 inventory 换成配对 multiset（`_balanced_stacking_inventory`），目标排序照常跑而平衡恒不破；symmetric=True 再镜像 ⟹ B=0。
+
+**关键 / 定量锚点（约束真绑定）**：(a) feasible — balanced=True ⟹ A₁₆=A₂₆=0（abs 1e-7）；(b) 改变设计 — balanced=False 同输入 |A₁₆|>1e3（raw inventory 不平衡）且序列不同；(c) **byte-exact** — balanced=False 逐位复现 D095 默认路径（sequence/A/B/D array_equal + objective ==）；order-independent（max_bending & min_coupling 都平衡）；guard（配对翻倍 ⟹ min_coupling n≤8 仍触发）。
+**诚实边界**：平衡靠**构造非搜索限制**（A 与序无关，无序可限）；balanced=True **改变 ply 数**（非自平衡角翻倍）；只零 A₁₆/A₂₆ 非 D₁₆/D₂₆（弯-剪是 D110 anti-symmetric）；角度弧度；均匀厚。
+
+---
+
 ## 常见错误
 
 | 现象 | 原因 | 解决 |

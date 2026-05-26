@@ -58,7 +58,7 @@ v15 完成 = `python scripts/test_agent.py --rubric v15` 报告：
 
 ## 进度（wave 勾选）
 
-- [ ] AAAAAAA — balanced 约束嵌入 optimize_stacking_sequence
+- [x] AAAAAAA — balanced 约束嵌入 optimize_stacking_sequence（balanced=True ⟹ 输入 +θ/−θ 配对 multiset 再排序 ⟹ A₁₆=A₂₆=0；symmetric+balanced 同时 B=0；balanced=False byte-exact 复现 D095；约束改变设计[balanced=False 同输入 A₁₆≠0]；A 与序无关故构造非搜索限制；D106）
 - [ ] BBBBBBB — concentric shells 接入 write_stl_cdt_multi_hole(refine)
 - [ ] CCCCCCC — 约束化离散角选择
 - [ ] DDDDDDD — 严格 KKT-binding peak-binding（或诚实 defer）

@@ -318,15 +318,29 @@ def _stacking_position_weights(n: int, thickness: float) -> np.ndarray:
     return (z[1:] ** 3 - z[:-1] ** 3) / 3.0
 
 
+def _balanced_stacking_inventory(angles: np.ndarray) -> np.ndarray:
+    """Build the **balanced** (+θ/−θ paired) ply multiset for the ``balanced_stacking``
+    embedding (Wave AAAAAAA, v15, D106).
+
+    Pairs each non-self-balanced input angle with its negation
+    (:func:`make_balanced_laminate`, ``symmetric=False``). Because the extensional
+    ``A = Σ Q̄_k t_k`` is **order-independent** and ``Q̄₁₆/Q̄₂₆`` are odd in θ, this
+    multiset has ``A₁₆ = A₂₆ = 0`` for **any** ordering — so the stacking optimiser is
+    free to reorder it for the objective without ever breaking balance."""
+    return make_balanced_laminate(np.asarray(angles, dtype=float), symmetric=False)
+
+
 def optimize_stacking_sequence(
     d0: np.ndarray,
     ply_angles: np.ndarray,
     thickness: float = 1.0,
     objective: str = "max_bending",
     symmetric: bool = False,
+    balanced: bool = False,
 ) -> StackingSequenceResult:
     """Optimise the **stacking sequence** (ordering) of a fixed ply inventory under
-    classical lamination theory (Wave FFFFF, D095).
+    classical lamination theory (Wave FFFFF, D095; ``balanced`` added Wave AAAAAAA,
+    v15, D106).
 
     Two discrete objectives over the *arrangement* of the given plies (uniform
     ``thickness``):
@@ -345,6 +359,15 @@ def optimize_stacking_sequence(
     full laminate is built as ``half + reversed(half)``, which makes ``B = 0`` *exactly*
     (the classical mid-plane-symmetry decoupling) regardless of the objective, and the
     half-stack order is then chosen to maximise ``D_11``.
+
+    With ``balanced=True`` (D106) the input ``ply_angles`` is first **balanced** — each
+    non-self-balanced angle paired with its negation
+    (:func:`_balanced_stacking_inventory`) — so the optimiser's output has
+    ``A₁₆ = A₂₆ = 0`` (extension–shear decoupling, the D101 reopening criterion now
+    embedded *inside* the production optimiser). Balance is a multiset property and the
+    extensional ``A`` is order-independent, so the subsequent objective ordering never
+    breaks it; combined with ``symmetric=True`` the output is **symmetric-balanced**
+    (``A₁₆=A₂₆=0`` *and* ``B=0``). ``balanced=False`` (default) reproduces D095 exactly.
     """
     d0 = np.asarray(d0, dtype=float)
     angles = np.asarray(ply_angles, dtype=float).reshape(-1)
@@ -354,6 +377,11 @@ def optimize_stacking_sequence(
         raise SolverError("stacking_nonpositive_thickness")
     if objective not in ("max_bending", "min_coupling"):
         raise SolverError("stacking_unknown_objective")
+    if balanced:
+        # Embed the balanced constraint: replace the inventory with its +θ/−θ paired
+        # multiset, then let the existing objective ordering proceed (A-balance is
+        # order-independent so it survives any reordering / mirroring below).
+        angles = _balanced_stacking_inventory(angles)
 
     def _abd(seq: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         return laminate_abd(d0, seq, np.full(seq.size, thickness))
