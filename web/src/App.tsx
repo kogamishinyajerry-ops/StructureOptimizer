@@ -14,6 +14,7 @@ import { RunStatus } from "./components/RunStatus";
 import { ExportBar } from "./components/ExportBar";
 import { ProblemEditor } from "./components/ProblemEditor";
 import { RunHistory } from "./components/RunHistory";
+import { CompareView } from "./components/CompareView";
 import { DensityViewport } from "./viewport/DensityViewport";
 import "./App.css";
 
@@ -27,6 +28,7 @@ export function App() {
   const [configError, setConfigError] = useState<string | null>(null);
   const [configReload, setConfigReload] = useState(0);
   const [runs, setRuns] = useState<RunListItem[]>([]);
+  const [comparePair, setComparePair] = useState<[string, string] | null>(null);
   const { snap, launch, loadRun } = useRun();
 
   useEffect(() => {
@@ -120,6 +122,10 @@ export function App() {
     [running, loadRun],
   );
 
+  const onCompare = useCallback((idA: string, idB: string) => {
+    setComparePair([idA, idB]);
+  }, []);
+
   return (
     <div className="app">
       <header className="app-header">
@@ -193,9 +199,14 @@ export function App() {
             activeRunId={snap.runId}
             disabled={running}
             onReopen={onReopen}
+            onCompare={onCompare}
           />
         </aside>
       </main>
+
+      {comparePair && (
+        <CompareView pair={comparePair} onClose={() => setComparePair(null)} />
+      )}
     </div>
   );
 }
