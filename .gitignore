@@ -1,16 +1,17 @@
-runs/**
-!runs/.gitkeep
+runs/
+*.egg-info/
+.DS_Store
 __pycache__/
 *.pyc
-.pytest_cache/
-.DS_Store
 .venv/
-*.egg-info/
-.coverage
 .mypy_cache/
 .ruff_cache/
-htmlcov/
-
-
-# v6 demo artifacts
+.pytest_cache/
 build/
+
+# web frontend build artifacts (also covered by web/.gitignore)
+web/node_modules/
+web/dist/
+
+# TypeScript incremental build cache (web frontend)
+web/*.tsbuildinfo

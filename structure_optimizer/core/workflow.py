@@ -45,6 +45,7 @@ def run_config(
     parent_id: str | None = None,
     study_id: str | None = None,
     generation: int = 0,
+    on_iteration=None,
 ) -> Path:
     """Run mesh → algorithm (SIMP or BESO) → save artifacts → verify → report.
 
@@ -56,12 +57,17 @@ def run_config(
     provided, a ``lineage.json`` is written into the run dir for downstream
     tree-building. Defaults preserve v1/v2 behavior (no parent → fresh
     root-of-tree run).
+
+    ``on_iteration`` (web runner): optional observational callback forwarded to
+    the algorithm and called once per iteration with ``(iteration,
+    IterationMetric, densities)``. ``None`` (default, CLI/study path) preserves
+    the original behaviour exactly.
     """
     from structure_optimizer.adapters.algorithm_base import get_algorithm
 
     mesh = create_structured_mesh(config)
     algorithm = get_algorithm(config.optimization.algorithm)
-    result = algorithm.run(config, mesh)
+    result = algorithm.run(config, mesh, on_iteration=on_iteration)
     if run_dir is None:
         run_dir = create_run_dir(config)
     else:

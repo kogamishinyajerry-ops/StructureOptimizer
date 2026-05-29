@@ -63,7 +63,7 @@ def diagnose_error(exc: Exception) -> str:
     hint = ""
     name = type(exc).__name__
     if name == "ConfigError":
-        hint = "check docs/blueprint-v4.md or run `structopt help` for valid config schema"
+        hint = "check docs/blueprint-v4.md or run `structure-optimizer --help` for valid config schema"
     elif "No module named" in msg:
         hint = "install optional dep with `pip install scipy` (or the missing package)"
     elif "all degrees of freedom are fixed" in msg:
@@ -84,7 +84,7 @@ def _package_version() -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construct the top-level argparse parser (5 subcommands + --version + epilog examples)."""
+    """Construct the top-level argparse parser (6 subcommands + --version + epilog examples)."""
     parser = argparse.ArgumentParser(
         prog="structure-optimizer",
         description=(

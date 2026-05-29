@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -70,12 +71,23 @@ class OptimizationResult:
         return _grayscale_png_bytes(pixels)
 
 
-def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResult:
+def run_simp(
+    config: BenchmarkConfig,
+    mesh: StructuredMesh,
+    on_iteration: Callable[[int, IterationMetric, np.ndarray], None] | None = None,
+) -> OptimizationResult:
     """Run the SIMP main loop: density init → FEA → sensitivity → filter → OC update → manufacturing projection → repeat.
 
     Stops when ``change <= change_tolerance`` (after ``min_iterations``) or
     ``max_iterations`` is reached. Returns ``OptimizationResult`` with the final
     density field, full iteration history, and pre/post-optimization FEA results.
+
+    ``on_iteration``, if given, is called once per iteration with
+    ``(iteration, IterationMetric, densities)`` where ``densities`` is a fresh
+    copy of the current field (shape ``(nelx*nely,)``, values in ``[0, 1]``).
+    It is purely observational — used by the web runner to stream live
+    convergence. When ``None`` (the default, e.g. the CLI path) the loop is
+    byte-identical to before.
     """
     opt = config.optimization
     load_cases = effective_load_cases(config)
@@ -143,6 +155,8 @@ def run_simp(config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResul
             )
         )
         final_analysis = analysis
+        if on_iteration is not None:
+            on_iteration(iteration, metrics[-1], densities.copy())
         if iteration >= opt.min_iterations and change <= opt.change_tolerance:
             stop_reason = "change_tolerance"
             break
