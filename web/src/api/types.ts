@@ -19,16 +19,45 @@ export interface StartRunResponse {
   nely: number;
 }
 
-export interface IterationFrame {
-  type: "iteration";
+/** One convergence-curve sample (shared by live frames and persisted metrics). */
+export interface MetricPoint {
   iteration: number;
   compliance: number;
   volume_fraction: number;
   change: number;
   max_displacement: number;
   mass: number;
+}
+
+export interface IterationFrame extends MetricPoint {
+  type: "iteration";
   shape: [number, number]; // [nely, nelx]
   density_b64: string;
+}
+
+/** Summary row for the run-history list (GET /api/runs). */
+export interface RunListItem {
+  run_id: string;
+  benchmark_id: string;
+  label: string;
+  nelx: number;
+  nely: number;
+  status: string;
+  compliance: number | null;
+  verified: boolean | null;
+  iterations: number | null;
+}
+
+/** Full payload for reopening a completed run (GET /api/runs/{run_id}). */
+export interface RunDetail {
+  run_id: string;
+  benchmark_id: string;
+  status: string;
+  summary: Record<string, unknown>;
+  verification: Record<string, unknown>;
+  shape: [number, number];
+  density_b64: string;
+  metrics: MetricPoint[];
 }
 
 export interface DoneFrame {

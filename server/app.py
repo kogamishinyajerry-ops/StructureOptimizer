@@ -22,7 +22,7 @@ from structure_optimizer.benchmarks.registry import (
     load_benchmark,
 )
 from structure_optimizer.core.config import ConfigError
-from structure_optimizer.core.run_store import load_density, read_json
+from structure_optimizer.core.run_store import load_density, load_metrics, read_json
 
 from server.export import EXPORT_FORMATS, export_geometry
 from server.frames import encode_density
@@ -40,7 +40,9 @@ from server.schemas import (
     EditableLimits,
     EditableLoad,
     MeshOverride,
+    MetricPoint,
     OptimizationOverride,
+    RunListItem,
     RunResult,
     StartRunRequest,
     StartRunResponse,
@@ -153,6 +155,43 @@ def get_benchmark_config(benchmark_id: str) -> BenchmarkConfigEditable:
     )
 
 
+@app.get("/api/runs", response_model=list[RunListItem])
+def list_runs() -> list[RunListItem]:
+    """List in-memory runs, newest first, for the history panel."""
+    items: list[RunListItem] = []
+    for state in manager.list():
+        compliance: float | None = None
+        verified: bool | None = None
+        iterations: int | None = None
+        if state.status == "done" and state.run_dir is not None:
+            # Safe reads: a missing/partial artifact leaves the field None.
+            try:
+                summary = read_json(state.run_dir / "summary.json")
+                compliance = float(summary["optimized"]["compliance"])
+                iterations = int(summary.get("iterations", 0))
+            except Exception:
+                pass
+            try:
+                verification = read_json(state.run_dir / "verification.json")
+                verified = verification.get("status") == "passed"
+            except Exception:
+                pass
+        items.append(
+            RunListItem(
+                run_id=state.run_id,
+                benchmark_id=state.benchmark_id,
+                label=_label(state.benchmark_id),
+                nelx=state.nelx,
+                nely=state.nely,
+                status=state.status,
+                compliance=compliance,
+                verified=verified,
+                iterations=iterations,
+            )
+        )
+    return items
+
+
 @app.post("/api/runs", response_model=StartRunResponse)
 def start_run(req: StartRunRequest) -> StartRunResponse:
     """Start an optimization run in a worker thread; returns its id immediately."""
@@ -206,8 +245,17 @@ def get_run(run_id: str) -> RunResult:
         raise HTTPException(status_code=500, detail=state.error or "Run failed")
 
     summary: dict[str, Any] = read_json(state.run_dir / "summary.json")
-    verification = read_json(state.run_dir / "verification.json")
+    # verification + metrics are optional artifacts: a reopened run with a
+    # missing/partial file degrades to {}/[] rather than 500-ing the panel.
+    try:
+        verification = read_json(state.run_dir / "verification.json")
+    except (FileNotFoundError, ValueError):
+        verification = {}
     shape, density_b64 = encode_density(load_density(state.run_dir), state.nelx, state.nely)
+    try:
+        metrics = [MetricPoint(**row) for row in load_metrics(state.run_dir)]
+    except (TypeError, ValueError):
+        metrics = []
     return RunResult(
         run_id=state.run_id,
         benchmark_id=state.benchmark_id,
@@ -216,6 +264,7 @@ def get_run(run_id: str) -> RunResult:
         verification=verification,
         shape=shape,
         density_b64=density_b64,
+        metrics=metrics,
     )
 
 

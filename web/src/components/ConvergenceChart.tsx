@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import type { IterationFrame } from "../api/types";
+import type { MetricPoint } from "../api/types";
 import { fmt } from "../lib/format";
 import "./ConvergenceChart.css";
 
 interface ConvergenceChartProps {
-  iterations: IterationFrame[];
+  iterations: MetricPoint[];
 }
 
 // viewBox coordinate space — SVG scales responsively to its container.
@@ -28,7 +28,7 @@ interface ChartGeometry {
   complianceMax: number;
 }
 
-function buildGeometry(iterations: IterationFrame[]): ChartGeometry | null {
+function buildGeometry(iterations: MetricPoint[]): ChartGeometry | null {
   if (iterations.length === 0) return null;
 
   const startIter = iterations[0].iteration;

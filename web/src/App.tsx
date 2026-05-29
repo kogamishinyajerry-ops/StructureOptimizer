@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
-import { fetchBenchmarks, fetchBenchmarkConfig } from "./api/client";
+import { useCallback, useEffect, useState } from "react";
+import { fetchBenchmarks, fetchBenchmarkConfig, fetchRuns } from "./api/client";
 import { useRun } from "./api/useRun";
 import type {
   BenchmarkSummary,
   BenchmarkConfigEditable,
+  RunListItem,
   RunOverrides,
 } from "./api/types";
 import { BenchmarkPicker } from "./components/BenchmarkPicker";
@@ -12,6 +13,7 @@ import { ConvergenceChart } from "./components/ConvergenceChart";
 import { RunStatus } from "./components/RunStatus";
 import { ExportBar } from "./components/ExportBar";
 import { ProblemEditor } from "./components/ProblemEditor";
+import { RunHistory } from "./components/RunHistory";
 import { DensityViewport } from "./viewport/DensityViewport";
 import "./App.css";
 
@@ -24,7 +26,8 @@ export function App() {
   const [overrides, setOverrides] = useState<RunOverrides | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const [configReload, setConfigReload] = useState(0);
-  const { snap, launch } = useRun();
+  const [runs, setRuns] = useState<RunListItem[]>([]);
+  const { snap, launch, loadRun } = useRun();
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +79,24 @@ export function App() {
     };
   }, [selectedId, configReload]);
 
+  // Run history: refetch on mount and whenever the active run reaches a terminal
+  // state (a finished run changes the list). The cancelled flag guards against a
+  // late response landing after the effect re-ran. Failures are swallowed — the
+  // history panel is non-critical and degrades to its last-known list.
+  useEffect(() => {
+    let cancelled = false;
+    fetchRuns()
+      .then((list) => {
+        if (!cancelled) setRuns(list);
+      })
+      .catch(() => {
+        /* history is best-effort; keep prior list */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [snap.status]);
+
   const selectedBench = benchmarks.find((b) => b.id === selectedId);
   const presets = selectedBench?.presets ?? [];
   const running = snap.status === "running" || snap.status === "starting";
@@ -90,6 +111,14 @@ export function App() {
   const onRun = () => {
     if (selectedId && !editorInvalid) launch(selectedId, preset ?? undefined, overrides ?? undefined);
   };
+
+  // Reopen a finished run from history (no-op while a live run is streaming).
+  const onReopen = useCallback(
+    (runId: string) => {
+      if (!running) loadRun(runId);
+    },
+    [running, loadRun],
+  );
 
   return (
     <div className="app">
@@ -159,6 +188,12 @@ export function App() {
           <div className="app-chart-slot">
             <ConvergenceChart iterations={snap.iterations} />
           </div>
+          <RunHistory
+            runs={runs}
+            activeRunId={snap.runId}
+            disabled={running}
+            onReopen={onReopen}
+          />
         </aside>
       </main>
     </div>

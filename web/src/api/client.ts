@@ -1,6 +1,8 @@
 import type {
   BenchmarkConfigEditable,
   BenchmarkSummary,
+  RunDetail,
+  RunListItem,
   RunOverrides,
   StartRunResponse,
 } from "./types";
@@ -33,6 +35,16 @@ export function startRun(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ benchmark_id, preset: preset ?? null, ...(overrides ? { overrides } : {}) }),
   }).then(json<StartRunResponse>);
+}
+
+/** Past runs, newest first, for the history panel. */
+export function fetchRuns(): Promise<RunListItem[]> {
+  return fetch(`${BASE}/api/runs`).then(json<RunListItem[]>);
+}
+
+/** Full payload (summary + verification + metrics + density) for one run. */
+export function fetchRun(run_id: string): Promise<RunDetail> {
+  return fetch(`${BASE}/api/runs/${run_id}`).then(json<RunDetail>);
 }
 
 /** WebSocket URL for a run's live stream (handles ws/wss + dev proxy). */

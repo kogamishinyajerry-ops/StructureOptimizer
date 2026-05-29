@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { startRun, streamUrl } from "./client";
-import type { DoneFrame, IterationFrame, RunOverrides, StreamFrame } from "./types";
+import { fetchRun, startRun, streamUrl } from "./client";
+import type { DoneFrame, MetricPoint, RunOverrides, StreamFrame } from "./types";
 
 export type RunStatus = "idle" | "starting" | "running" | "done" | "error";
 
@@ -11,7 +11,7 @@ export interface RunSnapshot {
   shape: [number, number] | null; // [nely, nelx]
   /** Latest density frame (base64 uint8), updated per iteration. */
   density: string | null;
-  iterations: IterationFrame[];
+  iterations: MetricPoint[];
   done: DoneFrame | null;
   error: string | null;
 }
@@ -117,5 +117,45 @@ export function useRun() {
     };
   }, []);
 
-  return { snap, launch, reset };
+  // Reopen a finished run from history: drop any live socket, fetch the
+  // persisted detail, and rebuild a terminal "done" snapshot (no streaming).
+  const loadRun = useCallback(async (runId: string) => {
+    detach(wsRef.current);
+    wsRef.current = null;
+    setSnap({ ...EMPTY, status: "starting", runId });
+
+    let detail;
+    try {
+      detail = await fetchRun(runId);
+    } catch (e) {
+      setSnap({ ...EMPTY, status: "error", runId, error: (e as Error).message });
+      return;
+    }
+
+    // Synthesize the DoneFrame the live path would have produced, so RunStatus /
+    // ExportBar consume an identical shape whether streamed or reopened.
+    const done: DoneFrame = {
+      type: "done",
+      run_id: detail.run_id,
+      iterations: detail.metrics.length,
+      stop_reason: String(detail.summary.stop_reason ?? ""),
+      summary: detail.summary,
+      verification: detail.verification,
+      shape: detail.shape,
+      density_b64: detail.density_b64,
+    };
+
+    setSnap({
+      status: "done",
+      runId: detail.run_id,
+      benchmarkId: detail.benchmark_id,
+      shape: detail.shape,
+      density: detail.density_b64,
+      iterations: detail.metrics,
+      done,
+      error: null,
+    });
+  }, []);
+
+  return { snap, launch, loadRun, reset };
 }

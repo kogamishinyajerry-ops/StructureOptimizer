@@ -60,6 +60,11 @@ class RunManager:
         with self._lock:
             return self._runs.get(run_id)
 
+    def list(self) -> list[RunState]:
+        """Return live run states, newest first (reverse insertion order)."""
+        with self._lock:
+            return [self._runs[run_id] for run_id in reversed(self._order)]
+
     def start(
         self,
         benchmark_id: str,

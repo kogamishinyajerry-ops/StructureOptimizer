@@ -146,6 +146,27 @@ def main() -> int:
     assert over_cap.status_code == 400, f"over-cap mesh should 400, got {over_cap.status_code}"
     print(f"over-cap mesh -> 400: {over_cap.json()['detail']}")
 
+    # ---- Milestone 4: run history (list + reopen with metrics) ---------------
+    runs_resp = client.get("/api/runs")
+    assert runs_resp.status_code == 200, f"list runs -> {runs_resp.status_code}"
+    runs = runs_resp.json()
+    assert isinstance(runs, list), f"runs not a list: {type(runs)}"
+    mbb = next((r for r in runs if r["run_id"] == run_id), None)
+    assert mbb is not None, f"mbb_beam run {run_id} missing from history"
+    assert mbb["status"] == "done", f"mbb_beam status={mbb['status']}"
+    assert isinstance(mbb["compliance"], (int, float)), f"compliance not numeric: {mbb['compliance']!r}"
+    assert isinstance(mbb["verified"], bool), f"verified not bool: {mbb['verified']!r}"
+
+    detail = client.get(f"/api/runs/{run_id}").json()
+    metrics = detail["metrics"]
+    assert isinstance(metrics, list) and metrics, "metrics list empty"
+    for key in ("iteration", "compliance", "volume_fraction"):
+        assert key in metrics[0], f"metric row missing '{key}'"
+    print(
+        f"M4 history: {len(runs)} runs; mbb_beam compliance={mbb['compliance']:.3f} "
+        f"verified={mbb['verified']} metrics={len(metrics)} rows"
+    )
+
     print("SMOKE OK")
     return 0
 

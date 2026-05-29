@@ -116,6 +116,31 @@ class ErrorFrame(BaseModel):
     message: str
 
 
+class MetricPoint(BaseModel):
+    """One ``metrics.csv`` row — the convergence series for a finished run."""
+
+    iteration: int
+    compliance: float
+    volume_fraction: float
+    change: float
+    max_displacement: float
+    mass: float
+
+
+class RunListItem(BaseModel):
+    """One entry in ``GET /api/runs`` — enough for the history panel."""
+
+    run_id: str
+    benchmark_id: str
+    label: str
+    nelx: int
+    nely: int
+    status: str
+    compliance: float | None = None
+    verified: bool | None = None
+    iterations: int | None = None
+
+
 class RunResult(BaseModel):
     run_id: str
     benchmark_id: str
@@ -124,3 +149,4 @@ class RunResult(BaseModel):
     verification: dict[str, Any]
     shape: list[int]
     density_b64: str
+    metrics: list[MetricPoint] = Field(default_factory=list)
