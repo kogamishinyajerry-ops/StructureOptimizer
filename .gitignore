@@ -12,3 +12,6 @@ build/
 # web frontend build artifacts (also covered by web/.gitignore)
 web/node_modules/
 web/dist/
+
+# TypeScript incremental build cache (web frontend)
+web/*.tsbuildinfo
