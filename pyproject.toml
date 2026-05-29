@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "structure-optimizer"
 version = "5.0.0"
-description = "Local, verifiable, explainable 2D/2.5D structural optimization workbench with SIMP topology optimization, manufacturing constraints, multi-objective candidate study, and Pareto-front comparison."
+description = "Local, dependency-light (numpy-only) 2D/2.5D SIMP topology-optimization engine with independent verification, fronted by a React/FastAPI live web workbench."
 requires-python = ">=3.11"
 dependencies = [
   "numpy>=2.0",
@@ -31,6 +31,10 @@ amg = [
 bayes = [
   "scipy>=1.11",
   "scikit-learn>=1.3",
+]
+web = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
 ]
 dev = [
   "pytest>=8.0",

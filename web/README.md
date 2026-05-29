@@ -1,34 +1,66 @@
-# StructureOptimizer Workbench (Milestone 1)
+# StructureOptimizer Web Workbench
 
-An experience-grade web workbench over the StructureOptimizer numpy engine. Milestone 1 = the
-**live convergence viewport**: pick a benchmark → Run → watch the topology emerge in real time →
-read the verification result.
+An experience-grade web front end for the SIMP topology-optimization engine:
+define a problem, watch it converge live, browse past runs, and export the
+result geometry — all driving the same numpy-only engine the CLI uses.
 
-- **Backend**: FastAPI (`server/`), wraps the engine, streams per-iteration frames over WebSocket.
-- **Frontend**: React + TypeScript + Vite (`web/`), modern-SaaS-minimal UI, canvas density viewport.
+## Shipped
 
-## Run it
+- **M1 — live convergence viewport.** A canvas density viewport plus a
+  hand-rolled SVG convergence chart, both fed by per-iteration frames streamed
+  over a WebSocket while the engine runs.
+- **M2 — geometry export.** Export the final design as SVG, DXF, or STL.
+- **M3 — problem-definition editor.** Edit the run config in the browser; the
+  server enforces caps (rejecting over-cap configs with HTTP 400), and the
+  client mirrors those caps to block an invalid Run before it is sent.
+- **M4 — run history + reopen.** Past runs are listed and can be reopened to
+  inspect their metrics and final density.
+- **Export disclaimer / provenance.** Exports carry a provenance/disclaimer
+  note inline — an XML comment in SVG and `999` group codes in DXF.
+- **Two-run comparison.** A frontend-only modal places two runs side by side.
 
-Two terminals from the repo root.
+## Layout
 
-**1. Backend** (needs the `[web]` extra — fastapi + uvicorn):
+- `server/` — FastAPI backend. Runs the synchronous engine on a worker thread;
+  an `on_iteration` callback pushes per-iteration frames onto a thread-safe
+  queue, and an async task drains the queue to a WebSocket. A `RunManager`
+  keeps the last 16 runs in memory.
+- `web/` — React 18 + TypeScript (strict) + Vite frontend. The CSS design-token
+  system in `web/src/theme/tokens.css` is the single source of truth for
+  styling — tokens only, no chart library (the convergence chart is hand-rolled
+  SVG), canvas density viewport.
+
+## Backend
+
+Needs the `[web]` extra (fastapi + uvicorn). From the repo root:
 
 ```bash
 # one-time, into the project venv (uses uv):
-VIRTUAL_ENV=.venv uv pip install fastapi "uvicorn[standard]"
+VIRTUAL_ENV=.venv uv pip install -e ".[web]"
 # start the API on :8000
 .venv/bin/python -m uvicorn server.app:app --reload --port 8000
 ```
 
-**2. Frontend** (Vite dev server on :5173, proxies `/api` → :8000):
+The server exposes:
+
+- `GET /api/benchmarks` — list bundled benchmark problems.
+- `GET /api/benchmarks/{id}/config` — default config for a benchmark.
+- `POST /api/runs` — start a run (body: full run config; over-cap → HTTP 400).
+- `GET /api/runs` — run history (most recent first).
+- `GET /api/runs/{id}` — run detail + metrics.
+- `WS /api/runs/{id}/stream` — live per-iteration frames.
+- `GET /api/runs/{id}/export` — export final geometry (svg / dxf / stl).
+- `GET /api/health` — liveness probe.
+
+## Frontend
 
 ```bash
 cd web
-npm install      # one-time
+npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — select a benchmark, hit **Run optimization**, watch it converge.
+The dev server runs on :5173 and proxies `/api` to the backend on :8000.
 
 ## Verify without a browser
 
@@ -37,18 +69,5 @@ Open http://localhost:5173 — select a benchmark, hit **Run optimization**, wat
 cd web && npm run build                # tsc --noEmit + vite production build
 ```
 
-## What's wired
-
-- `GET /api/benchmarks` — runnable benchmarks (recommended first; large meshes excluded).
-- `POST /api/runs {benchmark_id, preset?}` — starts a run in a worker thread.
-- `WS /api/runs/{id}/stream` — `iteration` frames (density + metrics) → `done` (summary + verification).
-- `GET /api/runs/{id}` — final summary + verification + density.
-
-The only engine change is an optional `on_iteration` callback in `core/simp.py` (default-off, CLI
-path unchanged). Density frames mirror the engine's PNG colormap and orientation so the live view
-matches the saved `density.png`.
-
-## Not yet (future milestones)
-
-Custom problem definition (loads/BCs/mesh editor), geometry export buttons (SVG/DXF/STL), study /
-Pareto UI, run history. Reliability is "good enough" for a single local user, single in-flight run.
+The smoke script exercises the REST + WebSocket path end-to-end in-process — no
+browser required.
