@@ -8,8 +8,13 @@
 
 ## 演示
 
-引擎在优化过程中输出的密度场收敛动画（一个 cantilever 候选）。工作台视口实时流式渲染的
-是同一份密度场、同一套配色 —— 这张 GIF 就是工作台里"实时看收敛"那一步的引擎产物：
+工作台界面（一个跑完并验证通过的 cantilever 候选）：左侧视口是收敛后的密度场，右栏自上而下
+是问题定义、实时指标、`Verified` 验证徽章、收敛曲线、历史记录：
+
+![StructureOptimizer 工作台界面](docs/assets/workbench-ui.png)
+
+引擎在优化过程中输出的密度场收敛动画。工作台视口实时流式渲染的是同一份密度场、同一套配色
+—— 这段 GIF 就是上图"实时看收敛"那一步逐迭代的样子：
 
 ![密度场收敛](docs/assets/workbench-convergence-cantilever.gif)
 
