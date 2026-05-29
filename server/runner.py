@@ -45,6 +45,13 @@ class RunState:
     run_dir: Path | None = None
     error: str | None = None
     thread: threading.Thread | None = None
+    # The frame queue is a single destructive stream with exactly one SENTINEL,
+    # so only one WebSocket may drain it. These flags let the stream endpoint
+    # reject a second concurrent consumer (which would steal frames and then
+    # block forever on the already-consumed SENTINEL) and a late consumer
+    # connecting after the stream is finished.
+    streaming: bool = False
+    stream_done: bool = False
 
 
 class RunManager:

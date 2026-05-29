@@ -220,15 +220,31 @@ async def stream_run(websocket: WebSocket, run_id: str) -> None:
         await websocket.close()
         return
 
+    # A run's frame queue is a single destructive stream with one SENTINEL, so it
+    # supports exactly one consumer. Reject a second concurrent consumer (two tabs,
+    # a StrictMode double-mount, a reconnect race) or a late one connecting after
+    # the stream finished — either would otherwise steal frames or block forever on
+    # the missing SENTINEL, leaking a thread + socket. The check/set pair has no
+    # await between it, so it is atomic on the event loop.
+    if state.streaming or state.stream_done:
+        await websocket.send_json(
+            {"type": "error", "message": "Run stream is unavailable; fetch the result via GET /api/runs/{id}"}
+        )
+        await websocket.close()
+        return
+    state.streaming = True
+
     try:
         while True:
             frame = await asyncio.to_thread(state.frames.get)
             if frame is SENTINEL:
+                state.stream_done = True
                 break
             await websocket.send_json(frame)
     except WebSocketDisconnect:
         return
     finally:
+        state.streaming = False
         with contextlib.suppress(RuntimeError):
             await websocket.close()
 
@@ -244,14 +260,21 @@ def get_run(run_id: str) -> RunResult:
     if state.status == "error":
         raise HTTPException(status_code=500, detail=state.error or "Run failed")
 
-    summary: dict[str, Any] = read_json(state.run_dir / "summary.json")
-    # verification + metrics are optional artifacts: a reopened run with a
-    # missing/partial file degrades to {}/[] rather than 500-ing the panel.
+    # summary.json + density.npy are the essential artifacts; a partially-written
+    # or pruned run dir that lacks them is "incomplete" -> a deliberate 409 rather
+    # than an unhandled 500 with a stack trace.
+    try:
+        summary: dict[str, Any] = read_json(state.run_dir / "summary.json")
+        density = load_density(state.run_dir)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail="Run artifacts are incomplete") from exc
+    shape, density_b64 = encode_density(density, state.nelx, state.nely)
+    # verification + metrics are optional: a reopened run with a missing/partial
+    # file degrades to {}/[] rather than failing the whole panel.
     try:
         verification = read_json(state.run_dir / "verification.json")
     except (FileNotFoundError, ValueError):
         verification = {}
-    shape, density_b64 = encode_density(load_density(state.run_dir), state.nelx, state.nely)
     try:
         metrics = [MetricPoint(**row) for row in load_metrics(state.run_dir)]
     except (TypeError, ValueError):
