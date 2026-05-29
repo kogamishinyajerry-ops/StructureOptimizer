@@ -62,15 +62,27 @@ def main() -> int:
     print(f"GET /api/runs/{run_id}: status={result['status']} density-cross-check=OK")
 
     # Geometry export — all three formats download non-empty attachments.
+    # (svg/dxf carry a prepended provenance comment, so the format sentinel is no
+    # longer at byte 0 — check the whole body.)
     for fmt, sentinel in (("svg", b"<svg"), ("dxf", b"SECTION"), ("stl", b"solid")):
         resp = client.get(f"/api/runs/{run_id}/export", params={"format": fmt})
         assert resp.status_code == 200, f"{fmt} export -> {resp.status_code}"
         body = resp.content
         assert len(body) > 0, f"{fmt} export empty"
-        assert sentinel in body[:64], f"{fmt} export missing {sentinel!r}"
+        assert sentinel in body, f"{fmt} export missing {sentinel!r}"
         cd = resp.headers.get("content-disposition", "")
         assert "attachment" in cd and f".{fmt}" in cd, f"{fmt} bad disposition: {cd}"
         print(f"export {fmt}: {len(body)} bytes, {cd}")
+
+    # Provenance/disclaimer header is embedded in the text formats (svg comment,
+    # dxf 999 group codes); STL carries provenance via the filename only.
+    svg_body = client.get(f"/api/runs/{run_id}/export", params={"format": "svg"}).content
+    dxf_body = client.get(f"/api/runs/{run_id}/export", params={"format": "dxf"}).content
+    assert b"NOT a certified result" in svg_body, "svg missing disclaimer"
+    assert b"<!--" in svg_body and b"input_hash" in svg_body, "svg missing provenance comment"
+    assert b"NOT a certified result" in dxf_body, "dxf missing disclaimer"
+    assert b"999" in dxf_body, "dxf missing 999 comment group code"
+    print("export provenance: svg+dxf carry disclaimer + input_hash")
 
     bad = client.get(f"/api/runs/{run_id}/export", params={"format": "obj"})
     assert bad.status_code == 400, f"bad format should 400, got {bad.status_code}"
