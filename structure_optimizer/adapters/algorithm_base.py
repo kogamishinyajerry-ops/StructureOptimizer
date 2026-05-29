@@ -27,10 +27,20 @@ Contract:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+
+import numpy as np
 
 from structure_optimizer.core.config import BenchmarkConfig
 from structure_optimizer.core.mesh import StructuredMesh
-from structure_optimizer.core.simp import OptimizationResult
+from structure_optimizer.core.simp import IterationMetric, OptimizationResult
+
+IterationCallback = Callable[[int, IterationMetric, "np.ndarray"], None]
+"""Observational per-iteration hook ``(iteration, IterationMetric, densities)``.
+
+Used by the web runner to stream live convergence. ``None`` (the default
+everywhere, including the CLI path) leaves behaviour unchanged.
+"""
 
 
 class TopologyAlgorithm(ABC):
@@ -39,11 +49,19 @@ class TopologyAlgorithm(ABC):
     name: str = "abstract"
 
     @abstractmethod
-    def run(self, config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResult:
+    def run(
+        self,
+        config: BenchmarkConfig,
+        mesh: StructuredMesh,
+        on_iteration: IterationCallback | None = None,
+    ) -> OptimizationResult:
         """Run the algorithm to convergence (or max_iterations).
 
         Implementations may use ``config.optimization.algorithm`` is one of the
         registered keys; the dispatcher already routed here, so no double-check.
+
+        ``on_iteration`` is an optional observational callback for live progress
+        streaming; ``None`` preserves the original behaviour.
         """
 
 
@@ -52,10 +70,15 @@ class SimpAlgorithm(TopologyAlgorithm):
 
     name = "simp"
 
-    def run(self, config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResult:
+    def run(
+        self,
+        config: BenchmarkConfig,
+        mesh: StructuredMesh,
+        on_iteration: IterationCallback | None = None,
+    ) -> OptimizationResult:
         from structure_optimizer.core.simp import run_simp
 
-        return run_simp(config, mesh)
+        return run_simp(config, mesh, on_iteration=on_iteration)
 
 
 class BesoAlgorithm(TopologyAlgorithm):
@@ -63,9 +86,16 @@ class BesoAlgorithm(TopologyAlgorithm):
 
     name = "beso"
 
-    def run(self, config: BenchmarkConfig, mesh: StructuredMesh) -> OptimizationResult:
+    def run(
+        self,
+        config: BenchmarkConfig,
+        mesh: StructuredMesh,
+        on_iteration: IterationCallback | None = None,
+    ) -> OptimizationResult:
         from structure_optimizer.core.beso import run_beso
 
+        # BESO does not yet support live streaming; the callback is accepted for
+        # signature parity with the plug-in contract and ignored.
         return run_beso(config, mesh)
 
 
