@@ -60,6 +60,21 @@ def main() -> int:
     api_final = np.frombuffer(base64.b64decode(result["density_b64"]), dtype=np.uint8)
     assert np.array_equal(ws_final, api_final), "WS done density != GET density"
     print(f"GET /api/runs/{run_id}: status={result['status']} density-cross-check=OK")
+
+    # Geometry export — all three formats download non-empty attachments.
+    for fmt, sentinel in (("svg", b"<svg"), ("dxf", b"SECTION"), ("stl", b"solid")):
+        resp = client.get(f"/api/runs/{run_id}/export", params={"format": fmt})
+        assert resp.status_code == 200, f"{fmt} export -> {resp.status_code}"
+        body = resp.content
+        assert len(body) > 0, f"{fmt} export empty"
+        assert sentinel in body[:64], f"{fmt} export missing {sentinel!r}"
+        cd = resp.headers.get("content-disposition", "")
+        assert "attachment" in cd and f".{fmt}" in cd, f"{fmt} bad disposition: {cd}"
+        print(f"export {fmt}: {len(body)} bytes, {cd}")
+
+    bad = client.get(f"/api/runs/{run_id}/export", params={"format": "obj"})
+    assert bad.status_code == 400, f"bad format should 400, got {bad.status_code}"
+
     print("SMOKE OK")
     return 0
 

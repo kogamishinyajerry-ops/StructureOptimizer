@@ -14,7 +14,7 @@ import asyncio
 import contextlib
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from structure_optimizer.benchmarks.registry import (
     available_benchmarks,
@@ -23,6 +23,7 @@ from structure_optimizer.benchmarks.registry import (
 )
 from structure_optimizer.core.run_store import load_density, read_json
 
+from server.export import EXPORT_FORMATS, export_geometry
 from server.frames import encode_density
 from server.runner import SENTINEL, RunManager
 from server.schemas import (
@@ -168,6 +169,34 @@ def get_run(run_id: str) -> RunResult:
         verification=verification,
         shape=shape,
         density_b64=density_b64,
+    )
+
+
+@app.get("/api/runs/{run_id}/export")
+def export_run(
+    run_id: str,
+    fmt: str = Query("svg", alias="format"),
+    threshold: float = Query(0.5, ge=0.0, le=1.0),
+    extrusion_depth: float = Query(1.0, gt=0.0),
+) -> Response:
+    """Download the run's optimized geometry as SVG / DXF / STL (attachment)."""
+    if fmt not in EXPORT_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Unknown format '{fmt}' (choose svg/dxf/stl)")
+    state = manager.get(run_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail=f"Unknown run '{run_id}'")
+    if state.status != "done" or state.run_dir is None:
+        raise HTTPException(status_code=409, detail="Run not finished")
+
+    try:
+        data, filename, mime = export_geometry(state.run_dir, fmt, threshold, extrusion_depth)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return Response(
+        content=data,
+        media_type=mime,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

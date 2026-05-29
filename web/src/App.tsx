@@ -6,6 +6,7 @@ import { BenchmarkPicker } from "./components/BenchmarkPicker";
 import { RunControls } from "./components/RunControls";
 import { ConvergenceChart } from "./components/ConvergenceChart";
 import { RunStatus } from "./components/RunStatus";
+import { ExportBar } from "./components/ExportBar";
 import { DensityViewport } from "./viewport/DensityViewport";
 import "./App.css";
 
@@ -95,6 +96,7 @@ export function App() {
 
         <aside className="app-sidebar">
           <RunStatus snap={snap} />
+          {snap.status === "done" && snap.runId && <ExportBar runId={snap.runId} />}
           <div className="app-chart-slot">
             <ConvergenceChart iterations={snap.iterations} />
           </div>

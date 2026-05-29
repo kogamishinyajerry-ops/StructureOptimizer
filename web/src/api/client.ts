@@ -27,3 +27,27 @@ export function streamUrl(run_id: string): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/api/runs/${run_id}/stream`;
 }
+
+export type ExportFormat = "svg" | "dxf" | "stl";
+
+/** Download a run's optimized geometry. Triggers a browser file download. */
+export async function downloadExport(run_id: string, format: ExportFormat): Promise<void> {
+  const res = await fetch(`${BASE}/api/runs/${run_id}/export?format=${format}`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`${res.status}: ${detail}`);
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get("content-disposition") ?? "";
+  const match = cd.match(/filename="([^"]+)"/);
+  const filename = match?.[1] ?? `geometry.${format}`;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
