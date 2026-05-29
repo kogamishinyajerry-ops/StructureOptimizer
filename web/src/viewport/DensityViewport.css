@@ -1,0 +1,81 @@
+.viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-lg);
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background-image:
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: center;
+}
+
+.viewport.is-running {
+  border-color: var(--accent-ring);
+  transition: border-color var(--dur) var(--ease-out);
+}
+
+.viewport-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  animation: viewport-fade var(--dur-slow) var(--ease-out);
+}
+
+@keyframes viewport-fade {
+  from {
+    opacity: 0;
+    transform: scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.viewport-empty {
+  max-width: 320px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  padding: var(--space-6);
+}
+
+.viewport-empty-glyph {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto var(--space-4);
+  border-radius: var(--radius);
+  border: 1.5px dashed var(--border-strong);
+  background: var(--accent-soft);
+}
+
+.viewport-scanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--accent-soft) 50%,
+    transparent 100%
+  );
+  background-size: 100% 40%;
+  background-repeat: no-repeat;
+  animation: scan 1.8s var(--ease-in-out) infinite;
+  opacity: 0.5;
+}
+
+@keyframes scan {
+  0% {
+    background-position: 0 -40%;
+  }
+  100% {
+    background-position: 0 140%;
+  }
+}

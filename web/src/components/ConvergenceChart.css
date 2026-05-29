@@ -1,0 +1,101 @@
+.convergence {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.convergence__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.convergence__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.convergence__plot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.convergence__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 1;
+  overflow: visible;
+}
+
+.convergence__grid {
+  stroke: var(--border-subtle);
+  stroke-width: 0.5;
+}
+
+.convergence__base {
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+
+.convergence__area {
+  fill: var(--accent-soft);
+  stroke: none;
+}
+
+.convergence__volume {
+  fill: none;
+  stroke: var(--text-tertiary);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.55;
+}
+
+.convergence__line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.convergence__dot {
+  fill: var(--accent-hover);
+  transition: cx var(--dur) var(--ease-out), cy var(--dur) var(--ease-out);
+}
+
+.convergence__axis {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.convergence__tick,
+.convergence__range {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.convergence__range {
+  margin-inline: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .convergence__dot {
+    transition: none;
+  }
+}
