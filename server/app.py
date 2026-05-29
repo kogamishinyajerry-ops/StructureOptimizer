@@ -21,13 +21,26 @@ from structure_optimizer.benchmarks.registry import (
     config_path,
     load_benchmark,
 )
+from structure_optimizer.core.config import ConfigError
 from structure_optimizer.core.run_store import load_density, read_json
 
 from server.export import EXPORT_FORMATS, export_geometry
 from server.frames import encode_density
+from server.overrides import (
+    ELEMENTS_MAX,
+    MAX_ITERATIONS_MAX,
+    NELX_MAX,
+    NELY_MAX,
+    VALID_SELECTORS,
+)
 from server.runner import SENTINEL, RunManager
 from server.schemas import (
+    BenchmarkConfigEditable,
     BenchmarkSummary,
+    EditableLimits,
+    EditableLoad,
+    MeshOverride,
+    OptimizationOverride,
     RunResult,
     StartRunRequest,
     StartRunResponse,
@@ -107,14 +120,48 @@ def list_benchmarks() -> list[BenchmarkSummary]:
     return summaries
 
 
+@app.get("/api/benchmarks/{benchmark_id}/config", response_model=BenchmarkConfigEditable)
+def get_benchmark_config(benchmark_id: str) -> BenchmarkConfigEditable:
+    """Return the editable problem-definition state for the editor's initial form."""
+    if benchmark_id in _EXCLUDED or benchmark_id not in available_benchmarks():
+        raise HTTPException(status_code=404, detail=f"Unknown benchmark '{benchmark_id}'")
+    cfg = load_benchmark(benchmark_id)
+    loads_editable = not cfg.load_cases
+    loads = (
+        [EditableLoad(selector=ld["selector"], fx=float(ld.get("fx", 0.0)), fy=float(ld.get("fy", 0.0))) for ld in cfg.loads]
+        if loads_editable
+        else []
+    )
+    return BenchmarkConfigEditable(
+        benchmark_id=benchmark_id,
+        optimization=OptimizationOverride(
+            volume_fraction=cfg.optimization.volume_fraction,
+            penalty=cfg.optimization.penalty,
+            filter_radius=cfg.optimization.filter_radius,
+            max_iterations=cfg.optimization.max_iterations,
+        ),
+        mesh=MeshOverride(nelx=cfg.mesh.nelx, nely=cfg.mesh.nely),
+        loads=loads,
+        loads_editable=loads_editable,
+        selectors=list(VALID_SELECTORS),
+        limits=EditableLimits(
+            nelx_max=NELX_MAX,
+            nely_max=NELY_MAX,
+            elements_max=ELEMENTS_MAX,
+            max_iterations_max=MAX_ITERATIONS_MAX,
+        ),
+    )
+
+
 @app.post("/api/runs", response_model=StartRunResponse)
 def start_run(req: StartRunRequest) -> StartRunResponse:
     """Start an optimization run in a worker thread; returns its id immediately."""
     if req.benchmark_id in _EXCLUDED or req.benchmark_id not in available_benchmarks():
         raise HTTPException(status_code=404, detail=f"Unknown benchmark '{req.benchmark_id}'")
+    overrides = req.overrides.model_dump(exclude_none=True) if req.overrides is not None else None
     try:
-        state = manager.start(req.benchmark_id, req.preset)
-    except Exception as exc:
+        state = manager.start(req.benchmark_id, req.preset, overrides)
+    except (ValueError, ConfigError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return StartRunResponse(
         run_id=state.run_id,

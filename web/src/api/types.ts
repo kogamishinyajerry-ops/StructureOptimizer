@@ -49,6 +49,45 @@ export interface ErrorFrame {
 
 export type StreamFrame = IterationFrame | DoneFrame | ErrorFrame;
 
+// ---- M3: problem-definition editor (mirrors server/overrides.py contract) ----
+
+export interface EditableLoad {
+  selector: string;
+  fx: number;
+  fy: number;
+}
+
+export interface BenchmarkConfigEditable {
+  benchmark_id: string;
+  optimization: {
+    volume_fraction: number;
+    penalty: number;
+    filter_radius: number;
+    max_iterations: number;
+  };
+  mesh: { nelx: number; nely: number };
+  loads: EditableLoad[];
+  loads_editable: boolean;
+  selectors: string[];
+  limits: {
+    nelx_max: number;
+    nely_max: number;
+    elements_max: number;
+    max_iterations_max: number;
+  };
+}
+
+export interface RunOverrides {
+  optimization?: {
+    volume_fraction: number;
+    penalty: number;
+    filter_radius: number;
+    max_iterations: number;
+  };
+  mesh?: { nelx: number; nely: number };
+  loads?: EditableLoad[];
+}
+
 /** Decode a base64 uint8 density payload into a Float32Array in [0,1]. */
 export function decodeDensity(b64: string): Float32Array {
   const bin = atob(b64);

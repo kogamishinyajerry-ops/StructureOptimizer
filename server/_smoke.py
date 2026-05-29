@@ -75,6 +75,77 @@ def main() -> int:
     bad = client.get(f"/api/runs/{run_id}/export", params={"format": "obj"})
     assert bad.status_code == 400, f"bad format should 400, got {bad.status_code}"
 
+    # ---- Milestone 3: problem-definition editor (config + override path) -----
+    cfg = client.get("/api/benchmarks/cantilever/config")
+    assert cfg.status_code == 200, f"config -> {cfg.status_code}"
+    cfg_body = cfg.json()
+    for key in ("benchmark_id", "optimization", "mesh", "loads", "loads_editable", "selectors", "limits"):
+        assert key in cfg_body, f"config missing '{key}'"
+    assert cfg_body["benchmark_id"] == "cantilever"
+    assert cfg_body["loads_editable"] is True, "cantilever should be loads_editable"
+    assert len(cfg_body["selectors"]) == 13, f"expected 13 selectors, got {len(cfg_body['selectors'])}"
+    assert cfg_body["limits"] == {
+        "nelx_max": 160,
+        "nely_max": 160,
+        "elements_max": 12000,
+        "max_iterations_max": 200,
+    }, cfg_body["limits"]
+    print(
+        f"config cantilever: opt.vf={cfg_body['optimization']['volume_fraction']} "
+        f"mesh={cfg_body['mesh']['nelx']}x{cfg_body['mesh']['nely']} loads={len(cfg_body['loads'])}"
+    )
+
+    over = {
+        "benchmark_id": "cantilever",
+        "overrides": {
+            "optimization": {
+                "volume_fraction": 0.3,
+                "penalty": 3.0,
+                "filter_radius": 1.5,
+                "max_iterations": 12,
+            },
+            "mesh": {"nelx": 40, "nely": 20},
+        },
+    }
+    ostart = client.post("/api/runs", json=over)
+    assert ostart.status_code == 200, f"override run -> {ostart.status_code}: {ostart.text}"
+    ostart_body = ostart.json()
+    assert ostart_body["nelx"] == 40 and ostart_body["nely"] == 20, (
+        f"override dims {ostart_body['nelx']}x{ostart_body['nely']} != 40x20"
+    )
+    orun_id = ostart_body["run_id"]
+    print(f"override run {orun_id} dims={ostart_body['nelx']}x{ostart_body['nely']}")
+
+    odone = None
+    with client.websocket_connect(f"/api/runs/{orun_id}/stream") as ws:
+        while True:
+            frame = ws.receive_json()
+            if frame["type"] == "iteration":
+                assert frame["shape"] == [20, 40], frame["shape"]
+            elif frame["type"] == "done":
+                odone = frame
+                break
+            elif frame["type"] == "error":
+                print("ERROR frame (override run):", frame["message"])
+                return 1
+    assert odone is not None, "override run no done frame"
+    print(f"override run streamed to done: stop_reason={odone['stop_reason']}")
+
+    bad_vf = client.post(
+        "/api/runs",
+        json={"benchmark_id": "cantilever", "overrides": {"optimization": {
+            "volume_fraction": 1.5, "penalty": 3.0, "filter_radius": 1.5, "max_iterations": 12}}},
+    )
+    assert bad_vf.status_code == 400, f"invalid volume_fraction should 400, got {bad_vf.status_code}"
+    print(f"invalid volume_fraction -> 400: {bad_vf.json()['detail']}")
+
+    over_cap = client.post(
+        "/api/runs",
+        json={"benchmark_id": "cantilever", "overrides": {"mesh": {"nelx": 9999, "nely": 20}}},
+    )
+    assert over_cap.status_code == 400, f"over-cap mesh should 400, got {over_cap.status_code}"
+    print(f"over-cap mesh -> 400: {over_cap.json()['detail']}")
+
     print("SMOKE OK")
     return 0
 

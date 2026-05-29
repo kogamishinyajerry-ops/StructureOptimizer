@@ -25,9 +25,38 @@ class BenchmarkSummary(BaseModel):
     recommended: bool = False
 
 
+class EditableLoad(BaseModel):
+    """One point load the editor can tweak (selector + 2D force components)."""
+
+    selector: str
+    fx: float
+    fy: float
+
+
+class OptimizationOverride(BaseModel):
+    volume_fraction: float
+    penalty: float
+    filter_radius: float
+    max_iterations: int
+
+
+class MeshOverride(BaseModel):
+    nelx: int
+    nely: int
+
+
+class RunOverrides(BaseModel):
+    """Optional edits applied on top of a benchmark before a run (M3)."""
+
+    optimization: OptimizationOverride | None = None
+    mesh: MeshOverride | None = None
+    loads: list[EditableLoad] | None = None
+
+
 class StartRunRequest(BaseModel):
     benchmark_id: str
     preset: str | None = None
+    overrides: RunOverrides | None = None
 
 
 class StartRunResponse(BaseModel):
@@ -35,6 +64,25 @@ class StartRunResponse(BaseModel):
     benchmark_id: str
     nelx: int
     nely: int
+
+
+class EditableLimits(BaseModel):
+    nelx_max: int
+    nely_max: int
+    elements_max: int
+    max_iterations_max: int
+
+
+class BenchmarkConfigEditable(BaseModel):
+    """``GET /api/benchmarks/{id}/config`` — the editor's initial form state."""
+
+    benchmark_id: str
+    optimization: OptimizationOverride
+    mesh: MeshOverride
+    loads: list[EditableLoad] = Field(default_factory=list)
+    loads_editable: bool
+    selectors: list[str]
+    limits: EditableLimits
 
 
 # ---- WebSocket frame envelopes (discriminated on ``type``) -------------------

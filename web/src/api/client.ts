@@ -1,4 +1,9 @@
-import type { BenchmarkSummary, StartRunResponse } from "./types";
+import type {
+  BenchmarkConfigEditable,
+  BenchmarkSummary,
+  RunOverrides,
+  StartRunResponse,
+} from "./types";
 
 const BASE = ""; // same-origin; Vite proxies /api to the backend in dev.
 
@@ -14,11 +19,19 @@ export function fetchBenchmarks(): Promise<BenchmarkSummary[]> {
   return fetch(`${BASE}/api/benchmarks`).then(json<BenchmarkSummary[]>);
 }
 
-export function startRun(benchmark_id: string, preset?: string): Promise<StartRunResponse> {
+export function fetchBenchmarkConfig(id: string): Promise<BenchmarkConfigEditable> {
+  return fetch(`${BASE}/api/benchmarks/${id}/config`).then(json<BenchmarkConfigEditable>);
+}
+
+export function startRun(
+  benchmark_id: string,
+  preset?: string,
+  overrides?: RunOverrides,
+): Promise<StartRunResponse> {
   return fetch(`${BASE}/api/runs`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ benchmark_id, preset: preset ?? null }),
+    body: JSON.stringify({ benchmark_id, preset: preset ?? null, ...(overrides ? { overrides } : {}) }),
   }).then(json<StartRunResponse>);
 }
 

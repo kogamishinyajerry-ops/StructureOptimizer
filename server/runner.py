@@ -28,6 +28,7 @@ from structure_optimizer.core.run_store import load_density, read_json
 from structure_optimizer.core.workflow import run_config
 
 from server.frames import encode_density
+from server.overrides import apply_overrides
 
 SENTINEL = object()
 """Pushed onto a run's queue to signal the stream is closed."""
@@ -59,8 +60,15 @@ class RunManager:
         with self._lock:
             return self._runs.get(run_id)
 
-    def start(self, benchmark_id: str, preset: str | None) -> RunState:
-        config = load_benchmark(benchmark_id, preset=preset)
+    def start(
+        self,
+        benchmark_id: str,
+        preset: str | None,
+        overrides: dict[str, Any] | None = None,
+    ) -> RunState:
+        # Apply overrides synchronously so ConfigError/ValueError propagate to
+        # the caller (HTTP 400) instead of surfacing late as a run error frame.
+        config = apply_overrides(load_benchmark(benchmark_id, preset=preset), overrides)
         run_id = uuid.uuid4().hex[:12]
         state = RunState(
             run_id=run_id,

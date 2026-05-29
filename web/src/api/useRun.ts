@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { startRun, streamUrl } from "./client";
-import type { DoneFrame, IterationFrame, StreamFrame } from "./types";
+import type { DoneFrame, IterationFrame, RunOverrides, StreamFrame } from "./types";
 
 export type RunStatus = "idle" | "starting" | "running" | "done" | "error";
 
@@ -53,13 +53,13 @@ export function useRun() {
     setSnap(EMPTY);
   }, []);
 
-  const launch = useCallback(async (benchmarkId: string, preset?: string) => {
+  const launch = useCallback(async (benchmarkId: string, preset?: string, overrides?: RunOverrides) => {
     detach(wsRef.current);
     wsRef.current = null;
     setSnap({ ...EMPTY, status: "starting", benchmarkId });
     let start;
     try {
-      start = await startRun(benchmarkId, preset);
+      start = await startRun(benchmarkId, preset, overrides);
     } catch (e) {
       setSnap({ ...EMPTY, status: "error", benchmarkId, error: (e as Error).message });
       return;
