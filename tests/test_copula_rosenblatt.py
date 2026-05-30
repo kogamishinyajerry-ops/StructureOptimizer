@@ -31,7 +31,7 @@ def _empirical_kendall_tau(x: np.ndarray, y: np.ndarray) -> float:
     n = len(x)
     s = 0.0
     for i in range(n):
-        s += float((np.sign(x[i] - x[i + 1:]) * np.sign(y[i] - y[i + 1:])).sum())
+        s += float((np.sign(x[i] - x[i + 1 :]) * np.sign(y[i] - y[i + 1 :])).sum())
     return 2.0 * s / (n * (n - 1))
 
 

@@ -30,6 +30,7 @@ def _phi(x: float) -> float:
 
 # --- analytical reliability anchor -----------------------------------------
 
+
 def test_form_reliability_matches_closed_form():
     d_nom, d_allow, cov = 0.8, 1.0, 0.15
     res = displacement_reliability(d_nom, d_allow, cov)
@@ -69,6 +70,7 @@ def test_reliability_rejects_bad_inputs():
 
 # --- RBTO driver -----------------------------------------------------------
 
+
 def _smoke():
     config = load_benchmark("cantilever", preset="smoke")
     return config, create_structured_mesh(config)
@@ -79,6 +81,7 @@ def _d_nominal_at(config, mesh, vf: float) -> float:
     from dataclasses import replace
 
     from structure_optimizer.core.simp import run_simp
+
     cfg = replace(config, optimization=replace(config.optimization, volume_fraction=vf))
     return float(run_simp(cfg, mesh).final_analysis.max_displacement)
 
@@ -86,8 +89,7 @@ def _d_nominal_at(config, mesh, vf: float) -> float:
 def test_rbto_meets_target_at_lightest_when_target_trivial():
     config, mesh = _smoke()
     # d_allow huge + beta_target 0 → the lightest vf already satisfies β ≥ 0.
-    res = rbto_simp(config, mesh, d_allow=1e9, beta_target=0.0, load_cov=0.15,
-                    vf_low=0.2, vf_high=0.6, max_iter=4)
+    res = rbto_simp(config, mesh, d_allow=1e9, beta_target=0.0, load_cov=0.15, vf_low=0.2, vf_high=0.6, max_iter=4)
     assert res.feasible
     assert res.beta >= res.beta_target
     assert res.volume_fraction == pytest.approx(0.2, abs=1e-9)
@@ -98,10 +100,12 @@ def test_rbto_higher_target_needs_more_volume():
     # Calibrate d_allow from a mid-vf design so targets are achievable in-bracket.
     d_allow = _d_nominal_at(config, mesh, 0.45) * 1.6  # margin so β>0 is reachable
 
-    low_target = rbto_simp(config, mesh, d_allow=d_allow, beta_target=1.0, load_cov=0.15,
-                           vf_low=0.2, vf_high=0.8, vf_tol=0.05, max_iter=6)
-    high_target = rbto_simp(config, mesh, d_allow=d_allow, beta_target=2.5, load_cov=0.15,
-                            vf_low=0.2, vf_high=0.8, vf_tol=0.05, max_iter=6)
+    low_target = rbto_simp(
+        config, mesh, d_allow=d_allow, beta_target=1.0, load_cov=0.15, vf_low=0.2, vf_high=0.8, vf_tol=0.05, max_iter=6
+    )
+    high_target = rbto_simp(
+        config, mesh, d_allow=d_allow, beta_target=2.5, load_cov=0.15, vf_low=0.2, vf_high=0.8, vf_tol=0.05, max_iter=6
+    )
     assert low_target.feasible and high_target.feasible
     assert low_target.beta >= 1.0 - 1e-9
     assert high_target.beta >= 2.5 - 1e-9
@@ -114,8 +118,7 @@ def test_rbto_infeasible_when_target_unreachable():
     # Allowable barely above the densest displacement → even max material can't
     # reach a large β.
     d_allow = _d_nominal_at(config, mesh, 0.6) * 1.01
-    res = rbto_simp(config, mesh, d_allow=d_allow, beta_target=5.0, load_cov=0.15,
-                    vf_low=0.2, vf_high=0.6, max_iter=3)
+    res = rbto_simp(config, mesh, d_allow=d_allow, beta_target=5.0, load_cov=0.15, vf_low=0.2, vf_high=0.6, max_iter=3)
     assert not res.feasible
     assert res.beta < res.beta_target
 

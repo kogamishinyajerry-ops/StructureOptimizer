@@ -53,9 +53,7 @@ def test_three_objective_delegation_is_bit_identical():
         [{**ld, "fx": ld.get("fy", 0.0), "fy": ld.get("fx", 0.0)} for ld in config.loads],
     ]
     pub = multi_load_case_to(config, mesh, n_generations=GEN, population_size=POP, rng_seed=0)
-    gen = nsga3_density_to(
-        config, mesh, load_cases=default_lc, n_generations=GEN, population_size=POP, rng_seed=0
-    )
+    gen = nsga3_density_to(config, mesh, load_cases=default_lc, n_generations=GEN, population_size=POP, rng_seed=0)
     assert np.array_equal(pub.front_objectives, gen.front_objectives)
     assert np.array_equal(pub.front_densities, gen.front_densities)
     assert np.array_equal(np.array(pub.hv_history), np.array(gen.hv_history))

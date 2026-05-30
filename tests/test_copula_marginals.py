@@ -51,9 +51,11 @@ def test_non_normal_marginal_changes_pf():
     point — the marginal tail genuinely matters (the new quantity the normal path misses)."""
     indep = gumbel_d_copula(2, 1.0)
     pf_w = system_reliability_series_copula_marginals(
-        [Marginal("weibull", 2.0, 3.0), Marginal("normal", 0.0, 1.0)], [2.5, 1.2], indep)
+        [Marginal("weibull", 2.0, 3.0), Marginal("normal", 0.0, 1.0)], [2.5, 1.2], indep
+    )
     pf_n = system_reliability_series_copula_marginals(
-        [Marginal("normal", 0.0, 1.0), Marginal("normal", 0.0, 1.0)], [2.5, 1.2], indep)
+        [Marginal("normal", 0.0, 1.0), Marginal("normal", 0.0, 1.0)], [2.5, 1.2], indep
+    )
     assert abs(pf_w - pf_n) > 1e-3
 
 

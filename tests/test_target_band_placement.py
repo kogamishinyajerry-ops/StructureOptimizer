@@ -75,9 +75,7 @@ def test_target_band_placement_suppresses_peak():
 
     r = target_band_placement(config, mesh, band, alpha=ALPHA, beta=BETA, n_steps=20, p=P)
     # the true worst-case in-band response drops substantially
-    assert r.peak_final < 0.5 * r.peak_initial, (
-        f"weak suppression: {r.peak_initial:.3e} → {r.peak_final:.3e}"
-    )
+    assert r.peak_final < 0.5 * r.peak_initial, f"weak suppression: {r.peak_initial:.3e} → {r.peak_final:.3e}"
 
 
 def test_target_band_placement_preserves_volume():

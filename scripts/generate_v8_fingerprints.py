@@ -52,14 +52,20 @@ def gen_nonlinear_oc() -> None:
     config = load_benchmark("cantilever", preset="smoke")
     mesh = create_structured_mesh(config)
     r = nonlinear_to_oc(config, mesh, n_load_steps=3, max_iter=6)
-    _write("nonlinear_oc_cantilever__smoke", {
-        "benchmark": "cantilever", "preset": "smoke",
-        "rubric_version": "v8.0-wave-UU", "kind": "nonlinear_oc",
-        "n_load_steps": 3, "max_iter": 6,
-        "densities_sha256": _sha256(np.asarray(r.densities)),
-        "compliance_final": float(r.compliance_history[-1]),
-        "converged": bool(r.converged),
-    })
+    _write(
+        "nonlinear_oc_cantilever__smoke",
+        {
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v8.0-wave-UU",
+            "kind": "nonlinear_oc",
+            "n_load_steps": 3,
+            "max_iter": 6,
+            "densities_sha256": _sha256(np.asarray(r.densities)),
+            "compliance_final": float(r.compliance_history[-1]),
+            "converged": bool(r.converged),
+        },
+    )
 
 
 def gen_general_nataf() -> None:
@@ -67,29 +73,36 @@ def gen_general_nataf() -> None:
 
     marginals = [Marginal("weibull", 5.0, 130.0), Marginal("gumbel", 70.0, 12.0)]
     nataf = build_nataf_general(marginals, np.asarray(NATAF_GEN_CORR))
-    _write("general_nataf_weibull_gumbel", {
-        "benchmark": "weibull_gumbel_pair",
-        "rubric_version": "v8.0-wave-XX", "kind": "general_nataf",
-        "correlation_x": NATAF_GEN_CORR,
-        "correlation_u_sha256": _sha256(np.asarray(nataf.correlation_u)),
-        "rho_u_01": float(nataf.correlation_u[0, 1]),
-    })
+    _write(
+        "general_nataf_weibull_gumbel",
+        {
+            "benchmark": "weibull_gumbel_pair",
+            "rubric_version": "v8.0-wave-XX",
+            "kind": "general_nataf",
+            "correlation_x": NATAF_GEN_CORR,
+            "correlation_u_sha256": _sha256(np.asarray(nataf.correlation_u)),
+            "rho_u_01": float(nataf.correlation_u[0, 1]),
+        },
+    )
 
 
 def gen_system_reliability() -> None:
     from structure_optimizer.core.reliability import system_reliability_series
 
     r = system_reliability_series(SERIES_BETAS)
-    bounds = np.array([r["p_failure_lower"], r["p_failure_upper"],
-                       r["simple_lower"], r["simple_upper"]])
-    _write("system_reliability_series", {
-        "benchmark": "series_system",
-        "rubric_version": "v8.0-wave-ZZ", "kind": "system_reliability",
-        "betas": SERIES_BETAS,
-        "bounds_sha256": _sha256(bounds),
-        "p_failure_lower": float(r["p_failure_lower"]),
-        "p_failure_upper": float(r["p_failure_upper"]),
-    })
+    bounds = np.array([r["p_failure_lower"], r["p_failure_upper"], r["simple_lower"], r["simple_upper"]])
+    _write(
+        "system_reliability_series",
+        {
+            "benchmark": "series_system",
+            "rubric_version": "v8.0-wave-ZZ",
+            "kind": "system_reliability",
+            "betas": SERIES_BETAS,
+            "bounds_sha256": _sha256(bounds),
+            "p_failure_lower": float(r["p_failure_lower"]),
+            "p_failure_upper": float(r["p_failure_upper"]),
+        },
+    )
 
 
 def gen_fibre_steering() -> None:
@@ -98,16 +111,25 @@ def gen_fibre_steering() -> None:
     config, _k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
     mesh = create_structured_mesh(config)
     rho = np.full(mesh.elements.shape[0], 1.0)
-    r = fibre_steering_thermal_to(config, mesh, rho, 5.0, 1.0, n_steps=10, step=0.3,
-                                  heat_sources=sources, thermal_bcs=bcs)
-    _write("fibre_steering_heat_sink__smoke", {
-        "benchmark": "heat_sink", "preset": "smoke",
-        "rubric_version": "v8.0-wave-YY", "kind": "fibre_steering",
-        "kxx": 5.0, "kyy": 1.0, "n_steps": 10, "step": 0.3,
-        "angles_sha256": _sha256(np.asarray(r.angles)),
-        "compliance_initial": float(r.compliance_history[0]),
-        "compliance_final": float(r.compliance_history[-1]),
-    })
+    r = fibre_steering_thermal_to(
+        config, mesh, rho, 5.0, 1.0, n_steps=10, step=0.3, heat_sources=sources, thermal_bcs=bcs
+    )
+    _write(
+        "fibre_steering_heat_sink__smoke",
+        {
+            "benchmark": "heat_sink",
+            "preset": "smoke",
+            "rubric_version": "v8.0-wave-YY",
+            "kind": "fibre_steering",
+            "kxx": 5.0,
+            "kyy": 1.0,
+            "n_steps": 10,
+            "step": 0.3,
+            "angles_sha256": _sha256(np.asarray(r.angles)),
+            "compliance_initial": float(r.compliance_history[0]),
+            "compliance_final": float(r.compliance_history[-1]),
+        },
+    )
 
 
 def gen_holed_cap() -> None:
@@ -115,13 +137,17 @@ def gen_holed_cap() -> None:
 
     pts, tris = triangulate_with_holes(HOLE_OUTER, [HOLE_INNER])
     area = sum(_tri_area(pts[i], pts[j], pts[k]) for i, j, k in tris)
-    _write("holed_cap_rect", {
-        "benchmark": "rect_with_rect_hole",
-        "rubric_version": "v8.0-wave-AAA", "kind": "holed_cap",
-        "vertices_sha256": _sha256(np.asarray(pts)),
-        "n_triangles": len(tris),
-        "cross_section_area": float(area),
-    })
+    _write(
+        "holed_cap_rect",
+        {
+            "benchmark": "rect_with_rect_hole",
+            "rubric_version": "v8.0-wave-AAA",
+            "kind": "holed_cap",
+            "vertices_sha256": _sha256(np.asarray(pts)),
+            "n_triangles": len(tris),
+            "cross_section_area": float(area),
+        },
+    )
 
 
 def main() -> None:

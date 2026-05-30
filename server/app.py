@@ -130,7 +130,10 @@ def get_benchmark_config(benchmark_id: str) -> BenchmarkConfigEditable:
     cfg = load_benchmark(benchmark_id)
     loads_editable = not cfg.load_cases
     loads = (
-        [EditableLoad(selector=ld["selector"], fx=float(ld.get("fx", 0.0)), fy=float(ld.get("fy", 0.0))) for ld in cfg.loads]
+        [
+            EditableLoad(selector=ld["selector"], fx=float(ld.get("fx", 0.0)), fy=float(ld.get("fy", 0.0)))
+            for ld in cfg.loads
+        ]
         if loads_editable
         else []
     )

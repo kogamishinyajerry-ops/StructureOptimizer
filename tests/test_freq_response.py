@@ -98,7 +98,6 @@ def test_frequency_sweep_marks_resonance_invalid_or_finite(vibrating_beam_smoke)
 def test_property_frequency_response_linear_in_load(vibrating_beam_smoke):
     """At fixed ω, doubling the load amplitude doubles the displacement
     (linear PDE)."""
-    from copy import deepcopy
 
     config, mesh = vibrating_beam_smoke
     densities = np.full(mesh.elements.shape[0], 1.0)

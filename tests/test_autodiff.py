@@ -9,7 +9,6 @@ from structure_optimizer.core.autodiff import (
     gradient_check,
 )
 
-
 # ---------------------------------------------------------------------------
 # Central-difference gradient check
 # ---------------------------------------------------------------------------

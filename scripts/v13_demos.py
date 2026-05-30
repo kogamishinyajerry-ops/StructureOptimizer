@@ -21,9 +21,11 @@ def _html(title: str, body: str) -> str:
 
 
 def _write(out_path: Path, title: str, rows: dict) -> dict:
-    body = "<table border=1 cellpadding=4>" + "".join(
-        f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in rows.items()
-    ) + "</table>"
+    body = (
+        "<table border=1 cellpadding=4>"
+        + "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in rows.items())
+        + "</table>"
+    )
     out_path.write_text(_html(title, body))
     return rows
 
@@ -36,9 +38,13 @@ def buckling_constrained_demo(out_path: str | Path, benchmark: str = "cantilever
     mesh = create_structured_mesh(config)
     r = buckling_constrained_mma(config, mesh, lambda_safety=8.0, max_iter=10)
     return _write(
-        Path(out_path), "D090 buckling-constrained MMA",
-        {"lambda_initial": f"{r.lambda_history[0]:.3f}", "lambda_final": f"{r.lambda_history[-1]:.3f}",
-         "lambda_safety": "8.000"},
+        Path(out_path),
+        "D090 buckling-constrained MMA",
+        {
+            "lambda_initial": f"{r.lambda_history[0]:.3f}",
+            "lambda_final": f"{r.lambda_history[-1]:.3f}",
+            "lambda_safety": "8.000",
+        },
     )
 
 
@@ -48,7 +54,8 @@ def bandwidth_adaptive_demo(out_path: str | Path) -> dict:
 
     omega = 1000.0
     return _write(
-        Path(out_path), "D091 half-power bandwidth-adaptive window",
+        Path(out_path),
+        "D091 half-power bandwidth-adaptive window",
         {f"beta={b:g}": f"{half_power_relative_bandwidth(omega, beta=b):.5f}" for b in (5e-7, 2e-6, 8e-6)},
     )
 
@@ -68,7 +75,8 @@ def extent_demo(out_path: str | Path) -> dict:
     scaled = spread.copy()
     scaled[:, 0] *= 1000.0
     return _write(
-        Path(out_path), "D092 extent + range-adaptive R2",
+        Path(out_path),
+        "D092 extent + range-adaptive R2",
         {
             "extent_spread": f"{extent_indicator(spread):.4f}",
             "extent_two_extreme": f"{extent_indicator(two_extreme):.4f}",
@@ -91,9 +99,13 @@ def gumbel_d_demo(out_path: str | Path) -> dict:
     g = gumbel_d_copula(3, 2.2)
     u = [0.3, 0.5, 0.7]
     return _write(
-        Path(out_path), "D093 d-dim exchangeable Gumbel copula",
-        {"cdf": f"{g.cdf(u):.6f}", "conditional_cdf": f"{g.conditional_cdf(u):.6f}",
-         "kendall_tau": f"{g.kendall_tau():.6f}"},
+        Path(out_path),
+        "D093 d-dim exchangeable Gumbel copula",
+        {
+            "cdf": f"{g.cdf(u):.6f}",
+            "conditional_cdf": f"{g.conditional_cdf(u):.6f}",
+            "kendall_tau": f"{g.kendall_tau():.6f}",
+        },
     )
 
 
@@ -105,9 +117,12 @@ def genz_reorder_demo(out_path: str | Path) -> dict:
     R = np.full((6, 6), 0.5)
     np.fill_diagonal(R, 1.0)
     return _write(
-        Path(out_path), "D094 Genz variable reordering",
-        {"reordered": f"{genz_mvn_cdf_reordered(b, R, n_samples=20000, seed=0):.6f}",
-         "unordered": f"{genz_mvn_cdf(b, R, n_samples=20000, seed=0):.6f}"},
+        Path(out_path),
+        "D094 Genz variable reordering",
+        {
+            "reordered": f"{genz_mvn_cdf_reordered(b, R, n_samples=20000, seed=0):.6f}",
+            "unordered": f"{genz_mvn_cdf(b, R, n_samples=20000, seed=0):.6f}",
+        },
     )
 
 
@@ -122,9 +137,13 @@ def stacking_demo(out_path: str | Path) -> dict:
     mb = optimize_stacking_sequence(d0, np.array([0.0, 0.0, 45.0, 90.0, -45.0, 90.0]), 0.125, "max_bending")
     sym = optimize_stacking_sequence(d0, np.array([0.0, 45.0, 90.0]), 0.125, "max_bending", symmetric=True)
     return _write(
-        Path(out_path), "D095 stacking-sequence optimisation",
-        {"max_bending_D11": f"{mb.objective_value:.2f}", "max_bending_seq": str([int(a) for a in mb.sequence]),
-         "symmetric_B_norm": f"{np.linalg.norm(sym.b_matrix):.2e}"},
+        Path(out_path),
+        "D095 stacking-sequence optimisation",
+        {
+            "max_bending_D11": f"{mb.objective_value:.2f}",
+            "max_bending_seq": str([int(a) for a in mb.sequence]),
+            "symmetric_B_norm": f"{np.linalg.norm(sym.b_matrix):.2e}",
+        },
     )
 
 
@@ -140,10 +159,13 @@ def ruppert_demo(out_path: str | Path) -> dict:
     p_law, t_law = constrained_delaunay_flip_recover(rect, refine=True)
     p_rup, t_rup = constrained_delaunay_ruppert(rect, min_angle_deg=20.0)
     return _write(
-        Path(out_path), "D096 Ruppert quality refinement",
-        {"lawson_min_angle_deg": f"{np.degrees(_min_triangle_angle(p_law, t_law)):.2f}",
-         "ruppert_min_angle_deg": f"{np.degrees(_min_triangle_angle(p_rup, t_rup)):.2f}",
-         "n_steiner": len(p_rup) - 4},
+        Path(out_path),
+        "D096 Ruppert quality refinement",
+        {
+            "lawson_min_angle_deg": f"{np.degrees(_min_triangle_angle(p_law, t_law)):.2f}",
+            "ruppert_min_angle_deg": f"{np.degrees(_min_triangle_angle(p_rup, t_rup)):.2f}",
+            "n_steiner": len(p_rup) - 4,
+        },
     )
 
 

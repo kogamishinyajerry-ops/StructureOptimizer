@@ -41,9 +41,7 @@ def orthotropic_plane_stress_matrix(e1: float, e2: float, nu12: float, g12: floa
     denom = 1.0 - nu12 * nu21
     if denom <= 0:
         raise SolverError("orthotropic_invalid_poisson")
-    return np.array(
-        [[e1 / denom, nu12 * e2 / denom, 0.0], [nu12 * e2 / denom, e2 / denom, 0.0], [0.0, 0.0, g12]]
-    )
+    return np.array([[e1 / denom, nu12 * e2 / denom, 0.0], [nu12 * e2 / denom, e2 / denom, 0.0], [0.0, 0.0, g12]])
 
 
 def _voigt_to_tensor(d: np.ndarray) -> np.ndarray:
@@ -228,9 +226,7 @@ def _continuity_metric(angles: np.ndarray, pairs: list[tuple[int, int]]) -> tupl
     return total / n, {k: v / n for k, v in grad.items()}
 
 
-def period_aware_continuity(
-    angles: np.ndarray, pairs: list[tuple[int, int]]
-) -> tuple[float, dict[int, float]]:
+def period_aware_continuity(angles: np.ndarray, pairs: list[tuple[int, int]]) -> tuple[float, dict[int, float]]:
     """**Period-aware** fibre-continuity metric ``mean_{(e,f)} sin²(θ_e − θ_f)`` +
     per-element gradient (Wave FFFF, D087).
 
@@ -726,9 +722,7 @@ def simultaneous_elastic_orientation_mma(
             dfdx = np.zeros((1, 2 * n_design))
             dfdx[0, :n_design] = 1.0 / n_design
         else:
-            fval = np.array(
-                [float(np.mean(x[:n_design]) - vf_target), cont / fibre_continuity_limit - 1.0]
-            )
+            fval = np.array([float(np.mean(x[:n_design]) - vf_target), cont / fibre_continuity_limit - 1.0])
             dfdx = np.zeros((2, 2 * n_design))
             dfdx[0, :n_design] = 1.0 / n_design
             for eid, g in cont_grad.items():

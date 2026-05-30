@@ -21,9 +21,11 @@ def _html(title: str, body: str) -> str:
 
 
 def _write(out_path: Path, title: str, rows: dict) -> dict:
-    body = "<table border=1 cellpadding=4>" + "".join(
-        f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in rows.items()
-    ) + "</table>"
+    body = (
+        "<table border=1 cellpadding=4>"
+        + "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in rows.items())
+        + "</table>"
+    )
     out_path.write_text(_html(title, body))
     return rows
 
@@ -36,7 +38,8 @@ def design_grade_demo(out_path: str | Path, benchmark: str = "cantilever") -> di
     mesh = create_structured_mesh(config)
     r = maximize_buckling_load(config, mesh, vf=config.optimization.volume_fraction, n_steps=30)
     return _write(
-        Path(out_path), "D082 design-grade buckling",
+        Path(out_path),
+        "D082 design-grade buckling",
         {"lambda_initial": f"{r.lambda_history[0]:.3f}", "lambda_final": f"{r.lambda_history[-1]:.3f}"},
     )
 
@@ -53,7 +56,8 @@ def inloop_band_demo(out_path: str | Path, benchmark: str = "cantilever") -> dic
     w1 = float(np.sqrt(solve_modal(config, mesh, rho0, n_modes=1).omega_squared[0]))
     r = adaptive_peak_constrained_mma(config, mesh, 3e9, 0.6 * w1, 2.1 * w1, beta=2e-6, max_iter=10)
     return _write(
-        Path(out_path), "D083 in-loop adaptive band",
+        Path(out_path),
+        "D083 in-loop adaptive band",
         {"peak_omega_initial": f"{r.peak_omega_history[0]:.0f}", "peak_omega_final": f"{r.peak_omega_history[-1]:.0f}"},
     )
 
@@ -67,7 +71,8 @@ def augmented_r2_demo(out_path: str | Path) -> dict:
     weak, proper = np.array([[0.5, 0.5]]), np.array([[0.5, 0.3]])
     front = np.array([[0.0, 1.0], [0.5, 0.5], [1.0, 0.0]])
     return _write(
-        Path(out_path), "D084 augmented R2 + spacing",
+        Path(out_path),
+        "D084 augmented R2 + spacing",
         {
             "plain_r2_weak": f"{r2_indicator(weak, weights=w, ideal=z):.3f}",
             "plain_r2_proper": f"{r2_indicator(proper, weights=w, ideal=z):.3f}",
@@ -85,7 +90,8 @@ def spacing_demo(out_path: str | Path) -> dict:
     even = np.array([[0.0, 3.0], [1.0, 2.0], [2.0, 1.0], [3.0, 0.0]])
     clustered = np.array([[0.0, 3.0], [0.1, 2.9], [2.0, 1.0], [3.0, 0.0]])
     return _write(
-        Path(out_path), "D084 spacing",
+        Path(out_path),
+        "D084 spacing",
         {"even_S": f"{spacing_indicator(even):.4f}", "clustered_S": f"{spacing_indicator(clustered):.4f}"},
     )
 
@@ -96,7 +102,8 @@ def nested_copula_demo(out_path: str | Path) -> dict:
 
     c = nested_clayton_copula(4, [[0, 1], [2, 3]], 2.0, [6.0, 4.0])
     return _write(
-        Path(out_path), "D085 nested Clayton copula",
+        Path(out_path),
+        "D085 nested Clayton copula",
         {
             "cdf": f"{c.cdf(np.array([0.4, 0.6, 0.5, 0.7])):.5f}",
             "tau_within_g0": f"{c.kendall_tau_within(0):.3f}",
@@ -114,7 +121,8 @@ def lattice_genz_demo(out_path: str | Path) -> dict:
     R = (1 - rho) * np.eye(4) + rho * np.ones((4, 4))
     res = genz_mvn_cdf_lattice(np.ones(4), R, n_points=1021, n_shifts=12)
     return _write(
-        Path(out_path), "D086 Korobov-lattice Genz",
+        Path(out_path),
+        "D086 Korobov-lattice Genz",
         {"value": f"{res.value:.6f}", "std_error": f"{res.std_error:.2e}", "n_points": res.n_points},
     )
 
@@ -127,9 +135,13 @@ def laminate_demo(out_path: str | Path) -> dict:
     A_sym, B_sym, _ = laminate_abd(d0, np.deg2rad([45.0, -45.0, -45.0, 45.0]), np.full(4, 0.5))
     _, B_unsym, _ = laminate_abd(d0, np.deg2rad([0.0, 90.0]), np.full(2, 1.0))
     return _write(
-        Path(out_path), "D087 laminate ABD",
-        {"A00_symmetric": f"{A_sym[0, 0]:.3e}", "B_norm_symmetric": f"{np.abs(B_sym).max():.3e}",
-         "B_norm_unsymmetric": f"{np.abs(B_unsym).max():.3e}"},
+        Path(out_path),
+        "D087 laminate ABD",
+        {
+            "A00_symmetric": f"{A_sym[0, 0]:.3e}",
+            "B_norm_symmetric": f"{np.abs(B_sym).max():.3e}",
+            "B_norm_unsymmetric": f"{np.abs(B_unsym).max():.3e}",
+        },
     )
 
 
@@ -140,9 +152,12 @@ def periodic_fibre_demo(out_path: str | Path) -> dict:
     angles = np.deg2rad([89.0, -89.0])
     pairs = [(0, 1)]
     return _write(
-        Path(out_path), "D087 period-aware fibre continuity",
-        {"sin2_metric": f"{period_aware_continuity(angles, pairs)[0]:.5f}",
-         "squared_metric": f"{_continuity_metric(angles, pairs)[0]:.3f}"},
+        Path(out_path),
+        "D087 period-aware fibre continuity",
+        {
+            "sin2_metric": f"{period_aware_continuity(angles, pairs)[0]:.5f}",
+            "squared_metric": f"{_continuity_metric(angles, pairs)[0]:.3f}",
+        },
     )
 
 
@@ -150,14 +165,25 @@ def cdt_refine_demo(out_path: str | Path) -> dict:
     """D088: flip recovery triangulates a non-convex star that D080 rejects."""
     from structure_optimizer.core.stl_export import _min_triangle_angle, constrained_delaunay_flip_recover
 
-    star = np.array([
-        [2.6146, 0.045], [0.3886, 0.0405], [2.1953, 0.578], [-0.096, 0.7683],
-        [-2.5324, -0.7121], [-1.381, -1.0942], [-0.1425, -1.1], [0.558, -1.3289],
-        [0.1514, -0.3447], [0.5424, -0.3312], [1.9375, -0.8374],
-    ])
+    star = np.array(
+        [
+            [2.6146, 0.045],
+            [0.3886, 0.0405],
+            [2.1953, 0.578],
+            [-0.096, 0.7683],
+            [-2.5324, -0.7121],
+            [-1.381, -1.0942],
+            [-0.1425, -1.1],
+            [0.558, -1.3289],
+            [0.1514, -0.3447],
+            [0.5424, -0.3312],
+            [1.9375, -0.8374],
+        ]
+    )
     pts, tris = constrained_delaunay_flip_recover([p for p in star], refine=True)
     return _write(
-        Path(out_path), "D088 flip-recovery CDT",
+        Path(out_path),
+        "D088 flip-recovery CDT",
         {"n_triangles": len(tris), "min_angle_deg": f"{np.rad2deg(_min_triangle_angle(pts, tris)):.2f}"},
     )
 

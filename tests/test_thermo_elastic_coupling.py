@@ -21,19 +21,14 @@ We don't implement a full monolithic thermo-mechanical solver in v5
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 import numpy as np
-import pytest
 from structure_optimizer.benchmarks.registry import load_benchmark
-from structure_optimizer.core.fem2d import element_stiffness, solve_linear_elastic
+from structure_optimizer.core.fem2d import element_stiffness
 from structure_optimizer.core.mesh import create_structured_mesh
 from structure_optimizer.core.thermal import solve_thermal
 
 
-def _compute_thermal_body_force(
-    config, mesh, T_nodes, alpha, ke
-):
+def _compute_thermal_body_force(config, mesh, T_nodes, alpha, ke):
     """Convert a nodal temperature field into an equivalent elastic load vector.
 
     For each element: equivalent thermal force = α · ΔT_avg · ∫ B^T C [1,1,0]^T dV
@@ -68,8 +63,12 @@ def _solve_thermal_stress(config, mesh, densities, alpha, conductivity, heat_sou
     Returns elastic displacement field due to ONLY the thermal expansion
     (no mechanical loads applied)."""
     thermal_result = solve_thermal(
-        config, mesh, densities,
-        conductivity=conductivity, heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+        config,
+        mesh,
+        densities,
+        conductivity=conductivity,
+        heat_sources=heat_sources,
+        thermal_bcs=thermal_bcs,
     )
     T = thermal_result.temperatures
     ke = element_stiffness(config.material.young_modulus, config.material.poisson_ratio)
@@ -77,6 +76,7 @@ def _solve_thermal_stress(config, mesh, densities, alpha, conductivity, heat_sou
 
     # Build elastic system and solve
     from structure_optimizer.core.fem2d import _assemble_stiffness_dense
+
     opt = config.optimization
     densities = np.asarray(densities, dtype=float).reshape(-1)
     active = np.where(mesh.void_mask, opt.min_density, densities)
@@ -98,13 +98,19 @@ def test_thermo_elastic_thermal_stress_scales_linearly_with_dT():
     alpha = 23e-6  # aluminium-style coefficient
 
     T1, u1 = _solve_thermal_stress(
-        config, mesh, densities, alpha,
+        config,
+        mesh,
+        densities,
+        alpha,
         conductivity=200.0,
         heat_sources=[{"selector": "center", "q": 100.0}],
         thermal_bcs=[{"selector": "left_edge", "temperature": 0.0}],
     )
     T2, u2 = _solve_thermal_stress(
-        config, mesh, densities, alpha,
+        config,
+        mesh,
+        densities,
+        alpha,
         conductivity=200.0,
         heat_sources=[{"selector": "center", "q": 200.0}],  # doubled
         thermal_bcs=[{"selector": "left_edge", "temperature": 0.0}],
@@ -122,7 +128,10 @@ def test_thermo_elastic_zero_alpha_yields_zero_displacement():
     densities = np.full(mesh.elements.shape[0], 1.0)
 
     T, u = _solve_thermal_stress(
-        config, mesh, densities, alpha=0.0,
+        config,
+        mesh,
+        densities,
+        alpha=0.0,
         conductivity=200.0,
         heat_sources=[{"selector": "center", "q": 100.0}],
         thermal_bcs=[{"selector": "left_edge", "temperature": 0.0}],
@@ -139,7 +148,10 @@ def test_property_thermo_elastic_coupling_decouples_when_no_temperature():
     densities = np.full(mesh.elements.shape[0], 1.0)
     for alpha in [1e-6, 1e-5, 23e-6]:
         T, u = _solve_thermal_stress(
-            config, mesh, densities, alpha,
+            config,
+            mesh,
+            densities,
+            alpha,
             conductivity=200.0,
             heat_sources=[],
             thermal_bcs=[{"selector": "left_edge", "temperature": 0.0}],

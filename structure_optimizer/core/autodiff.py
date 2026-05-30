@@ -19,7 +19,7 @@ for SIMP sensitivity verification and as an educational reference.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 
@@ -66,7 +66,7 @@ class Var:
         7.0
     """
 
-    __slots__ = ("value", "grad")
+    __slots__ = ("grad", "value")
 
     def __init__(self, value: float, grad: float = 0.0):
         self.value = float(value)
@@ -75,47 +75,47 @@ class Var:
     def __repr__(self) -> str:
         return f"Var(value={self.value!r}, grad={self.grad!r})"
 
-    def __add__(self, other: "Var | float") -> "Var":
+    def __add__(self, other: Var | float) -> Var:
         if isinstance(other, Var):
             return Var(self.value + other.value, self.grad + other.grad)
         return Var(self.value + other, self.grad)
 
-    def __radd__(self, other: float) -> "Var":
+    def __radd__(self, other: float) -> Var:
         return Var(other + self.value, self.grad)
 
-    def __sub__(self, other: "Var | float") -> "Var":
+    def __sub__(self, other: Var | float) -> Var:
         if isinstance(other, Var):
             return Var(self.value - other.value, self.grad - other.grad)
         return Var(self.value - other, self.grad)
 
-    def __rsub__(self, other: float) -> "Var":
+    def __rsub__(self, other: float) -> Var:
         return Var(other - self.value, -self.grad)
 
-    def __mul__(self, other: "Var | float") -> "Var":
+    def __mul__(self, other: Var | float) -> Var:
         if isinstance(other, Var):
             return Var(self.value * other.value, self.grad * other.value + self.value * other.grad)
         return Var(self.value * other, self.grad * other)
 
-    def __rmul__(self, other: float) -> "Var":
+    def __rmul__(self, other: float) -> Var:
         return Var(other * self.value, other * self.grad)
 
-    def __truediv__(self, other: "Var | float") -> "Var":
+    def __truediv__(self, other: Var | float) -> Var:
         if isinstance(other, Var):
             v = self.value / other.value
             g = (self.grad * other.value - self.value * other.grad) / (other.value**2)
             return Var(v, g)
         return Var(self.value / other, self.grad / other)
 
-    def __rtruediv__(self, other: float) -> "Var":
+    def __rtruediv__(self, other: float) -> Var:
         """c / self: d/dx (c/x) = -c/x²"""
         v = other / self.value
         g = -other * self.grad / (self.value**2)
         return Var(v, g)
 
-    def __neg__(self) -> "Var":
+    def __neg__(self) -> Var:
         return Var(-self.value, -self.grad)
 
-    def __pow__(self, p: float) -> "Var":
+    def __pow__(self, p: float) -> Var:
         v = self.value**p
         g = p * (self.value ** (p - 1)) * self.grad
         return Var(v, g)
@@ -165,7 +165,7 @@ class RVar:
         (4.0, 2.0)
     """
 
-    __slots__ = ("value", "parents", "grad")
+    __slots__ = ("grad", "parents", "value")
 
     def __init__(self, value: float, parents: tuple = ()):
         self.value = float(value)
@@ -175,44 +175,44 @@ class RVar:
     def __repr__(self) -> str:
         return f"RVar(value={self.value!r}, grad={self.grad!r})"
 
-    def __add__(self, other: "RVar | float") -> "RVar":
+    def __add__(self, other: RVar | float) -> RVar:
         if isinstance(other, RVar):
             return RVar(self.value + other.value, ((self, 1.0), (other, 1.0)))
         return RVar(self.value + other, ((self, 1.0),))
 
-    def __radd__(self, other: float) -> "RVar":
+    def __radd__(self, other: float) -> RVar:
         return RVar(other + self.value, ((self, 1.0),))
 
-    def __sub__(self, other: "RVar | float") -> "RVar":
+    def __sub__(self, other: RVar | float) -> RVar:
         if isinstance(other, RVar):
             return RVar(self.value - other.value, ((self, 1.0), (other, -1.0)))
         return RVar(self.value - other, ((self, 1.0),))
 
-    def __rsub__(self, other: float) -> "RVar":
+    def __rsub__(self, other: float) -> RVar:
         return RVar(other - self.value, ((self, -1.0),))
 
-    def __mul__(self, other: "RVar | float") -> "RVar":
+    def __mul__(self, other: RVar | float) -> RVar:
         if isinstance(other, RVar):
             return RVar(self.value * other.value, ((self, other.value), (other, self.value)))
         return RVar(self.value * other, ((self, float(other)),))
 
-    def __rmul__(self, other: float) -> "RVar":
+    def __rmul__(self, other: float) -> RVar:
         return RVar(other * self.value, ((self, float(other)),))
 
-    def __truediv__(self, other: "RVar | float") -> "RVar":
+    def __truediv__(self, other: RVar | float) -> RVar:
         if isinstance(other, RVar):
             v = self.value / other.value
             return RVar(v, ((self, 1.0 / other.value), (other, -self.value / other.value**2)))
         return RVar(self.value / other, ((self, 1.0 / float(other)),))
 
-    def __rtruediv__(self, other: float) -> "RVar":
+    def __rtruediv__(self, other: float) -> RVar:
         v = other / self.value
         return RVar(v, ((self, -other / self.value**2),))
 
-    def __neg__(self) -> "RVar":
+    def __neg__(self) -> RVar:
         return RVar(-self.value, ((self, -1.0),))
 
-    def __pow__(self, p: float) -> "RVar":
+    def __pow__(self, p: float) -> RVar:
         v = self.value**p
         return RVar(v, ((self, p * self.value ** (p - 1)),))
 

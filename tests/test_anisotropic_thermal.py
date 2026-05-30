@@ -93,8 +93,12 @@ def test_orthotropic_easier_conduction_lowers_temperature():
     config, k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
     mesh = create_structured_mesh(config)
     densities = np.full(mesh.elements.shape[0], 1.0)
-    r_lowk = solve_thermal(config, mesh, densities, k, sources, bcs, conductivity_tensor=conductivity_tensor(0.5 * k, 0.5 * k))
-    r_highk = solve_thermal(config, mesh, densities, k, sources, bcs, conductivity_tensor=conductivity_tensor(2.0 * k, 2.0 * k))
+    r_lowk = solve_thermal(
+        config, mesh, densities, k, sources, bcs, conductivity_tensor=conductivity_tensor(0.5 * k, 0.5 * k)
+    )
+    r_highk = solve_thermal(
+        config, mesh, densities, k, sources, bcs, conductivity_tensor=conductivity_tensor(2.0 * k, 2.0 * k)
+    )
     assert r_highk.max_temperature < r_lowk.max_temperature
 
 

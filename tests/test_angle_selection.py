@@ -56,9 +56,7 @@ def test_selection_beats_mixed_inventory():
     """Selecting all-stiffest strictly beats ORDERING a fixed mixed inventory (D095)."""
     n = 4
     sel = select_ply_angles(_D0, _CANDS, n, thickness=_T, objective="max_bending")
-    mixed = optimize_stacking_sequence(
-        _D0, np.deg2rad([0.0, 45.0, 90.0, 45.0]), thickness=_T, objective="max_bending"
-    )
+    mixed = optimize_stacking_sequence(_D0, np.deg2rad([0.0, 45.0, 90.0, 45.0]), thickness=_T, objective="max_bending")
     assert sel.d_matrix[0, 0] > mixed.d_matrix[0, 0] + 1.0  # strictly stiffer
 
 

@@ -27,9 +27,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 FINGERPRINT_DIR = REPO_ROOT / "tests" / "fingerprints"
 
 STAR = [
-    [2.6146, 0.045], [0.3886, 0.0405], [2.1953, 0.578], [-0.096, 0.7683],
-    [-2.5324, -0.7121], [-1.381, -1.0942], [-0.1425, -1.1], [0.558, -1.3289],
-    [0.1514, -0.3447], [0.5424, -0.3312], [1.9375, -0.8374],
+    [2.6146, 0.045],
+    [0.3886, 0.0405],
+    [2.1953, 0.578],
+    [-0.096, 0.7683],
+    [-2.5324, -0.7121],
+    [-1.381, -1.0942],
+    [-0.1425, -1.1],
+    [0.558, -1.3289],
+    [0.1514, -0.3447],
+    [0.5424, -0.3312],
+    [1.9375, -0.8374],
 ]
 
 
@@ -56,8 +64,10 @@ def gen_design_grade_buckling() -> None:
     _write(
         "design_grade_buckling_cantilever__smoke.json",
         {
-            "benchmark": "cantilever", "preset": "smoke",
-            "rubric_version": "v12.0-wave-AAAA", "kind": "design_grade_buckling",
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v12.0-wave-AAAA",
+            "kind": "design_grade_buckling",
             "eigenvalue": float(lambdas[0]),
             "dl_sha256": _sha256(dl),
         },
@@ -70,14 +80,25 @@ def gen_nested_clayton() -> None:
     c = nested_clayton_copula(4, [[0, 1], [2, 3]], 2.0, [6.0, 4.0])
     u = [0.4, 0.6, 0.5, 0.7]
     cdf = c.cdf(np.asarray(u))
-    margins = np.array([c.bivariate_margin_cdf(0, 1, 0.4, 0.6), c.bivariate_margin_cdf(2, 3, 0.4, 0.6), c.bivariate_margin_cdf(0, 2, 0.4, 0.6)])
+    margins = np.array(
+        [
+            c.bivariate_margin_cdf(0, 1, 0.4, 0.6),
+            c.bivariate_margin_cdf(2, 3, 0.4, 0.6),
+            c.bivariate_margin_cdf(0, 2, 0.4, 0.6),
+        ]
+    )
     _write(
         "nested_clayton_4d.json",
         {
-            "benchmark": "nested_clayton", "preset": "n/a",
-            "rubric_version": "v12.0-wave-DDDD", "kind": "nested_clayton",
-            "clusters": [[0, 1], [2, 3]], "theta_outer": 2.0, "thetas_inner": [6.0, 4.0],
-            "u": u, "cdf": float(cdf),
+            "benchmark": "nested_clayton",
+            "preset": "n/a",
+            "rubric_version": "v12.0-wave-DDDD",
+            "kind": "nested_clayton",
+            "clusters": [[0, 1], [2, 3]],
+            "theta_outer": 2.0,
+            "thetas_inner": [6.0, 4.0],
+            "u": u,
+            "cdf": float(cdf),
             "margins_sha256": _sha256(margins),
             "m01": float(margins[0]),
         },
@@ -93,10 +114,17 @@ def gen_korobov_genz() -> None:
     _write(
         "korobov_genz_equicorr.json",
         {
-            "benchmark": "korobov_genz", "preset": "n/a",
-            "rubric_version": "v12.0-wave-EEEE", "kind": "korobov_genz",
-            "rho": rho, "n_points": 1021, "n_shifts": 12, "a": 76, "seed": 0,
-            "value": res.value, "std_error": res.std_error,
+            "benchmark": "korobov_genz",
+            "preset": "n/a",
+            "rubric_version": "v12.0-wave-EEEE",
+            "kind": "korobov_genz",
+            "rho": rho,
+            "n_points": 1021,
+            "n_shifts": 12,
+            "a": 76,
+            "seed": 0,
+            "value": res.value,
+            "std_error": res.std_error,
             "value_sha256": _sha256(np.array([res.value, res.std_error])),
         },
     )
@@ -113,10 +141,14 @@ def gen_laminate_abd() -> None:
     _write(
         "laminate_abd_symmetric.json",
         {
-            "benchmark": "laminate", "preset": "n/a",
-            "rubric_version": "v12.0-wave-FFFF", "kind": "laminate_abd",
-            "angles_deg": [45.0, -45.0, -45.0, 45.0], "thicknesses": [0.5, 0.5, 0.5, 0.5],
-            "A00": float(A[0, 0]), "B_absmax": float(np.abs(B).max()),
+            "benchmark": "laminate",
+            "preset": "n/a",
+            "rubric_version": "v12.0-wave-FFFF",
+            "kind": "laminate_abd",
+            "angles_deg": [45.0, -45.0, -45.0, 45.0],
+            "thicknesses": [0.5, 0.5, 0.5, 0.5],
+            "A00": float(A[0, 0]),
+            "B_absmax": float(np.abs(B).max()),
             "abd_sha256": _sha256(stacked),
         },
     )
@@ -131,9 +163,12 @@ def gen_cdt_recovery() -> None:
     _write(
         "cdt_flip_recovery_star.json",
         {
-            "benchmark": "cdt_star", "preset": "n/a",
-            "rubric_version": "v12.0-wave-GGGG", "kind": "cdt_flip_recovery",
-            "n_triangles": len(tris), "total_area": float(area),
+            "benchmark": "cdt_star",
+            "preset": "n/a",
+            "rubric_version": "v12.0-wave-GGGG",
+            "kind": "cdt_flip_recovery",
+            "n_triangles": len(tris),
+            "total_area": float(area),
             "tris_sha256": _sha256(flat),
         },
     )

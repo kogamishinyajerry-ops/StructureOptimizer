@@ -26,6 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+
 from structure_optimizer.core.config import BenchmarkConfig
 from structure_optimizer.core.fem2d import (
     SolverError,
@@ -89,7 +90,7 @@ def effective_modulus_per_element(
     """
     densities_per_material = np.asarray(densities_per_material, dtype=float)
     M, n_elem = densities_per_material.shape
-    if M != len(materials):
+    if len(materials) != M:
         raise SolverError(f"multi_material_count_mismatch: {M} vs {len(materials)}")
     E_eff = np.full(n_elem, e_min, dtype=float)
     for i, mat in enumerate(materials):
@@ -112,7 +113,7 @@ def solve_multi_material(
     """
     densities_per_material = np.asarray(densities_per_material, dtype=float)
     M, n_elem = densities_per_material.shape
-    if M != len(materials):
+    if len(materials) != M:
         raise SolverError("multi_material_count_mismatch")
     if n_elem != mesh.elements.shape[0]:
         raise SolverError("density_count_mismatch")
@@ -185,7 +186,6 @@ def _oc_update_per_material(
 ) -> np.ndarray:
     """Bisection-OC update for one material's density field."""
     l1, l2 = 0.0, 1e9
-    n = densities_row.size
     updated = densities_row.copy()
     for _ in range(80):
         mid = 0.5 * (l1 + l2)

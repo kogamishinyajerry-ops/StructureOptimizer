@@ -356,7 +356,7 @@ def sorm_breitung(
     if np.any(factors <= 0):
         raise SolverError("sorm_breitung_invalid_curvature")
     p_form = _standard_normal_cdf(-beta)
-    p_sorm = float(p_form * np.prod(factors ** -0.5))
+    p_sorm = float(p_form * np.prod(factors**-0.5))
     return ReliabilityResult(
         beta=beta,
         p_failure=p_sorm,
@@ -434,28 +434,43 @@ def _standard_normal_ppf(p: float) -> float:
         if p == 1.0:
             return np.inf
         raise SolverError("ppf_out_of_range")
-    a = (-3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2,
-         1.383577518672690e2, -3.066479806614716e1, 2.506628277459239e0)
-    b = (-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2,
-         6.680131188771972e1, -1.328068155288572e1)
-    c = (-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838e0,
-         -2.549732539343734e0, 4.374664141464968e0, 2.938163982698783e0)
-    d = (7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996e0,
-         3.754408661907416e0)
+    a = (
+        -3.969683028665376e1,
+        2.209460984245205e2,
+        -2.759285104469687e2,
+        1.383577518672690e2,
+        -3.066479806614716e1,
+        2.506628277459239e0,
+    )
+    b = (-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1, -1.328068155288572e1)
+    c = (
+        -7.784894002430293e-3,
+        -3.223964580411365e-1,
+        -2.400758277161838e0,
+        -2.549732539343734e0,
+        4.374664141464968e0,
+        2.938163982698783e0,
+    )
+    d = (7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996e0, 3.754408661907416e0)
     plow, phigh = 0.02425, 1.0 - 0.02425
     if p < plow:
         q = sqrt(-2.0 * np.log(p))
-        x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / \
-            ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
+        )
     elif p <= phigh:
         q = p - 0.5
         r = q * q
-        x = (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / \
-            (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+        x = (
+            (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5])
+            * q
+            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1.0)
+        )
     else:
         q = sqrt(-2.0 * np.log(1.0 - p))
-        x = -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / \
-            ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0)
+        x = -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1.0
+        )
     # One Halley refinement: e = Φ(x) − p, u = e·√(2π)·e^{x²/2}.
     e = _standard_normal_cdf(x) - p
     u = e * sqrt(2.0 * np.pi) * np.exp(0.5 * x * x)
@@ -1414,8 +1429,10 @@ def system_reliability_series(betas, correlation: np.ndarray | None = None, n_no
     simple_upper = float(min(1.0, p.sum()))
     if m == 1:
         return {
-            "p_failure_lower": float(p[0]), "p_failure_upper": float(p[0]),
-            "simple_lower": float(p[0]), "simple_upper": float(p[0]),
+            "p_failure_lower": float(p[0]),
+            "p_failure_upper": float(p[0]),
+            "simple_lower": float(p[0]),
+            "simple_upper": float(p[0]),
         }
 
     order = np.argsort(-p)  # descending P_i for the tightest Ditlevsen bounds
@@ -1435,8 +1452,10 @@ def system_reliability_series(betas, correlation: np.ndarray | None = None, n_no
     lower = float(np.clip(lower, simple_lower, simple_upper))
     upper = float(np.clip(upper, simple_lower, simple_upper))
     return {
-        "p_failure_lower": lower, "p_failure_upper": upper,
-        "simple_lower": simple_lower, "simple_upper": simple_upper,
+        "p_failure_lower": lower,
+        "p_failure_upper": upper,
+        "simple_lower": simple_lower,
+        "simple_upper": simple_upper,
     }
 
 
@@ -1637,9 +1656,7 @@ class MixtureCopula:
         u = np.asarray(u, dtype=float)
         if u.shape[0] != self._dim:
             raise SolverError("mixture_copula_dim_mismatch")
-        return float(
-            sum(float(w) * float(c.cdf(u)) for w, c in zip(self.weights, self.components, strict=True))
-        )
+        return float(sum(float(w) * float(c.cdf(u)) for w, c in zip(self.weights, self.components, strict=True)))
 
 
 def multi_family_copula(components: list, weights) -> MixtureCopula:

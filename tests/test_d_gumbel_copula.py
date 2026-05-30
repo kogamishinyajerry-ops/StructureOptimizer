@@ -49,7 +49,7 @@ def test_cdf_closed_form_and_d2_degenerates_to_bivariate():
     assert g2.cdf([0.35, 0.62]) == pytest.approx(biv.cdf(0.35, 0.62), rel=1e-12)
     # d=3 explicit: exp(−(Σ(−ln u_i)^θ)^{1/θ})
     u = np.array([0.3, 0.5, 0.7])
-    expect = np.exp(-(np.sum((-np.log(u)) ** THETA)) ** (1.0 / THETA))
+    expect = np.exp(-((np.sum((-np.log(u)) ** THETA)) ** (1.0 / THETA)))
     assert gumbel_d_copula(3, THETA).cdf(u) == pytest.approx(expect, rel=1e-12)
 
 
@@ -57,15 +57,11 @@ def test_conditional_cdf_matches_numerical_mixed_partials():
     """The headline: the analytic conditional CDF equals FD mixed partials of the CDF."""
     g3 = gumbel_d_copula(3, THETA)
     u3 = np.array([0.3, 0.5, 0.7])
-    assert g3.conditional_cdf(u3) == pytest.approx(
-        _numerical_mixed_conditional(u3, THETA), abs=1e-7
-    )
+    assert g3.conditional_cdf(u3) == pytest.approx(_numerical_mixed_conditional(u3, THETA), abs=1e-7)
     g4 = gumbel_d_copula(4, THETA)
     u4 = np.array([0.2, 0.4, 0.6, 0.8])
     # 4th-order central FD is noisier; the analytic form is exact, FD is the approximation
-    assert g4.conditional_cdf(u4) == pytest.approx(
-        _numerical_mixed_conditional(u4, THETA), abs=1e-4
-    )
+    assert g4.conditional_cdf(u4) == pytest.approx(_numerical_mixed_conditional(u4, THETA), abs=1e-4)
 
 
 def test_conditional_cdf_d2_degenerates_to_bivariate():
@@ -73,9 +69,7 @@ def test_conditional_cdf_d2_degenerates_to_bivariate():
     g2 = gumbel_d_copula(2, THETA)
     biv = gumbel_copula(THETA)
     for u1, u2 in [(0.2, 0.8), (0.5, 0.5), (0.35, 0.62), (0.9, 0.1)]:
-        assert g2.conditional_cdf([u1, u2]) == pytest.approx(
-            biv.conditional_cdf(u1, u2), abs=1e-12
-        )
+        assert g2.conditional_cdf([u1, u2]) == pytest.approx(biv.conditional_cdf(u1, u2), abs=1e-12)
 
 
 def test_kendall_tau_one_minus_inv_theta():

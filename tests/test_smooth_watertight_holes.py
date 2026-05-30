@@ -41,6 +41,7 @@ def _ring(cx, cy, r_in, r_out):
     def fn(x, y):
         r = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
         return (r >= r_in) & (r <= r_out)
+
     return fn
 
 

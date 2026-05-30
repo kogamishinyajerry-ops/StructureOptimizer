@@ -19,6 +19,8 @@ does not count them.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 from structure_optimizer.adapters.mesh_source import (
@@ -34,7 +36,6 @@ from structure_optimizer.adapters.solver_base import (
     get_linear_solver,
 )
 from structure_optimizer.core.fem2d import SolverError
-
 
 # ---------------------------------------------------------------------------
 # NumpyCGSolver: branch coverage
@@ -172,7 +173,7 @@ def test_meshio_reader_raises_when_points_are_one_dimensional(monkeypatch):
         data = np.array([[0, 1, 2]], dtype=int)
 
     class _StubMesh:
-        cells = [_StubBlock()]
+        cells: ClassVar = [_StubBlock()]
         points = np.array([[0.0], [1.0], [2.0]])  # shape (N, 1) — invalid
 
     monkeypatch.setattr(ms, "_MESHIO_AVAILABLE", True)
@@ -190,7 +191,7 @@ def test_meshio_reader_raises_when_no_triangle_block(monkeypatch):
         data = np.array([[0, 1, 2, 3]], dtype=int)
 
     class _StubMesh:
-        cells = [_QuadBlock()]
+        cells: ClassVar = [_QuadBlock()]
         points = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
 
     monkeypatch.setattr(ms, "_MESHIO_AVAILABLE", True)
@@ -208,7 +209,7 @@ def test_meshio_reader_happy_path_with_stubbed_meshio(monkeypatch):
         data = np.array([[0, 1, 2], [1, 2, 3]], dtype=int)
 
     class _StubMesh:
-        cells = [_TriBlock()]
+        cells: ClassVar = [_TriBlock()]
         points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]])
 
     monkeypatch.setattr(ms, "_MESHIO_AVAILABLE", True)
@@ -234,7 +235,7 @@ def test_meshio_reader_skips_non_triangle_blocks(monkeypatch):
         data = np.array([[0, 1, 2]], dtype=int)
 
     class _StubMesh:
-        cells = [_QuadBlock(), _TriBlock()]
+        cells: ClassVar = [_QuadBlock(), _TriBlock()]
         points = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
 
     monkeypatch.setattr(ms, "_MESHIO_AVAILABLE", True)

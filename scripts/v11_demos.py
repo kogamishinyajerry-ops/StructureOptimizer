@@ -74,9 +74,11 @@ def r2_demo(out_path: str | Path) -> dict:
     for s in (1.0, 0.8, 0.6, 0.4):
         front = base * s
         rows.append((s, r2_indicator(front, ideal=np.array([0.0, 0.0])), reference_free_hypervolume(front)))
-    body = "<table><tr><th>scale</th><th>R2</th><th>refHV</th></tr>" + "".join(
-        f"<tr><td>{s}</td><td>{r2:.4f}</td><td>{hv:.4f}</td></tr>" for s, r2, hv in rows
-    ) + "</table>"
+    body = (
+        "<table><tr><th>scale</th><th>R2</th><th>refHV</th></tr>"
+        + "".join(f"<tr><td>{s}</td><td>{r2:.4f}</td><td>{hv:.4f}</td></tr>" for s, r2, hv in rows)
+        + "</table>"
+    )
     Path(out_path).write_text(_html("reference-free indicators: R2 + auto-ref HV (D076)", body))
     return {"rows": [(float(s), float(r2), float(hv)) for s, r2, hv in rows], "out_path": str(out_path)}
 
@@ -128,7 +130,11 @@ def elastic_mma_demo(out_path: str | Path, benchmark: str = "cantilever") -> dic
     r = simultaneous_elastic_orientation_mma(config, mesh, d0, max_iter=60)
     body = f"<p>compliance {r.compliance_history[0]:.3e} → {r.compliance_history[-1]:.3e}</p>"
     Path(out_path).write_text(_html("elastic orthotropic simultaneous (ρ,θ) MMA (D079)", body))
-    return {"compliance_initial": float(r.compliance_history[0]), "compliance_final": float(r.compliance_history[-1]), "out_path": str(out_path)}
+    return {
+        "compliance_initial": float(r.compliance_history[0]),
+        "compliance_final": float(r.compliance_history[-1]),
+        "out_path": str(out_path),
+    }
 
 
 def cdt_demo(out_dir: str | Path) -> dict:
@@ -144,7 +150,9 @@ def cdt_demo(out_dir: str | Path) -> dict:
         a = np.linspace(0.0, 2.0 * np.pi, n, endpoint=False)
         return np.column_stack([cx + r * np.cos(a), cy + r * np.sin(a)])
 
-    info = write_stl_cdt_multi_hole(outer, [ring(-0.42, 0, 0.18, 36), ring(0.42, 0, 0.18, 36)], out_dir / "cdt_two_hole.stl")
+    info = write_stl_cdt_multi_hole(
+        outer, [ring(-0.42, 0, 0.18, 36), ring(0.42, 0, 0.18, 36)], out_dir / "cdt_two_hole.stl"
+    )
     return info
 
 

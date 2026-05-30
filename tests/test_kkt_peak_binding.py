@@ -81,7 +81,10 @@ def test_constraint_value_matches_dense_sweep(runs):
     config, mesh = runs["cfg"]
     s = kkt_binding_status(config, mesh, runs["tight"], beta=_BETA)
     lo, hi = runs["tight"].flanking_range
-    flank = max(_dynamic_compliance_objective(config, mesh, runs["tight"].densities, w, beta=_BETA) for w in np.linspace(lo, hi, 120))
+    flank = max(
+        _dynamic_compliance_objective(config, mesh, runs["tight"].densities, w, beta=_BETA)
+        for w in np.linspace(lo, hi, 120)
+    )
     assert s.flank_peak == pytest.approx(flank, rel=1e-9)
     assert s.constraint_value == pytest.approx(flank / runs["tight"].peak_limit - 1.0, rel=1e-9)
 

@@ -24,6 +24,7 @@ from structure_optimizer.core.fem2d import SolverError
 
 # --- a mixed function exercising +, -, *, /, ** and a reused input ----------
 
+
 def _mixed_rvar(v):
     return v[0] * v[0] * v[1] + 3 * v[0] + v[1] / v[2]
 
@@ -39,7 +40,7 @@ def _mixed_grad(x):
 def test_reverse_matches_analytical_and_fd():
     x = np.array([1.5, 2.0, 0.5])
     rg = reverse_grad(_mixed_rvar, x)
-    assert np.allclose(rg, _mixed_grad(x), atol=1e-9)        # exact (analytic)
+    assert np.allclose(rg, _mixed_grad(x), atol=1e-9)  # exact (analytic)
     assert np.allclose(rg, gradient_check(_mixed_np, x), atol=1e-6)  # vs central-FD
 
 
@@ -49,8 +50,8 @@ def test_reverse_matches_forward_var_single_input():
     rg = reverse_grad(lambda v: v[0] ** 3 + 2 * v[0] ** 2 - 5 * v[0], np.array([x]))
     # forward mode (single seed)
     xv = Var(x, 1.0)
-    yv = xv ** 3 + 2 * xv ** 2 - 5 * xv
-    analytical = 3 * x ** 2 + 4 * x - 5
+    yv = xv**3 + 2 * xv**2 - 5 * xv
+    analytical = 3 * x**2 + 4 * x - 5
     assert rg[0] == pytest.approx(yv.grad, rel=1e-12)
     assert rg[0] == pytest.approx(analytical, rel=1e-12)
 
@@ -64,8 +65,7 @@ def test_reverse_rosenbrock_all_partials_one_pass():
 
     x = np.array([0.7, -0.3])
     rg = reverse_grad(f_rvar, x)
-    an = np.array([-400.0 * x[0] * (x[1] - x[0] ** 2) - 2.0 * (1.0 - x[0]),
-                   200.0 * (x[1] - x[0] ** 2)])
+    an = np.array([-400.0 * x[0] * (x[1] - x[0] ** 2) - 2.0 * (1.0 - x[0]), 200.0 * (x[1] - x[0] ** 2)])
     assert rg.shape == (2,)  # both partials from one backward pass
     assert np.allclose(rg, an, atol=1e-9)
     assert np.allclose(rg, gradient_check(f_np, x), atol=1e-6)
@@ -74,6 +74,7 @@ def test_reverse_rosenbrock_all_partials_one_pass():
 def test_reverse_dag_reuse_accumulates():
     """A shared node y = a·b feeding y·y + y: adjoint must accumulate from both
     consumers. ∂/∂a = (2ab+1)·b, ∂/∂b = (2ab+1)·a."""
+
     def f_rvar(v):
         y = v[0] * v[1]  # reused
         return y * y + y
@@ -100,6 +101,7 @@ def test_backward_direct_example():
 def test_reverse_deep_chain_no_recursion_limit():
     """20k chained ops would blow Python's recursion limit with a recursive
     backward; the iterative traversal handles it. d/dx of x scaled by 1 = 1."""
+
     def deep(v):
         acc = v[0]
         for _ in range(20000):

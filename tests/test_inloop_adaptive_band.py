@@ -56,7 +56,13 @@ def _band(w, lo, hi, rel=0.05, n=5):
 def test_resonance_drifts_so_regridding_does_real_work():
     config, mesh, w1 = _setup()
     lo, hi = 0.6 * w1, 2.1 * w1
-    tp0, _ = _dense_true_peak(config, mesh, np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction), lo, hi)
+    tp0, _ = _dense_true_peak(
+        config,
+        mesh,
+        np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction),
+        lo,
+        hi,
+    )
     r = adaptive_peak_constrained_mma(config, mesh, 3.0 * tp0, lo, hi, beta=BETA, max_iter=45)
     w_init, w_fin = r.peak_omega_history[0], r.peak_omega_history[-1]
     drift = abs(w_fin - w_init) / w_init
@@ -69,7 +75,13 @@ def test_inloop_tracking_beats_stale_fixed_band():
     the initial resonance does not."""
     config, mesh, w1 = _setup()
     lo, hi = 0.6 * w1, 2.1 * w1
-    tp0, _ = _dense_true_peak(config, mesh, np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction), lo, hi)
+    tp0, _ = _dense_true_peak(
+        config,
+        mesh,
+        np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction),
+        lo,
+        hi,
+    )
     r = adaptive_peak_constrained_mma(config, mesh, 3.0 * tp0, lo, hi, beta=BETA, max_iter=45)
     rho = r.densities
     true_peak, _ = _dense_true_peak(config, mesh, rho, lo, hi)
@@ -88,9 +100,17 @@ def test_inloop_tracking_beats_stale_fixed_band():
 def test_final_design_feasible_against_dense_sweep():
     config, mesh, w1 = _setup()
     lo, hi = 0.6 * w1, 2.1 * w1
-    tp0, _ = _dense_true_peak(config, mesh, np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction), lo, hi)
+    tp0, _ = _dense_true_peak(
+        config,
+        mesh,
+        np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction),
+        lo,
+        hi,
+    )
     limit = 3.0 * tp0
-    r = adaptive_peak_constrained_mma(config, mesh, limit, lo, hi, beta=BETA, vf=config.optimization.volume_fraction, max_iter=45)
+    r = adaptive_peak_constrained_mma(
+        config, mesh, limit, lo, hi, beta=BETA, vf=config.optimization.volume_fraction, max_iter=45
+    )
     true_peak, _ = _dense_true_peak(config, mesh, r.densities, lo, hi)
     assert true_peak <= 1.05 * limit, f"true peak {true_peak:.3e} exceeds limit {limit:.3e}"
     # volume constraint honoured
@@ -101,7 +121,13 @@ def test_final_design_feasible_against_dense_sweep():
 def test_determinism():
     config, mesh, w1 = _setup()
     lo, hi = 0.6 * w1, 2.1 * w1
-    tp0, _ = _dense_true_peak(config, mesh, np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction), lo, hi)
+    tp0, _ = _dense_true_peak(
+        config,
+        mesh,
+        np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction),
+        lo,
+        hi,
+    )
     a = adaptive_peak_constrained_mma(config, mesh, 3.0 * tp0, lo, hi, beta=BETA, max_iter=8)
     b = adaptive_peak_constrained_mma(config, mesh, 3.0 * tp0, lo, hi, beta=BETA, max_iter=8)
     assert np.allclose(a.densities, b.densities)
@@ -117,7 +143,9 @@ def test_overdamped_has_no_resonance_to_track():
     rho = np.where(mesh.void_mask, config.optimization.min_density, config.optimization.volume_fraction)
     ab = adaptive_band_sample(config, mesh, rho, lo, hi, n_init=7, n_refine=14, beta=1e-2)
     first_step = (hi - lo) / 6.0
-    assert ab.peak_omega <= lo + first_step, "overdamped response should peak at the low edge, not an interior resonance"
+    assert ab.peak_omega <= lo + first_step, (
+        "overdamped response should peak at the low edge, not an interior resonance"
+    )
 
 
 def test_input_guards():

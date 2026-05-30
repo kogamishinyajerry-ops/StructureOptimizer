@@ -16,10 +16,11 @@ differ across versions / archs); honest scope note in D029.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 
 import numpy as np
+
 from structure_optimizer.core.config import BenchmarkConfig
 from structure_optimizer.core.fem2d import SolverError, solve_linear_elastic
 from structure_optimizer.core.mesh import StructuredMesh

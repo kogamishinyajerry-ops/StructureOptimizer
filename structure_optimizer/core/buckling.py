@@ -318,9 +318,7 @@ def design_grade_buckling_sensitivity(
 
     # w = ∂(φᵀ K_g φ)/∂u : K_g^e is linear in u_e, so the per-dof derivative is
     # φₑᵀ K_g^e(unit_k) φₑ (the geometric stiffness evaluated at a unit displacement).
-    kg_units = [
-        _element_geometric_stiffness_quad(mesh, young, nu, np.eye(8)[k]) for k in range(8)
-    ]
+    kg_units = [_element_geometric_stiffness_quad(mesh, young, nu, np.eye(8)[k]) for k in range(8)]
     w = np.zeros(mesh.ndof)
     for eid in range(n_elem):
         edofs = mesh.element_dofs(eid)

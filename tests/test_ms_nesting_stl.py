@@ -29,8 +29,7 @@ from structure_optimizer.core.stl_export import (
 
 
 def _square(cx, cy, half):
-    return [(cx - half, cy - half), (cx + half, cy - half),
-            (cx + half, cy + half), (cx - half, cy + half)]
+    return [(cx - half, cy - half), (cx + half, cy - half), (cx + half, cy + half), (cx - half, cy + half)]
 
 
 def test_even_odd_nesting_detection():
@@ -64,6 +63,7 @@ def _holed_field(mesh, hole_lo, hole_hi):
 def _mesh_40():
     config = load_benchmark("cantilever", preset="smoke")
     from dataclasses import replace
+
     config = replace(config, mesh=replace(config.mesh, nelx=40, nely=40, width=40.0, height=40.0))
     return create_structured_mesh(config)
 
@@ -78,8 +78,9 @@ def _expected_holed_area(mesh, rho, rho_threshold=0.5):
             field[ey, ex] = rho[mesh.element_index(ex, ey)]
     x_coords = (np.arange(mesh.nelx) + 0.5) * cell_w
     y_coords = (np.arange(mesh.nely) + 0.5) * cell_h
-    loops = [lp for lp in marching_squares_contours(field, x_coords, y_coords, rho_threshold)
-             if polygon_area(lp) > 1e-12]
+    loops = [
+        lp for lp in marching_squares_contours(field, x_coords, y_coords, rho_threshold) if polygon_area(lp) > 1e-12
+    ]
     groups = classify_loops_even_odd(loops)
     area = 0.0
     for outer, holes in groups:
@@ -122,5 +123,4 @@ def test_contracts(tmp_path):
     with pytest.raises(SolverError, match="density_count_mismatch"):
         write_stl_smooth_holes(mesh, np.ones(3), tmp_path / "x.stl")
     with pytest.raises(SolverError, match="nonpositive_thickness"):
-        write_stl_smooth_holes(mesh, np.zeros(mesh.elements.shape[0]),
-                               tmp_path / "x.stl", z_thickness=0.0)
+        write_stl_smooth_holes(mesh, np.zeros(mesh.elements.shape[0]), tmp_path / "x.stl", z_thickness=0.0)

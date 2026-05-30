@@ -50,14 +50,21 @@ def gen_multi_constraint() -> None:
     config = load_benchmark("cantilever", preset="smoke")
     mesh = create_structured_mesh(config)
     r = multi_constraint_mma(config, mesh, sigma_limit=5.0e3, p=8.0, max_iter=6)
-    _write("multi_constraint_cantilever__smoke", {
-        "benchmark": "cantilever", "preset": "smoke",
-        "rubric_version": "v10.0-wave-KKK", "kind": "multi_constraint",
-        "sigma_limit": 5.0e3, "p": 8.0, "max_iter": 6,
-        "densities_sha256": _sha256(np.asarray(r.densities)),
-        "compliance_final": float(r.compliance_history[-1]),
-        "stress_final": float(r.stress_history[-1]),
-    })
+    _write(
+        "multi_constraint_cantilever__smoke",
+        {
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v10.0-wave-KKK",
+            "kind": "multi_constraint",
+            "sigma_limit": 5.0e3,
+            "p": 8.0,
+            "max_iter": 6,
+            "densities_sha256": _sha256(np.asarray(r.densities)),
+            "compliance_final": float(r.compliance_history[-1]),
+            "stress_final": float(r.stress_history[-1]),
+        },
+    )
 
 
 def gen_target_band() -> None:
@@ -70,13 +77,22 @@ def gen_target_band() -> None:
     w1 = float(np.sqrt(solve_modal(config, mesh, rho0, n_modes=1).omega_squared[0]))
     band = np.linspace(BAND_FACTORS[0] * w1, BAND_FACTORS[1] * w1, BAND_N)
     r = target_band_placement(config, mesh, band, beta=1e-4, n_steps=6, p=12.0)
-    _write("target_band_cantilever__smoke", {
-        "benchmark": "cantilever", "preset": "smoke",
-        "rubric_version": "v10.0-wave-LLL", "kind": "target_band",
-        "w1": w1, "band_factors": list(BAND_FACTORS), "band_n": BAND_N, "n_steps": 6, "p": 12.0,
-        "densities_sha256": _sha256(np.asarray(r.densities)),
-        "peak_final": float(r.peak_final),
-    })
+    _write(
+        "target_band_cantilever__smoke",
+        {
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v10.0-wave-LLL",
+            "kind": "target_band",
+            "w1": w1,
+            "band_factors": list(BAND_FACTORS),
+            "band_n": BAND_N,
+            "n_steps": 6,
+            "p": 12.0,
+            "densities_sha256": _sha256(np.asarray(r.densities)),
+            "peak_final": float(r.peak_final),
+        },
+    )
 
 
 def gen_copula_rosenblatt() -> None:
@@ -85,13 +101,19 @@ def gen_copula_rosenblatt() -> None:
     marginals = [Marginal(k, a, b) for k, a, b in COPULA_MARGINALS]
     rb = build_copula_rosenblatt(marginals, clayton_copula(COPULA_THETA))
     u = rb.x_to_u(np.asarray(COPULA_X))
-    _write("copula_rosenblatt_clayton", {
-        "benchmark": "clayton_bivariate",
-        "rubric_version": "v10.0-wave-NNN", "kind": "copula_rosenblatt",
-        "marginals": COPULA_MARGINALS, "theta": COPULA_THETA, "x": COPULA_X,
-        "u_sha256": _sha256(np.asarray(u)),
-        "u0": float(u[0]),
-    })
+    _write(
+        "copula_rosenblatt_clayton",
+        {
+            "benchmark": "clayton_bivariate",
+            "rubric_version": "v10.0-wave-NNN",
+            "kind": "copula_rosenblatt",
+            "marginals": COPULA_MARGINALS,
+            "theta": COPULA_THETA,
+            "x": COPULA_X,
+            "u_sha256": _sha256(np.asarray(u)),
+            "u0": float(u[0]),
+        },
+    )
 
 
 def gen_simultaneous_coupled() -> None:
@@ -102,15 +124,21 @@ def gen_simultaneous_coupled() -> None:
 
     config, _k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
     mesh = create_structured_mesh(config)
-    r = simultaneous_density_orientation_mma(config, mesh, 5.0, 1.0, max_iter=6,
-                                             heat_sources=sources, thermal_bcs=bcs)
-    _write("simultaneous_coupled_heat_sink__smoke", {
-        "benchmark": "heat_sink", "preset": "smoke",
-        "rubric_version": "v10.0-wave-OOO", "kind": "simultaneous_coupled",
-        "kxx": 5.0, "kyy": 1.0, "max_iter": 6,
-        "densities_sha256": _sha256(np.asarray(r.densities)),
-        "compliance_final": float(r.compliance_history[-1]),
-    })
+    r = simultaneous_density_orientation_mma(config, mesh, 5.0, 1.0, max_iter=6, heat_sources=sources, thermal_bcs=bcs)
+    _write(
+        "simultaneous_coupled_heat_sink__smoke",
+        {
+            "benchmark": "heat_sink",
+            "preset": "smoke",
+            "rubric_version": "v10.0-wave-OOO",
+            "kind": "simultaneous_coupled",
+            "kxx": 5.0,
+            "kyy": 1.0,
+            "max_iter": 6,
+            "densities_sha256": _sha256(np.asarray(r.densities)),
+            "compliance_final": float(r.compliance_history[-1]),
+        },
+    )
 
 
 def _ring_field(n: int = 64):
@@ -127,15 +155,20 @@ def gen_smooth_watertight() -> None:
 
     field, xs, ys = _ring_field()
     info = write_stl_smooth_watertight_holes(field, xs, ys, tempfile.mktemp(suffix=".stl"), n_samples=96)
-    _write("smooth_watertight_ring", {
-        "benchmark": "ring_64", "preset": "smoke",
-        "rubric_version": "v10.0-wave-QQQ", "kind": "smooth_watertight",
-        "n_samples": 96,
-        "field_sha256": _sha256(field),
-        "n_triangles": int(info["n_triangles"]),
-        "cross_section_area": float(info["cross_section_area"]),
-        "is_watertight": bool(info["is_watertight"]),
-    })
+    _write(
+        "smooth_watertight_ring",
+        {
+            "benchmark": "ring_64",
+            "preset": "smoke",
+            "rubric_version": "v10.0-wave-QQQ",
+            "kind": "smooth_watertight",
+            "n_samples": 96,
+            "field_sha256": _sha256(field),
+            "n_triangles": int(info["n_triangles"]),
+            "cross_section_area": float(info["cross_section_area"]),
+            "is_watertight": bool(info["is_watertight"]),
+        },
+    )
 
 
 def main() -> None:

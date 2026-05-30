@@ -306,7 +306,11 @@ def qp_relaxed_stress_pnorm_sensitivity(
     active = np.where(mesh.void_mask, opt.min_density, densities)
     density_scale = opt.min_density + (active**opt.penalty) * (1.0 - opt.min_density)
     solver = get_linear_solver(config.solver.backend)
-    stiffness = _assemble_stiffness_sparse(mesh, density_scale, ke) if solver.prefers_sparse else _assemble_stiffness_dense(mesh, density_scale, ke)
+    stiffness = (
+        _assemble_stiffness_sparse(mesh, density_scale, ke)
+        if solver.prefers_sparse
+        else _assemble_stiffness_dense(mesh, density_scale, ke)
+    )
     fixed = mesh.fixed_dofs(config.boundary_conditions)
     free = np.setdiff1d(np.arange(mesh.ndof), fixed)
     kff = stiffness.tocsr()[free, :][:, free] if solver.prefers_sparse else stiffness[np.ix_(free, free)]

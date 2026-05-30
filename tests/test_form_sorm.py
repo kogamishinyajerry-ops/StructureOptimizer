@@ -36,6 +36,7 @@ def _linear_limit_state(a: np.ndarray, beta0: float):
 
 # --- FORM ------------------------------------------------------------------
 
+
 def test_form_linear_exact_beta():
     a = np.array([3.0, 4.0])  # ‖a‖ = 5
     beta0 = 10.0
@@ -70,6 +71,7 @@ def test_form_rejects_bad_dimension():
 
 # --- SORM ------------------------------------------------------------------
 
+
 def test_sorm_reduces_to_form_for_linear():
     a = np.array([2.0, 1.0])
     g = _linear_limit_state(a, 4.0)
@@ -96,6 +98,7 @@ def test_sorm_parabola_bends_pf_down():
 
 
 # --- Importance sampling ---------------------------------------------------
+
 
 def test_importance_sampling_matches_analytical():
     a = np.array([1.0, 0.0])
@@ -129,6 +132,7 @@ def test_importance_sampling_rejects_bad_samples():
 
 
 # --- helper ----------------------------------------------------------------
+
 
 def test_standardize_gaussian_and_rejects_bad_std():
     u = standardize_gaussian([12.0, 8.0], mean=[10.0, 6.0], std=[2.0, 4.0])

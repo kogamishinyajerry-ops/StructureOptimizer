@@ -162,14 +162,21 @@ def write_stl(
 # Undirected edge-pairs the contour crosses, per 4-bit corner-inside case.
 # Saddle cases 5 and 10 are resolved at run time by the cell-centre value.
 _MS_CASES: dict[int, list[tuple[int, int]]] = {
-    0: [], 15: [],
-    1: [(3, 0)], 14: [(3, 0)],
-    2: [(0, 1)], 13: [(0, 1)],
-    3: [(1, 3)], 12: [(1, 3)],
-    4: [(1, 2)], 11: [(1, 2)],
-    6: [(0, 2)], 9: [(0, 2)],
-    7: [(2, 3)], 8: [(2, 3)],
-    5: [(3, 0), (1, 2)],   # saddle — resolved below
+    0: [],
+    15: [],
+    1: [(3, 0)],
+    14: [(3, 0)],
+    2: [(0, 1)],
+    13: [(0, 1)],
+    3: [(1, 3)],
+    12: [(1, 3)],
+    4: [(1, 2)],
+    11: [(1, 2)],
+    6: [(0, 2)],
+    9: [(0, 2)],
+    7: [(2, 3)],
+    8: [(2, 3)],
+    5: [(3, 0), (1, 2)],  # saddle — resolved below
     10: [(0, 1), (2, 3)],  # saddle — resolved below
 }
 
@@ -262,9 +269,7 @@ def marching_squares_contours(
                 else:
                     pairs = [(3, 0), (1, 2)] if center_inside else [(0, 1), (2, 3)]
             for ea, eb in pairs:
-                segments.append(
-                    (_edge_point(ea, corners, vals, level), _edge_point(eb, corners, vals, level))
-                )
+                segments.append((_edge_point(ea, corners, vals, level), _edge_point(eb, corners, vals, level)))
     return _stitch_loops(segments)
 
 
@@ -428,11 +433,7 @@ def ear_clipping_triangulate(loop) -> tuple[np.ndarray, list[tuple[int, int, int
             cross = (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])
             if cross <= eps:  # reflex or collinear — not a strict ear
                 continue
-            if any(
-                _point_strictly_in_tri(pts[j], a, b, c)
-                for j in idx
-                if j not in (i0, i1, i2)
-            ):
+            if any(_point_strictly_in_tri(pts[j], a, b, c) for j in idx if j not in (i0, i1, i2)):
                 continue
             tris.append((i0, i1, i2))
             del idx[ii]
@@ -463,6 +464,7 @@ def ear_clipping_triangulate(loop) -> tuple[np.ndarray, list[tuple[int, int, int
 
 def _segment_intersects(p1, p2, q1, q2) -> bool:
     """Proper segment intersection test (shared endpoints do not count)."""
+
     def orient(a, b, c):
         v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
         if abs(v) < 1e-12:
@@ -519,7 +521,7 @@ def triangulate_with_holes(outer_loop, holes=None) -> tuple[np.ndarray, list[tup
     for k, hr in enumerate(hole_rings):
         # The bridge must cross neither the current merged polygon nor any hole
         # not yet merged in.
-        all_rings = [merged, hr, *hole_rings[k + 1:]]
+        all_rings = [merged, hr, *hole_rings[k + 1 :]]
         oi, hi = _bridge_visible(merged, hr, all_rings)
         # Insert the slit: merged[..oi], hole[hi..wrap..hi], merged[oi..].
         hole_seq = np.vstack([np.roll(hr, -hi, axis=0), hr[hi][None, :]])
@@ -723,8 +725,9 @@ def write_stl_smooth_holes(
     x_coords = (np.arange(mesh.nelx) + 0.5) * cell_w
     y_coords = (np.arange(mesh.nely) + 0.5) * cell_h
 
-    loops = [lp for lp in marching_squares_contours(field, x_coords, y_coords, rho_threshold)
-             if polygon_area(lp) > 1e-12]
+    loops = [
+        lp for lp in marching_squares_contours(field, x_coords, y_coords, rho_threshold) if polygon_area(lp) > 1e-12
+    ]
     groups = classify_loops_even_odd(loops)
 
     triangles: list[str] = []
@@ -1166,7 +1169,8 @@ def recover_constraints_by_flips(
         pa, pb = pts[a], pts[b]
         # crossing-edge work list
         crossing = [
-            e for e in {e for t in tris for e in _tri_sorted_edges(t)}
+            e
+            for e in {e for t in tris for e in _tri_sorted_edges(t)}
             if a not in e and b not in e and _segment_intersects(pa, pb, pts[e[0]], pts[e[1]])
         ]
         guard = 0
@@ -1504,8 +1508,13 @@ def constrained_delaunay_ruppert(
             constraints.add(tuple(sorted((start + k, start + (k + 1) % m))))
 
     pts, kept, cons, _ = ruppert_refine(
-        pts_list, constraints, outer, hole_rings,
-        min_angle_deg=min_angle_deg, max_steiner=max_steiner, concentric_shells=concentric_shells,
+        pts_list,
+        constraints,
+        outer,
+        hole_rings,
+        min_angle_deg=min_angle_deg,
+        max_steiner=max_steiner,
+        concentric_shells=concentric_shells,
     )
     edge_count: dict[tuple[int, int], int] = {}
     for t in kept:
@@ -1556,9 +1565,7 @@ def write_stl_cdt_multi_hole(
     if concentric_shells and not refine:
         raise SolverError("stl_export_concentric_requires_refine")
     outer = _resample_closed_ring(outer_loop, n_samples) if n_samples else _clean_ring(outer_loop)
-    hole_rings = [
-        _resample_closed_ring(h, n_samples) if n_samples else _clean_ring(h) for h in (holes or [])
-    ]
+    hole_rings = [_resample_closed_ring(h, n_samples) if n_samples else _clean_ring(h) for h in (holes or [])]
     if refine:
         pts, tris = constrained_delaunay_ruppert(
             outer, hole_rings, min_angle_deg=min_angle_deg, concentric_shells=concentric_shells

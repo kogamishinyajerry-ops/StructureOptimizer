@@ -64,9 +64,7 @@ def test_reordering_cuts_fixed_sample_error_severalfold():
     """The headline: at a fixed small N the reordered error is several-fold smaller."""
     ref = _equicorr_mvn_cdf(_B, _RHO)
     err_nat = np.mean([abs(genz_mvn_cdf(_B, _R, n_samples=400, seed=s) - ref) for s in range(60)])
-    err_ord = np.mean(
-        [abs(genz_mvn_cdf_reordered(_B, _R, n_samples=400, seed=s) - ref) for s in range(60)]
-    )
+    err_ord = np.mean([abs(genz_mvn_cdf_reordered(_B, _R, n_samples=400, seed=s) - ref) for s in range(60)])
     # measured ratio ≈ 0.11 (≈9× error reduction); assert a safe < 0.5 (≥2× better)
     assert err_ord < 0.5 * err_nat
 

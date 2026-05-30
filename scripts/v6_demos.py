@@ -83,16 +83,15 @@ def convergence_study(out_path: str | Path, radius: float = 0.3) -> dict:
 
     svg = (
         f'<svg width="{w}" height="{hgt}" style="background:#fafafa;border:1px solid #ccc">'
-        f'{series(2, "#0066cc")}{series(3, "#cc3300")}'
-        f'<text x="{w/2}" y="{hgt-20}" text-anchor="middle" font-size="13">log₁₀ h (cell size)</text>'
-        f'<text x="20" y="{hgt/2}" text-anchor="middle" font-size="13" transform="rotate(-90,20,{hgt/2})">log₁₀ |area error|</text>'
-        f'<text x="{w-160}" y="40" font-size="12" fill="#0066cc">■ marching squares O(h²)</text>'
-        f'<text x="{w-160}" y="58" font-size="12" fill="#cc3300">■ voxel staircase O(h)</text>'
+        f"{series(2, '#0066cc')}{series(3, '#cc3300')}"
+        f'<text x="{w / 2}" y="{hgt - 20}" text-anchor="middle" font-size="13">log₁₀ h (cell size)</text>'
+        f'<text x="20" y="{hgt / 2}" text-anchor="middle" font-size="13" transform="rotate(-90,20,{hgt / 2})">log₁₀ |area error|</text>'
+        f'<text x="{w - 160}" y="40" font-size="12" fill="#0066cc">■ marching squares O(h²)</text>'
+        f'<text x="{w - 160}" y="58" font-size="12" fill="#cc3300">■ voxel staircase O(h)</text>'
         "</svg>"
     )
     table = "".join(
-        f"<tr><td>{n}</td><td>{h:.4f}</td><td>{e_ms:.3e}</td><td>{e_vx:.3e}</td>"
-        f"<td>{e_ms/e_vx:.3f}</td></tr>"
+        f"<tr><td>{n}</td><td>{h:.4f}</td><td>{e_ms:.3e}</td><td>{e_vx:.3e}</td><td>{e_ms / e_vx:.3f}</td></tr>"
         for (n, h, e_ms, e_vx) in rows
     )
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
@@ -128,16 +127,19 @@ def render_bode(out_path: str | Path, benchmark: str = "cantilever") -> dict:
 
     def plot(values, color, ylabel):
         vmin, vmax = min(values), max(values)
+
         def px(i):
             return m + i / (len(values) - 1) * (w - 2 * m)
+
         def py(v):
             return hgt - m - (v - vmin) / max(vmax - vmin, 1e-12) * (hgt - 2 * m)
+
         pts = " ".join(f"{px(i):.1f},{py(v):.1f}" for i, v in enumerate(values))
         return (
             f'<svg width="{w}" height="{hgt}" style="background:#fafafa;border:1px solid #ccc">'
             f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="2"/>'
-            f'<text x="{w/2}" y="{hgt-15}" text-anchor="middle" font-size="12">ω (rad/s)</text>'
-            f'<text x="18" y="{hgt/2}" text-anchor="middle" font-size="12" transform="rotate(-90,18,{hgt/2})">{ylabel}</text>'
+            f'<text x="{w / 2}" y="{hgt - 15}" text-anchor="middle" font-size="12">ω (rad/s)</text>'
+            f'<text x="18" y="{hgt / 2}" text-anchor="middle" font-size="12" transform="rotate(-90,18,{hgt / 2})">{ylabel}</text>'
             "</svg>"
         )
 
@@ -156,6 +158,7 @@ def render_bode(out_path: str | Path, benchmark: str = "cantilever") -> dict:
 
 def render_nsga3_html(out_path: str | Path) -> dict:
     """Render a 3-objective NSGA-III Pareto front (DTLZ2) to self-contained HTML."""
+
     def dtlz2(x):
         x = np.asarray(x, dtype=float)
         g = float(np.sum((x[2:] - 0.5) ** 2))
@@ -166,21 +169,29 @@ def render_nsga3_html(out_path: str | Path) -> dict:
 
     n_vars = 2 + 4
     front = nsga3(
-        dtlz2, n_vars, np.zeros(n_vars), np.ones(n_vars),
-        n_obj=3, n_divisions=12, n_generations=60, rng_seed=0,
+        dtlz2,
+        n_vars,
+        np.zeros(n_vars),
+        np.ones(n_vars),
+        n_obj=3,
+        n_divisions=12,
+        n_generations=60,
+        rng_seed=0,
     )
     objs = front.objectives
     # Simple isometric projection of (f0,f1,f2) onto 2D.
     w, hgt, m = 520, 420, 60
-    proj = np.column_stack([
-        objs[:, 0] - objs[:, 1] * 0.5,
-        objs[:, 2] - (objs[:, 0] + objs[:, 1]) * 0.25,
-    ])
+    proj = np.column_stack(
+        [
+            objs[:, 0] - objs[:, 1] * 0.5,
+            objs[:, 2] - (objs[:, 0] + objs[:, 1]) * 0.25,
+        ]
+    )
     pmin, pmax = proj.min(axis=0), proj.max(axis=0)
     rng = np.maximum(pmax - pmin, 1e-9)
     dots = "".join(
-        f'<circle cx="{m + (p[0]-pmin[0])/rng[0]*(w-2*m):.1f}" '
-        f'cy="{hgt-m - (p[1]-pmin[1])/rng[1]*(hgt-2*m):.1f}" r="3.5" fill="#0066cc" opacity="0.7"/>'
+        f'<circle cx="{m + (p[0] - pmin[0]) / rng[0] * (w - 2 * m):.1f}" '
+        f'cy="{hgt - m - (p[1] - pmin[1]) / rng[1] * (hgt - 2 * m):.1f}" r="3.5" fill="#0066cc" opacity="0.7"/>'
         for p in proj
     )
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">

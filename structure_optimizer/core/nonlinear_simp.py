@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+
 from structure_optimizer.core.config import BenchmarkConfig
 from structure_optimizer.core.fem2d import element_stiffness
 from structure_optimizer.core.filtering import density_filter

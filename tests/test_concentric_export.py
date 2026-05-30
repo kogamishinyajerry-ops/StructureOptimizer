@@ -66,5 +66,7 @@ def test_concentric_export_wrapper_equivalent(tmp_path):
     """write_stl_concentric_export == write_stl_cdt_multi_hole(refine=True, concentric_shells=True)."""
     p1, p2 = tmp_path / "w.stl", tmp_path / "e.stl"
     write_stl_concentric_export(_SPIKE, out_path=p1, solid_name="x")
-    write_stl_cdt_multi_hole(_SPIKE, out_path=p2, refine=True, concentric_shells=True, min_angle_deg=20.0, solid_name="x")
+    write_stl_cdt_multi_hole(
+        _SPIKE, out_path=p2, refine=True, concentric_shells=True, min_angle_deg=20.0, solid_name="x"
+    )
     assert Path(p1).read_bytes() == Path(p2).read_bytes()

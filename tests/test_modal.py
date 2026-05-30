@@ -142,9 +142,9 @@ def test_modal_cantilever_first_freq_matches_euler_bernoulli_order_of_magnitude(
     t = config.thickness
     L = config.mesh.width
     h = config.mesh.height
-    I = h**3 * t / 12.0
+    second_moment = h**3 * t / 12.0
     A = h * t
-    omega_eb = (1.875104**2 / L**2) * np.sqrt(E * I / (rho * A))
+    omega_eb = (1.875104**2 / L**2) * np.sqrt(E * second_moment / (rho * A))
 
     # Within 4× either direction (FEM 2D plate > EB beam due to shear)
     ratio = omega_fem / omega_eb
@@ -185,7 +185,6 @@ def test_solve_modal_rejects_n_modes_exceeding_free_dofs(vibrating_beam_smoke):
 def test_property_modal_eigenvalues_scale_with_stiffness(vibrating_beam_smoke):
     """ω² is proportional to E (stiffness); doubling E should quadruple ω²
     at constant density."""
-    from copy import deepcopy
     from dataclasses import replace
 
     config, mesh = vibrating_beam_smoke

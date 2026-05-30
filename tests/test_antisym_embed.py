@@ -68,10 +68,12 @@ def test_rearrangement_is_global_max_among_antisymmetric_orderings():
     even in θ, no other anti-symmetric arrangement beats it."""
     res = optimize_stacking_sequence(_D0, _HALF, _T, objective="max_bending", bending_shear_decoupled=True)
     from itertools import permutations
+
     best_brute = -np.inf
     for perm in {tuple(p) for p in permutations(_HALF.tolist())}:
         stack = make_antisymmetric_laminate(np.array(perm))
         from structure_optimizer.core.orthotropic_simp import laminate_abd
+
         _, _, d = laminate_abd(_D0, stack, np.full(stack.size, _T))
         best_brute = max(best_brute, float(d[0, 0]))
     assert res.objective_value == pytest.approx(best_brute, abs=1e-9)

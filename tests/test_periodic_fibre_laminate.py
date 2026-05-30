@@ -65,7 +65,7 @@ def test_continuity_gradient_matches_central_fd():
         ap[e] += h
         am[e] -= h
         fd = (period_aware_continuity(ap, pairs)[0] - period_aware_continuity(am, pairs)[0]) / (2 * h)
-        assert abs(grad.get(e, 0.0) - fd) <= 1e-6, f"elem {e}: analytic {grad.get(e,0.0)} vs FD {fd}"
+        assert abs(grad.get(e, 0.0) - fd) <= 1e-6, f"elem {e}: analytic {grad.get(e, 0.0)} vs FD {fd}"
 
 
 def test_single_ply_abd_closed_form():

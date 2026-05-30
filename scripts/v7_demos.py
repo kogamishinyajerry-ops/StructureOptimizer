@@ -62,8 +62,9 @@ def rbto_demo(out_path: str | Path, benchmark: str = "cantilever") -> dict:
     d_allow = _d_nominal_at(config, mesh, 0.45) * 1.6
     rows = []
     for beta_target in (1.0, 2.0, 3.0):
-        res = rbto_simp(config, mesh, d_allow=d_allow, beta_target=beta_target,
-                        load_cov=0.15, vf_low=0.2, vf_high=0.85, max_iter=8)
+        res = rbto_simp(
+            config, mesh, d_allow=d_allow, beta_target=beta_target, load_cov=0.15, vf_low=0.2, vf_high=0.85, max_iter=8
+        )
         rows.append((beta_target, res.volume_fraction, res.beta))
     vmax = max(r[1] for r in rows) or 1.0
     body = "<table><tr><th>β target</th><th>volume fraction</th><th>β achieved</th></tr>"
@@ -93,10 +94,7 @@ def dynamic_to_demo(out_path: str | Path, benchmark: str = "cantilever") -> dict
     sweep = np.linspace(10.0, 120.0, 28)
 
     def peak(r):
-        return max(
-            solve_damped_frequency_response(config, mesh, r, float(w), alpha, beta).max_magnitude
-            for w in sweep
-        )
+        return max(solve_damped_frequency_response(config, mesh, r, float(w), alpha, beta).max_magnitude for w in sweep)
 
     p0, p1 = peak(rho0), peak(res.densities)
     h = res.objective_history

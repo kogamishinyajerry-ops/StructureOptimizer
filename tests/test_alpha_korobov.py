@@ -59,10 +59,14 @@ def test_alpha2_spatial_equals_general_rkhs():
 def test_higher_smoothness_decays_faster():
     """The headline generalization payoff: a smoother space (higher α) gives a strictly
     faster lattice decay rate — mean error ratio per N-doubling increases with α."""
+
     def mean_ratio(alpha):
-        es = [korobov_worst_case_error(_korobov_generating_vector(_D, 33, n), n, _GAMMA, smoothness=alpha)
-              for n in (61, 127, 257, 521)]
+        es = [
+            korobov_worst_case_error(_korobov_generating_vector(_D, 33, n), n, _GAMMA, smoothness=alpha)
+            for n in (61, 127, 257, 521)
+        ]
         return float(np.mean([es[i] / es[i + 1] for i in range(len(es) - 1)]))
+
     r1, r2, r3 = mean_ratio(1), mean_ratio(2), mean_ratio(3)
     assert r2 > r1
     assert r3 > r2

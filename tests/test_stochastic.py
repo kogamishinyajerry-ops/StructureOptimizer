@@ -130,7 +130,11 @@ def test_monte_carlo_uq_with_callback_runs(uncertain_load_smoke):
         return float(np.max(np.abs(r.displacements)))
 
     result = monte_carlo_uq_with_callback(
-        config, mesh, densities, rng_seed=0, n_samples=5,
+        config,
+        mesh,
+        densities,
+        rng_seed=0,
+        n_samples=5,
         uncertainty=UncertaintySpec(load_magnitude_std=0.1),
         callback=max_disp_callback,
     )

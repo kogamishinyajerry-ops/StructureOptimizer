@@ -204,9 +204,7 @@ def test_load_case_with_empty_name_rejected():
 
 def test_load_case_with_nonpositive_weight_rejected():
     raw = _base_raw()
-    raw["load_cases"] = [
-        {"name": "primary", "weight": 0.0, "loads": [{"selector": "right_mid", "fx": 1.0}]}
-    ]
+    raw["load_cases"] = [{"name": "primary", "weight": 0.0, "loads": [{"selector": "right_mid", "fx": 1.0}]}]
     with pytest.raises(ConfigError, match="load case weight"):
         validate_config(parse_config(raw))
 
@@ -220,9 +218,7 @@ def test_load_case_without_loads_rejected():
 
 def test_load_case_load_with_zero_force_rejected():
     raw = _base_raw()
-    raw["load_cases"] = [
-        {"name": "primary", "weight": 1.0, "loads": [{"selector": "right_mid", "fx": 0.0, "fy": 0.0}]}
-    ]
+    raw["load_cases"] = [{"name": "primary", "weight": 1.0, "loads": [{"selector": "right_mid", "fx": 0.0, "fy": 0.0}]}]
     with pytest.raises(ConfigError, match="load case load must define nonzero"):
         validate_config(parse_config(raw))
 
@@ -235,21 +231,21 @@ def test_load_case_load_with_zero_force_rejected():
 def test_symmetry_with_bad_axis_rejected():
     raw = _base_raw()
     raw["manufacturing_constraints"] = {"symmetry": {"axis": "z", "position": 0.5}}
-    with pytest.raises(ConfigError, match="symmetry.axis must be"):
+    with pytest.raises(ConfigError, match=r"symmetry\.axis must be"):
         validate_config(parse_config(raw))
 
 
 def test_symmetry_with_out_of_range_position_rejected():
     raw = _base_raw()
     raw["manufacturing_constraints"] = {"symmetry": {"axis": "x", "position": 1.5}}
-    with pytest.raises(ConfigError, match="symmetry.position must be in"):
+    with pytest.raises(ConfigError, match=r"symmetry\.position must be in"):
         validate_config(parse_config(raw))
 
 
 def test_extrusion_with_bad_axis_rejected():
     raw = _base_raw()
     raw["manufacturing_constraints"] = {"extrusion": {"axis": "z"}}
-    with pytest.raises(ConfigError, match="extrusion.axis must be"):
+    with pytest.raises(ConfigError, match=r"extrusion\.axis must be"):
         validate_config(parse_config(raw))
 
 
