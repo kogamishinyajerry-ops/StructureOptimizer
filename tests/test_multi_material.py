@@ -96,7 +96,6 @@ def test_solve_multi_material_stiff_field_lower_compliance(bimaterial_smoke, two
 def test_solve_multi_material_single_material_matches_linear_elastic(bimaterial_smoke):
     """With M=1 and uniform density 1.0, compliance must match
     solve_linear_elastic computed with the single material's E."""
-    from copy import deepcopy
     from dataclasses import replace
 
     config, mesh = bimaterial_smoke

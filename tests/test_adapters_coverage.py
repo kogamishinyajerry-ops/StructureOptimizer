@@ -35,7 +35,6 @@ from structure_optimizer.adapters.solver_base import (
 )
 from structure_optimizer.core.fem2d import SolverError
 
-
 # ---------------------------------------------------------------------------
 # NumpyCGSolver: branch coverage
 # ---------------------------------------------------------------------------

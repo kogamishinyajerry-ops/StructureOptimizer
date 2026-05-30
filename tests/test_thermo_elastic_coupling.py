@@ -21,12 +21,9 @@ We don't implement a full monolithic thermo-mechanical solver in v5
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 import numpy as np
-import pytest
 from structure_optimizer.benchmarks.registry import load_benchmark
-from structure_optimizer.core.fem2d import element_stiffness, solve_linear_elastic
+from structure_optimizer.core.fem2d import element_stiffness
 from structure_optimizer.core.mesh import create_structured_mesh
 from structure_optimizer.core.thermal import solve_thermal
 

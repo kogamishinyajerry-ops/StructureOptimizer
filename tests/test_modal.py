@@ -185,7 +185,6 @@ def test_solve_modal_rejects_n_modes_exceeding_free_dofs(vibrating_beam_smoke):
 def test_property_modal_eigenvalues_scale_with_stiffness(vibrating_beam_smoke):
     """ω² is proportional to E (stiffness); doubling E should quadruple ω²
     at constant density."""
-    from copy import deepcopy
     from dataclasses import replace
 
     config, mesh = vibrating_beam_smoke
