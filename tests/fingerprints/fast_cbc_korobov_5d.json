@@ -1,0 +1,27 @@
+{
+  "benchmark": "reliability",
+  "preset": "smoke",
+  "rubric_version": "v16.0-wave-HHHHHHHH",
+  "kind": "fast_cbc",
+  "dim": 5,
+  "n_points": 1021,
+  "weights": [
+    1.0,
+    0.25,
+    0.1111111111111111,
+    0.0625,
+    0.04
+  ],
+  "korobov_a": 76,
+  "z": [
+    1,
+    374,
+    428,
+    453,
+    240
+  ],
+  "e_fast": 0.030665378203536105,
+  "e_korobov": 0.04336360267522668,
+  "fast_le_korobov": true,
+  "z_sha256": "sha256:44de058d4fb216470ddb4772675f219ac7a77d5068b11511fe5bcae1b85873e3"
+}

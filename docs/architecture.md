@@ -841,3 +841,34 @@ v15 多数 wave **把约束嵌入既有优化器循环**（不是只加新函数
 - D111 multi-family：仅 **CDF 级**（够 series 用），**未**做混合 Rosenblatt 采样；边缘仍标准正态（general non-normal-marginal Rosenblatt 留 reopening）。
 - D112 deterministic QMC：是确定性**界**非新估计器（未接入 `genz_mvn_cdf_lattice` 留 reopening）；仅 α=1 乘积权重；naive O(d·N²) CBC（非 fast-CBC FFT）。
 - 详见 D106-D113 各自 "Honest scope notes" + "Reopening criteria"。
+
+## 26. v16 — deep embedding & exact generalization：把 v15 构造原语再深一层接入生产优化器/估计器 + proxy 升精确 / 受限升一般
+
+v15 把 v14 浅集成原语接入生产优化器作真约束，但自身留下两类残口：(a) 一批仍是 **construction+verification 未接优化器**的原语（D110 anti-symmetric 未接 `optimize_stacking_sequence`；D112 CBC 未接 `genz_mvn_cdf_lattice`）；(b) 一批用了 **proxy / 受限假设**（D109 `active_multiplier` 是相对牺牲 proxy 非精确 MMA 对偶 λ；D111 仅 CDF 级 + 正态边缘 + 仅 series；D112 仅 α=1 乘积权重 + naive O(dN²) CBC）。v16 的主题是 **deep embedding & exact generalization**：把这些原语**再深一层接入生产估计器/优化器**，并把 **proxy 升级为精确量、把受限假设泛化**（AAAAAAAA-GGGGGGGG 七个能力 wave，HHHHHHHH 收口 = D114-D121）。
+
+### 26.1 v16 设计原则 — "深嵌入 / 精确泛化"铁律（叠加 v14 byte-exact + v15 约束真绑定）
+
+- **embedding wave**（接入既有生产函数）：必证 (a) opt-in 默认**逐位复现**原行为 (b) 开启时结果**改变**且满足新语义。
+- **exactness/generalization wave**（把 proxy 升精确 / 受限升一般）：必证 (a) 退化到旧受限情形**精确复现**旧量 (b) 一般情形给出旧量给不出的**新正确量**，且对独立参考（central-FD / 闭式 / 高 N 数值）定量吻合。
+- **诚实 defer 仍是一等公民**（沿用 D074/D091/D104/D112 先例）——proxy 升精确不成立则带探针证据诚实 defer，绝不伪造（D117 cross-regime 稳定 λ defer、D120 literal anchor 不可达改可达锚）。
+
+### 26.2 v16 七个能力 wave
+
+- **anti-symmetric 排序约束嵌入优化器**：D114 把 anti-symmetric 排序嵌入 `optimize_stacking_sequence(bending_shear_decoupled=)`（关闭 D110 reopening；输入当半层 ⟹ 闭式 max_bending 排序后建 [half,−reversed(half)] ⟹ D₁₆=D₂₆=0 + A₁₆=A₂₆=0；=False byte-exact 复现 D095；与 symmetric/balanced 互斥）。
+- **一般非正态边缘**：D115 `system_reliability_series_copula_marginals` 把 D111 CDF 级 series 泛化到任意 Marginal（Weibull/Gumbel/lognormal per-mode，u_k=Φ(Marginal.to_standard_normal(x_k))；正态(0,1)+β 逐位复现 D098；独立 copula ⟹ 1−∏F_k 对闭式 1e-10）。
+- **CBC 确定性向量接入 Genz 估计器**：D116 `genz_mvn_cdf_cbc` 把 D112 CBC 向量接入 Genz MVN CDF（单不移位 lattice ⟹ seed-free 逐位可复现 + 报告确定性 e(z) 证书；m=1 精确；收敛到 GH 参考；纯新增不动 D086）。
+- **proxy 升精确乘子**：D117 `peak_binding_exact_multiplier` = 包络定理影子价 λ=−dJ*/d(limit) 替代 D109 J/J_ref proxy（对可微 J* 精确：线性精确/否则 O(δ²)；active 0.08·init λ=+0.73 可靠；**cross-regime 稳定 λ 诚实 defer**——inactive 路径 MMA regrid path-noise > 信号，D109 proxy 保留为指示器）。
+- **高阶光滑 QMC**：D118 `korobov_worst_case_error(smoothness=α)` + `_korobov_kernel_omega_alpha`（ω_α=(−1)^{α+1}(2π)^{2α}/(2α)!·B_{2α}，闭式 B₂/B₄/B₆ numpy-only；α=1 走 D112 同代码路径逐位；α≥2 更快衰减；仅 α∈{1,2,3} 保 numpy-only）。
+- **并联 / 一般系统可靠性**：D119 `system_reliability_parallel_copula`（fails iff all fail = safe-copula 上 orthant 容斥）+ `system_reliability_k_out_of_n_copula`（Schuette–Nesbitt，k=1⟹series/k=m⟹parallel；独立 parallel=∏(1−Φ(β_k)) 1e-14；parallel≤series；O(Σ C(m,j)2^j) 仅小 m≤6）。
+- **fast-CBC（FFT）**：D120 `fast_cbc_korobov_generating_vector`（Nuyens–Cools：素数 N 按原根重排 (Z/N)^× ⟹ 每分量 CBC 目标=循环相关 ⟹ 一对 rfft/irfft O(N log N) 全候选，总 O(d·N·log N)；canonical 对称 min-g tie-break ⟹ 确定性；FFT 相关==直接 O(N²) 相关 2e-14 + e≤教科书 Korobov；**probe-then-decide**：literal anchor "fast z==naive z" 不可达——B₂(1−t)=B₂(t) ⟹ g↔N−g 精确对称 ⟹ 2^{d−1} 成员最优集、naive 靠浮点求和顺序选/fast 靠 canonical 选、等优；改锚可达真理）。
+
+### 26.3 v16 已知限制（诚实范围）
+
+- D114 anti-symmetric 嵌入：仅 max_bending 闭式全局；trade B₁₆≠0；min_coupling 搜索路径留 reopening；等厚弧度。
+- D115 general marginals：Sklar 分离非 Nataf 物理联合 Rosenblatt；CDF 级 series；仅 4 边缘类型（normal/lognormal/weibull/gumbel）。
+- D116 genz CBC：e(z) 证规则质量非本被积函数紧界；单不移位无统计误差估计；plain Cholesky 排序。
+- D117 exact multiplier：cross-regime 稳定 λ 诚实 defer（inactive MMA regrid path-noise）；机器精确仅对可微 value function；单 flanking mode；生产 active-regime λ>0 验证靠 --run-slow。
+- D118 α≥2 Korobov：仅 α∈{1,2,3} 保 numpy-only；证规则质量非特定被积函数紧界；CBC 仍 α=1。
+- D119 parallel/k-out-of-n：O(Σ_j C(m,j)2^j) 容斥仅小 m≤6（大 m 估计留 reopening）；标准正态 safe-prob；与 D115 一般边缘组合未接。
+- D120 fast-CBC：**非** naive z 逐位复现（可证不可能——对称最优集）；仅素数 N（合数留 reopening）；本仓库加速学术性（唯一消费者 genz N≤1021）。
+- 详见 D114-D121 各自 "Honest scope notes" + "Reopening criteria"。

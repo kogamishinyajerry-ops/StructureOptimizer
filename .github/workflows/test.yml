@@ -162,6 +162,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
         run: python scripts/test_agent.py --rubric v15 --strict
 
+      - name: v16 test agent — deep-embedding-&-exact-generalization rubric scorecard
+        # v16 §4.7: v16 rubric scored after v15. The v16 run enforces the D033
+        # pytest-green no-regression gate and the v4-v15 regression checks.
+        # Strict: v16 reached 100/100 at closure (Wave HHHHHHHH, D121).
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
+        run: python scripts/test_agent.py --rubric v16 --strict
+
   smoke:
     name: End-to-end smoke (Python 3.12 with extras)
     runs-on: ubuntu-latest

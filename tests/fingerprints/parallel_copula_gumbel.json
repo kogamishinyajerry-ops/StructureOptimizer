@@ -1,0 +1,16 @@
+{
+  "benchmark": "reliability",
+  "preset": "smoke",
+  "rubric_version": "v16.0-wave-HHHHHHHH",
+  "kind": "parallel_copula",
+  "betas": [
+    2.0,
+    2.5,
+    3.0,
+    1.8
+  ],
+  "theta": 2.5,
+  "p_f_parallel": 0.0012958467153770803,
+  "p_f_series": 0.040134771686929804,
+  "ks_sha256": "sha256:ddcab3f74b1ba6822012d7657395e1622974b0c57dece9997aa5f24af5f46a34"
+}

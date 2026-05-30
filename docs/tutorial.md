@@ -2379,6 +2379,24 @@ z = fast_cbc_korobov_generating_vector(5, 1021, gamma)   # 确定性，无 RNG�
 
 **诚实边界**（核心 — 决定 implement 而非照搬 blueprint anchor）：fast-CBC z **不是** naive z 的逐位复现，而且**可证不可能**——核 `B₂(1−t)=B₂(t)` ⟹ g 与 N−g 给**精确**相等的 worst-case error ⟹ 最优是 2^{d−1} 成员的对称集；naive 靠浮点求和顺序选成员、fast 靠 canonical min-g tie-break 选，二者**等优**（同 worst-case-error 类、同 ≤ 教科书 Korobov）。强行逐位匹配试到 20/21、第 21 例需任意 rounding 粒度 = 伪精度。**仅素数 N**（合数非循环群留 reopening）；**本仓库加速是学术性**（唯一消费者 genz N≤1021 naive 仅 ~0.35s，O(NlogN) 优势要 N≳10⁴）。
 
+### 26.8 v16 收口与 demos（Wave HHHHHHHH，D121）
+
+`scripts/v16_demos.py` 把 7 个能力 wave 各做一个**真实可运行** demo（调真生产函数、写 HTML 摘要、确定性）：
+
+```bash
+python scripts/v16_demos.py build/v16_demos   # 写 7 个 HTML
+```
+
+- `antisym_embed_demo`（D114）：decoupled D₁₆≈1e-13 vs plain D₁₆≈369
+- `general_marginal_demo`（D115）：正态边缘 bit-exact 复现 D098 + Weibull/Gumbel 真尾 CDF
+- `cbc_lattice_demo`（D116）：seed-free Φ₂(b;R) + 确定性 e(z) 证书
+- `exact_multiplier_demo`（D117）：J*=A/L ⟹ λ=A/L²=4.0；flat ⟹ 0；decreasing ⟹ >0
+- `alpha_korobov_demo`（D118）：α=2 的 e 比 α=1 小 ~17×
+- `parallel_system_demo`（D119）：parallel ≤ series + k=1..m
+- `fast_cbc_demo`（D120）：fast-CBC e ≤ 教科书 Korobov
+
+**收口门控**（`python scripts/test_agent.py --rubric v16 --strict`）：rubric 100/100 + v4-v15 无回归 + D033 pytest-green。其它量化门：test count 1323≥1290 / property 65≥65 / fingerprint 80≥80（tolerant + bit-exact 双 tier）/ mutation 80%≥75%。**坑提醒**：`--rubric v16 --strict` 全量回归链增至 v4-v15 共 12 里程碑，预计 ≥6h——用 harness `run_in_background:true` 跑，别 `nohup &`（会让 harness 误判 launcher 完成、真进程变 untracked orphan）。
+
 ---
 
 ## 常见错误
