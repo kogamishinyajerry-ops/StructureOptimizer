@@ -26,14 +26,19 @@ from structure_optimizer.core.simp import run_simp
 def _setup():
     config = load_benchmark("cantilever", preset="smoke")
     mesh = create_structured_mesh(config)
-    d_mid = float(run_simp(replace(config, optimization=replace(config.optimization, volume_fraction=0.45)), mesh).final_analysis.max_displacement)
+    d_mid = float(
+        run_simp(
+            replace(config, optimization=replace(config.optimization, volume_fraction=0.45)), mesh
+        ).final_analysis.max_displacement
+    )
     return config, mesh, d_mid * 1.6  # allowable in-bracket
 
 
 def test_system_rbto_meets_target_and_harder_than_single_mode():
     config, mesh, da = _setup()
-    res = system_rbto_simp(config, mesh, [da, da * 1.1], beta_target=2.0,
-                           load_covs=[0.15, 0.15], vf_low=0.2, vf_high=0.85)
+    res = system_rbto_simp(
+        config, mesh, [da, da * 1.1], beta_target=2.0, load_covs=[0.15, 0.15], vf_low=0.2, vf_high=0.85
+    )
     assert res.feasible
     assert res.beta_system >= 2.0 - 1e-9
     # an independent 2-mode series system is harder than either mode alone
@@ -57,8 +62,9 @@ def test_volume_monotone_in_target_beta():
 
 def test_system_pf_within_ditlevsen_bounds():
     config, mesh, da = _setup()
-    res = system_rbto_simp(config, mesh, [da, da * 1.1], beta_target=2.0,
-                           load_covs=[0.15, 0.2], vf_low=0.2, vf_high=0.85)
+    res = system_rbto_simp(
+        config, mesh, [da, da * 1.1], beta_target=2.0, load_covs=[0.15, 0.2], vf_low=0.2, vf_high=0.85
+    )
     bounds = system_reliability_series(res.per_mode_betas)
     assert bounds["p_failure_lower"] - 1e-9 <= res.p_failure_system <= bounds["p_failure_upper"] + 1e-9
 

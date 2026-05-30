@@ -64,8 +64,9 @@ def test_isotropic_base_has_zero_orientation_sensitivity():
 def test_fibre_steering_lowers_thermal_compliance():
     config, mesh, sources, bcs = _setup()
     rho = np.full(mesh.elements.shape[0], 1.0)
-    res = fibre_steering_thermal_to(config, mesh, rho, KXX, KYY, n_steps=20, step=0.3,
-                                    heat_sources=sources, thermal_bcs=bcs)
+    res = fibre_steering_thermal_to(
+        config, mesh, rho, KXX, KYY, n_steps=20, step=0.3, heat_sources=sources, thermal_bcs=bcs
+    )
     h = res.compliance_history
     assert len(h) == 21
     assert h[-1] < h[0]  # steering beats the fixed (axis-aligned) orientation

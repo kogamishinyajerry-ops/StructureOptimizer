@@ -53,6 +53,7 @@ TOLERANCE = 1e-9
 
 # --- deterministic recipes shared with scripts/generate_v6_fingerprints.py ---
 
+
 def _fp_linear_limit_state(u) -> float:
     """v6 FORM fingerprint limit state g(u) = 10 − (3u₀ + 4u₁); β = 10/5 = 2."""
     u = np.asarray(u, dtype=float)
@@ -294,7 +295,9 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         config = load_benchmark(bench, preset=preset)
         mesh = create_structured_mesh(config)
         densities = np.full(mesh.elements.shape[0], 0.6)
-        r = dynamic_compliance_sensitivity(config, mesh, densities, omega=rec["omega"], alpha=rec["alpha"], beta=rec["beta"])
+        r = dynamic_compliance_sensitivity(
+            config, mesh, densities, omega=rec["omega"], alpha=rec["alpha"], beta=rec["beta"]
+        )
         checks = [
             ("objective", rec["objective"], r.objective),
             ("c_real", rec["c_real"], r.dynamic_compliance.real),
@@ -355,8 +358,7 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         from structure_optimizer.core.reliability import system_reliability_series
 
         r = system_reliability_series(rec["betas"])
-        bounds = np.array([r["p_failure_lower"], r["p_failure_upper"],
-                           r["simple_lower"], r["simple_upper"]])
+        bounds = np.array([r["p_failure_lower"], r["p_failure_upper"], r["simple_lower"], r["simple_upper"]])
         checks = [
             ("p_failure_lower", rec["p_failure_lower"], r["p_failure_lower"]),
             ("p_failure_upper", rec["p_failure_upper"], r["p_failure_upper"]),
@@ -372,9 +374,17 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         config, _k, sources, bcs = load_thermal_benchmark(bench, preset=preset)
         mesh = create_structured_mesh(config)
         rho = np.full(mesh.elements.shape[0], 1.0)
-        r = fibre_steering_thermal_to(config, mesh, rho, rec["kxx"], rec["kyy"],
-                                      n_steps=rec["n_steps"], step=rec["step"],
-                                      heat_sources=sources, thermal_bcs=bcs)
+        r = fibre_steering_thermal_to(
+            config,
+            mesh,
+            rho,
+            rec["kxx"],
+            rec["kyy"],
+            n_steps=rec["n_steps"],
+            step=rec["step"],
+            heat_sources=sources,
+            thermal_bcs=bcs,
+        )
         checks = [
             ("compliance_initial", rec["compliance_initial"], r.compliance_history[0]),
             ("compliance_final", rec["compliance_final"], r.compliance_history[-1]),
@@ -433,8 +443,15 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         config, _k, sources, bcs = load_thermal_benchmark(bench, preset=preset)
         mesh = create_structured_mesh(config)
         r = coupled_density_orientation_to(
-            config, mesh, rec["kxx"], rec["kyy"], n_outer=rec["n_outer"],
-            n_orient_steps=rec["n_orient_steps"], heat_sources=sources, thermal_bcs=bcs)
+            config,
+            mesh,
+            rec["kxx"],
+            rec["kyy"],
+            n_outer=rec["n_outer"],
+            n_orient_steps=rec["n_orient_steps"],
+            heat_sources=sources,
+            thermal_bcs=bcs,
+        )
         checks = [("compliance_final", rec["compliance_final"], r.compliance_history[-1])]
         return np.asarray(r.densities), ("densities_sha256", rec["densities_sha256"]), checks
 
@@ -504,8 +521,8 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         config, _k, sources, bcs = load_thermal_benchmark(bench, preset=preset)
         mesh = create_structured_mesh(config)
         r = simultaneous_density_orientation_mma(
-            config, mesh, rec["kxx"], rec["kyy"], max_iter=rec["max_iter"],
-            heat_sources=sources, thermal_bcs=bcs)
+            config, mesh, rec["kxx"], rec["kyy"], max_iter=rec["max_iter"], heat_sources=sources, thermal_bcs=bcs
+        )
         checks = [("compliance_final", rec["compliance_final"], r.compliance_history[-1])]
         return np.asarray(r.densities), ("densities_sha256", rec["densities_sha256"]), checks
 
@@ -520,7 +537,9 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         gx, gy = np.meshgrid(xs, ys, indexing="xy")
         rr = np.sqrt((gx - 0.5) ** 2 + (gy - 0.5) ** 2)
         field = ((rr >= 0.25) & (rr <= 0.45)).astype(float)
-        info = write_stl_smooth_watertight_holes(field, xs, ys, tempfile.mktemp(suffix=".stl"), n_samples=rec["n_samples"])
+        info = write_stl_smooth_watertight_holes(
+            field, xs, ys, tempfile.mktemp(suffix=".stl"), n_samples=rec["n_samples"]
+        )
         checks = [
             ("n_triangles", rec["n_triangles"], info["n_triangles"]),
             ("cross_section_area", rec["cross_section_area"], info["cross_section_area"]),
@@ -601,11 +620,13 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
 
         c = nested_clayton_copula(4, rec["clusters"], rec["theta_outer"], rec["thetas_inner"])
         cdf = c.cdf(np.asarray(rec["u"]))
-        margins = np.array([
-            c.bivariate_margin_cdf(0, 1, 0.4, 0.6),
-            c.bivariate_margin_cdf(2, 3, 0.4, 0.6),
-            c.bivariate_margin_cdf(0, 2, 0.4, 0.6),
-        ])
+        margins = np.array(
+            [
+                c.bivariate_margin_cdf(0, 1, 0.4, 0.6),
+                c.bivariate_margin_cdf(2, 3, 0.4, 0.6),
+                c.bivariate_margin_cdf(0, 2, 0.4, 0.6),
+            ]
+        )
         checks = [("cdf", rec["cdf"], cdf), ("m01", rec["m01"], margins[0])]
         return margins, ("margins_sha256", rec["margins_sha256"]), checks
 
@@ -633,9 +654,17 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         from structure_optimizer.core.stl_export import _tri_area, constrained_delaunay_flip_recover
 
         star = [
-            [2.6146, 0.045], [0.3886, 0.0405], [2.1953, 0.578], [-0.096, 0.7683],
-            [-2.5324, -0.7121], [-1.381, -1.0942], [-0.1425, -1.1], [0.558, -1.3289],
-            [0.1514, -0.3447], [0.5424, -0.3312], [1.9375, -0.8374],
+            [2.6146, 0.045],
+            [0.3886, 0.0405],
+            [2.1953, 0.578],
+            [-0.096, 0.7683],
+            [-2.5324, -0.7121],
+            [-1.381, -1.0942],
+            [-0.1425, -1.1],
+            [0.558, -1.3289],
+            [0.1514, -0.3447],
+            [0.5424, -0.3312],
+            [1.9375, -0.8374],
         ]
         pts, tris = constrained_delaunay_flip_recover([np.array(p, float) for p in star], refine=True)
         area = sum(_tri_area(pts[i], pts[j], pts[k]) for i, j, k in tris)
@@ -683,9 +712,7 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         m = len(rec["b"])
         R = np.full((m, m), rec["rho"])
         np.fill_diagonal(R, 1.0)
-        val = genz_mvn_cdf_reordered(
-            np.array(rec["b"]), R, n_samples=rec["n_samples"], seed=rec["seed"]
-        )
+        val = genz_mvn_cdf_reordered(np.array(rec["b"]), R, n_samples=rec["n_samples"], seed=rec["seed"])
         checks = [("value", rec["value"], val)]
         return np.array([val]), ("value_sha256", rec["value_sha256"]), checks
 
@@ -696,9 +723,7 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         )
 
         d0 = orthotropic_plane_stress_matrix(140e3, 10e3, 0.3, 5e3)
-        res = optimize_stacking_sequence(
-            d0, np.array(rec["inventory"]), rec["thickness"], objective=rec["objective"]
-        )
+        res = optimize_stacking_sequence(d0, np.array(rec["inventory"]), rec["thickness"], objective=rec["objective"])
         checks = [
             ("sequence", rec["sequence"], res.sequence),
             ("d11", rec["d11"], res.objective_value),
@@ -716,7 +741,11 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         checks = [
             ("n_triangles", rec["n_triangles"], len(tris)),
             ("n_points", rec["n_points"], len(pts)),
-            ("min_angle_achieved_deg", rec["min_angle_achieved_deg"], float(np.degrees(_min_triangle_angle(pts, tris)))),
+            (
+                "min_angle_achieved_deg",
+                rec["min_angle_achieved_deg"],
+                float(np.degrees(_min_triangle_angle(pts, tris))),
+            ),
         ]
         return flat, ("tris_sha256", rec["tris_sha256"]), checks
 
@@ -763,7 +792,11 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
 
         d0 = orthotropic_plane_stress_matrix(140e3, 10e3, 0.3, 5e3)
         res = select_ply_angles(
-            d0, np.deg2rad(rec["candidates_deg"]), rec["n_plies"], thickness=rec["thickness"], objective=rec["objective"]
+            d0,
+            np.deg2rad(rec["candidates_deg"]),
+            rec["n_plies"],
+            thickness=rec["thickness"],
+            objective=rec["objective"],
         )
         checks = [("d11", rec["d11"], res.objective_value)]
         return np.asarray(res.sequence, dtype=float), ("sequence_sha256", rec["sequence_sha256"]), checks
@@ -821,8 +854,12 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
 
         d0 = orthotropic_plane_stress_matrix(140e3, 10e3, 0.3, 5e3)
         res = select_ply_angles(
-            d0, np.deg2rad(rec["candidates_deg"]), rec["n_plies"],
-            thickness=rec["thickness"], objective=rec["objective"], balanced=True,
+            d0,
+            np.deg2rad(rec["candidates_deg"]),
+            rec["n_plies"],
+            thickness=rec["thickness"],
+            objective=rec["objective"],
+            balanced=True,
         )
         checks = [("d11", rec["d11"], res.objective_value)]
         return np.asarray(res.sequence, dtype=float), ("sequence_sha256", rec["sequence_sha256"]), checks

@@ -43,7 +43,9 @@ def test_balanced_constraint_changes_the_design():
 
 def test_symmetric_balanced_zeros_both_a_and_b():
     """symmetric=True + balanced=True ⟹ A₁₆=A₂₆=0 (balance) AND ‖B‖=0 (symmetry)."""
-    res = optimize_stacking_sequence(_D0, np.deg2rad([30.0, 60.0]), _T, objective="max_bending", symmetric=True, balanced=True)
+    res = optimize_stacking_sequence(
+        _D0, np.deg2rad([30.0, 60.0]), _T, objective="max_bending", symmetric=True, balanced=True
+    )
     assert res.a_matrix[0, 2] == pytest.approx(0.0, abs=1e-7)
     assert res.a_matrix[1, 2] == pytest.approx(0.0, abs=1e-7)
     assert float(np.linalg.norm(res.b_matrix)) < 1e-7

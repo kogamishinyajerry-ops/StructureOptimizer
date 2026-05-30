@@ -200,8 +200,12 @@ def anisotropic_thermal_sensitivity(
     """
     densities = np.asarray(densities, dtype=float).reshape(-1)
     result = solve_thermal(
-        config, mesh, densities, conductivity=1.0,
-        heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+        config,
+        mesh,
+        densities,
+        conductivity=1.0,
+        heat_sources=heat_sources,
+        thermal_bcs=thermal_bcs,
         conductivity_tensor=conductivity_tensor,
         conductivity_tensor_field=conductivity_tensor_field,
     )
@@ -283,8 +287,12 @@ def orientation_sensitivity(
     angles = np.asarray(angles, dtype=float).reshape(-1)
     field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
     result = solve_thermal(
-        config, mesh, densities, conductivity=1.0,
-        heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+        config,
+        mesh,
+        densities,
+        conductivity=1.0,
+        heat_sources=heat_sources,
+        thermal_bcs=thermal_bcs,
         conductivity_tensor_field=field,
     )
     temps = result.temperatures
@@ -324,9 +332,15 @@ def fibre_steering_thermal_to(
     history: list[float] = []
     for _ in range(n_steps + 1):
         field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
-        r = solve_thermal(config, mesh, densities, conductivity=1.0,
-                          heat_sources=heat_sources, thermal_bcs=thermal_bcs,
-                          conductivity_tensor_field=field)
+        r = solve_thermal(
+            config,
+            mesh,
+            densities,
+            conductivity=1.0,
+            heat_sources=heat_sources,
+            thermal_bcs=thermal_bcs,
+            conductivity_tensor_field=field,
+        )
         history.append(float(r.thermal_compliance))
         if len(history) > n_steps:
             break
@@ -396,8 +410,12 @@ def coupled_density_orientation_to(
         # (1) density step at fixed orientation
         field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
         sens = anisotropic_thermal_sensitivity(
-            config, mesh, rho, conductivity_tensor_field=field,
-            heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+            config,
+            mesh,
+            rho,
+            conductivity_tensor_field=field,
+            heat_sources=heat_sources,
+            thermal_bcs=thermal_bcs,
         )
         sens = density_filter(mesh, rho, sens, opt.filter_radius, opt.min_density)
         prev_rho = rho.copy()
@@ -414,8 +432,12 @@ def coupled_density_orientation_to(
 
         field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
         c = solve_thermal(
-            config, mesh, rho, conductivity=1.0,
-            heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+            config,
+            mesh,
+            rho,
+            conductivity=1.0,
+            heat_sources=heat_sources,
+            thermal_bcs=thermal_bcs,
             conductivity_tensor_field=field,
         ).thermal_compliance
         history.append(float(c))
@@ -490,8 +512,12 @@ def simultaneous_density_orientation_mma(
         field = orientation_field_to_tensors(kxx, kyy, ang_v, kxy)
         return float(
             solve_thermal(
-                config, mesh, rho_v, conductivity=1.0,
-                heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+                config,
+                mesh,
+                rho_v,
+                conductivity=1.0,
+                heat_sources=heat_sources,
+                thermal_bcs=thermal_bcs,
                 conductivity_tensor_field=field,
             ).thermal_compliance
         )
@@ -505,8 +531,12 @@ def simultaneous_density_orientation_mma(
         angles[design] = x[n_design:]
         field = orientation_field_to_tensors(kxx, kyy, angles, kxy)
         d_rho = anisotropic_thermal_sensitivity(
-            config, mesh, rho, conductivity_tensor_field=field,
-            heat_sources=heat_sources, thermal_bcs=thermal_bcs,
+            config,
+            mesh,
+            rho,
+            conductivity_tensor_field=field,
+            heat_sources=heat_sources,
+            thermal_bcs=thermal_bcs,
         )
         d_rho = density_filter(mesh, rho, d_rho, opt.filter_radius, opt.min_density)
         d_theta = orientation_sensitivity(config, mesh, rho, angles, kxx, kyy, kxy, heat_sources, thermal_bcs)

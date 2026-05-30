@@ -565,10 +565,14 @@ def check_v5_4_6_v5_rubric_in_agent() -> tuple[int, str, str]:
     """§4.6 quality-rubric-v5.md referenced in this script (2 pts)."""
     me = REPO_ROOT / "scripts/test_agent.py"
     txt = me.read_text()
-    return (2, "PASS", "v5 rubric referenced") if "quality-rubric-v5" in txt or "v5 multi-physics" in txt else (
-        0,
-        "FAIL",
-        "no v5 reference",
+    return (
+        (2, "PASS", "v5 rubric referenced")
+        if "quality-rubric-v5" in txt or "v5 multi-physics" in txt
+        else (
+            0,
+            "FAIL",
+            "no v5 reference",
+        )
     )
 
 
@@ -641,14 +645,18 @@ def check_v5_6_3_arch_v5() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (2, "PASS", "v5 section present") if ("v5" in txt and "multi-physics" in txt) else (0, "FAIL", "no v5 section")
+    return (
+        (2, "PASS", "v5 section present") if ("v5" in txt and "multi-physics" in txt) else (0, "FAIL", "no v5 section")
+    )
 
 
 def check_v5_6_4_adrs_v5() -> tuple[int, str, str]:
     """§6.4 ADRs D025-D032 ≥ 8 new (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D0[23]*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 25]
-    return (3, "PASS", f"{len(new_adrs)} v5 ADRs") if len(new_adrs) >= 8 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥8)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v5 ADRs") if len(new_adrs) >= 8 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥8)")
+    )
 
 
 # --- v6 production-grade rubric checks ---------------------------------
@@ -667,7 +675,13 @@ def check_v6_1_1_total_lagrangian() -> tuple[int, str, str]:
 
 def check_v6_1_2_rayleigh_damping() -> tuple[int, str, str]:
     """§1.2 Rayleigh-damped complex frequency response (6 pts)."""
-    has = _grep_count(r"damped_harmonic|rayleigh_damp|alpha.*M.*beta.*K|C\s*=\s*alpha", "structure_optimizer/core/freq_response.py") >= 1
+    has = (
+        _grep_count(
+            r"damped_harmonic|rayleigh_damp|alpha.*M.*beta.*K|C\s*=\s*alpha",
+            "structure_optimizer/core/freq_response.py",
+        )
+        >= 1
+    )
     has_test = _grep_count(r"rayleigh|damped.*freq|half_power|damping_ratio", "tests/**/*.py") >= 1
     if has and has_test:
         return 6, "PASS", "damped harmonic response + test"
@@ -678,7 +692,13 @@ def check_v6_1_2_rayleigh_damping() -> tuple[int, str, str]:
 
 def check_v6_1_3_anisotropic_thermal() -> tuple[int, str, str]:
     """§1.3 anisotropic / orthotropic thermal conductivity (6 pts)."""
-    has = _grep_count(r"anisotropic|orthotropic|conductivity_matrix|tensor.*conduct|k_xy|kxy", "structure_optimizer/core/thermal.py") >= 1
+    has = (
+        _grep_count(
+            r"anisotropic|orthotropic|conductivity_matrix|tensor.*conduct|k_xy|kxy",
+            "structure_optimizer/core/thermal.py",
+        )
+        >= 1
+    )
     has_test = _grep_count(r"anisotropic|orthotropic|rotation.*invar|tensor.*conduct", "tests/**/*.py") >= 1
     if has and has_test:
         return 6, "PASS", "tensor conductivity + test"
@@ -689,7 +709,12 @@ def check_v6_1_3_anisotropic_thermal() -> tuple[int, str, str]:
 
 def check_v6_1_4_nsga3() -> tuple[int, str, str]:
     """§1.4 NSGA-III for ≥3 objectives (5 pts)."""
-    has = _grep_count(r"nsga3|nsga_iii|das_dennis|reference_direction|reference_point", "structure_optimizer/core/pareto_nsga.py") >= 1
+    has = (
+        _grep_count(
+            r"nsga3|nsga_iii|das_dennis|reference_direction|reference_point", "structure_optimizer/core/pareto_nsga.py"
+        )
+        >= 1
+    )
     has_test = _grep_count(r"nsga3|nsga_iii|three_objective|3.?obj|das_dennis", "tests/**/*.py") >= 1
     if has and has_test:
         return 5, "PASS", "NSGA-III + 3-objective test"
@@ -700,7 +725,13 @@ def check_v6_1_4_nsga3() -> tuple[int, str, str]:
 
 def check_v6_2_1_form() -> tuple[int, str, str]:
     """§2.1 FORM reliability index β (5 pts)."""
-    has = _grep_count(r"def form|form_reliability|hl_rf|hasofer|reliability_index|\bbeta\b.*reliab", "structure_optimizer/core/reliability.py") >= 1
+    has = (
+        _grep_count(
+            r"def form|form_reliability|hl_rf|hasofer|reliability_index|\bbeta\b.*reliab",
+            "structure_optimizer/core/reliability.py",
+        )
+        >= 1
+    )
     has_test = _grep_count(r"\bform\b|reliability_index|hl_rf|beta.*linear|linear.*limit_state", "tests/**/*.py") >= 1
     if has and has_test:
         return 5, "PASS", "FORM + analytical β test"
@@ -722,7 +753,12 @@ def check_v6_2_2_importance_sampling() -> tuple[int, str, str]:
 
 def check_v6_2_3_sorm() -> tuple[int, str, str]:
     """§2.3 SORM / curvature correction (3 pts)."""
-    has = _grep_count(r"\bsorm\b|breitung|curvature.*correct|second_order_reliab", "structure_optimizer/core/reliability.py") >= 1
+    has = (
+        _grep_count(
+            r"\bsorm\b|breitung|curvature.*correct|second_order_reliab", "structure_optimizer/core/reliability.py"
+        )
+        >= 1
+    )
     has_test = _grep_count(r"\bsorm\b|breitung|curvature.*reliab", "tests/**/*.py") >= 1
     if has and has_test:
         return 3, "PASS", "SORM + test"
@@ -755,7 +791,13 @@ def check_v6_2_5_half_power_bandwidth() -> tuple[int, str, str]:
 
 def check_v6_3_1_smooth_stl() -> tuple[int, str, str]:
     """§3.1 marching-squares smooth-boundary STL (5 pts)."""
-    has = _grep_count(r"marching_squares|smooth_boundary|export_stl_smooth|smooth.*contour", "structure_optimizer/core/stl_export.py") >= 1
+    has = (
+        _grep_count(
+            r"marching_squares|smooth_boundary|export_stl_smooth|smooth.*contour",
+            "structure_optimizer/core/stl_export.py",
+        )
+        >= 1
+    )
     has_test = _grep_count(r"marching_squares|smooth.*stl|area_converg|smooth_boundary", "tests/**/*.py") >= 1
     if has and has_test:
         return 5, "PASS", "smooth-boundary STL + area-convergence test"
@@ -766,7 +808,10 @@ def check_v6_3_1_smooth_stl() -> tuple[int, str, str]:
 
 def check_v6_3_2_reverse_ad() -> tuple[int, str, str]:
     """§3.2 reverse-mode AD (tape) (5 pts)."""
-    has = _grep_count(r"reverse_mode|backward|class Tape|def grad\b|\.backward\(", "structure_optimizer/core/autodiff.py") >= 1
+    has = (
+        _grep_count(r"reverse_mode|backward|class Tape|def grad\b|\.backward\(", "structure_optimizer/core/autodiff.py")
+        >= 1
+    )
     return (5, "PASS", "reverse-mode AD present") if has else (0, "FAIL", "no reverse-mode AD")
 
 
@@ -880,14 +925,20 @@ def check_v6_6_3_arch_v6() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (2, "PASS", "v6 section present") if ("v6" in txt and "production-grade" in txt) else (0, "FAIL", "no v6 section")
+    return (
+        (2, "PASS", "v6 section present")
+        if ("v6" in txt and "production-grade" in txt)
+        else (0, "FAIL", "no v6 section")
+    )
 
 
 def check_v6_6_4_adrs_v6() -> tuple[int, str, str]:
     """§6.4 ADRs D034+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D0[34]*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 34]
-    return (3, "PASS", f"{len(new_adrs)} v6 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v6 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 # --- v7 rubric: production drivers & field-level fidelity ----------------
@@ -908,50 +959,85 @@ def _mod_and_test(module: str, mod_pat: str, test_pat: str, full: int, partial_m
 def check_v7_1_1_rbto() -> tuple[int, str, str]:
     """§1.1 reliability-based TO — FORM into a SIMP driver (8 pts)."""
     return _mod_and_test(
-        "structure_optimizer/core/rbto.py", r"def rbto|reliability_based|beta_target|rbto_simp",
-        r"rbto|reliability_based.*to|beta_target", 8, "RBTO module, no test", "RBTO + analytical-β test")
+        "structure_optimizer/core/rbto.py",
+        r"def rbto|reliability_based|beta_target|rbto_simp",
+        r"rbto|reliability_based.*to|beta_target",
+        8,
+        "RBTO module, no test",
+        "RBTO + analytical-β test",
+    )
 
 
 def check_v7_1_2_nonlinear_to() -> tuple[int, str, str]:
     """§1.2 geometric-nonlinear TO via full-TL adjoint sensitivity (8 pts)."""
     return _mod_and_test(
-        "structure_optimizer/core/nonlinear_simp.py", r"total_lagrangian|tl_adjoint|green_strain|geometric_nonlinear.*simp|nonlinear_compliance",
-        r"tl_adjoint|nonlinear.*sensitivity.*fd|geometric_nonlinear.*to", 8, "nonlinear-TO module, no test", "nonlinear TO + adjoint-vs-FD test")
+        "structure_optimizer/core/nonlinear_simp.py",
+        r"total_lagrangian|tl_adjoint|green_strain|geometric_nonlinear.*simp|nonlinear_compliance",
+        r"tl_adjoint|nonlinear.*sensitivity.*fd|geometric_nonlinear.*to",
+        8,
+        "nonlinear-TO module, no test",
+        "nonlinear TO + adjoint-vs-FD test",
+    )
 
 
 def check_v7_1_3_damped_fr_to() -> tuple[int, str, str]:
     """§1.3 damped frequency-response TO — minimise dynamic compliance (8 pts)."""
     return _mod_and_test(
-        "structure_optimizer/core/freq_response.py", r"dynamic_compliance|damped.*simp|freq_response_to|dynamic_to",
-        r"dynamic_compliance|damped.*to|freq.*response.*sensitivity", 8, "damped-FR-TO in module, no test", "damped-FR TO + sensitivity test")
+        "structure_optimizer/core/freq_response.py",
+        r"dynamic_compliance|damped.*simp|freq_response_to|dynamic_to",
+        r"dynamic_compliance|damped.*to|freq.*response.*sensitivity",
+        8,
+        "damped-FR-TO in module, no test",
+        "damped-FR TO + sensitivity test",
+    )
 
 
 def check_v7_2_1_per_element_anisotropic() -> tuple[int, str, str]:
     """§2.1 per-element anisotropic thermal field (5 pts)."""
     return _mod_and_test(
-        "structure_optimizer/core/thermal.py", r"per_element.*tensor|tensor_field|conductivity_field|element_orientation|fibre_angle",
-        r"per_element.*anisotrop|fibre_angle|orientation_field|tensor_field", 5, "per-element field in module, no test", "per-element anisotropic field + patch test")
+        "structure_optimizer/core/thermal.py",
+        r"per_element.*tensor|tensor_field|conductivity_field|element_orientation|fibre_angle",
+        r"per_element.*anisotrop|fibre_angle|orientation_field|tensor_field",
+        5,
+        "per-element field in module, no test",
+        "per-element anisotropic field + patch test",
+    )
 
 
 def check_v7_2_2_anisotropic_thermal_to() -> tuple[int, str, str]:
     """§2.2 anisotropic thermal TO sensitivity (4 pts)."""
     return _mod_and_test(
-        "structure_optimizer/core/thermal_simp.py", r"anisotropic.*sens|tensor.*sensitivity|anisotropic.*simp",
-        r"anisotropic.*thermal.*sens|anisotropic.*thermal.*to", 4, "anisotropic sens in module, no test", "anisotropic thermal TO sensitivity + FD test")
+        "structure_optimizer/core/thermal_simp.py",
+        r"anisotropic.*sens|tensor.*sensitivity|anisotropic.*simp",
+        r"anisotropic.*thermal.*sens|anisotropic.*thermal.*to",
+        4,
+        "anisotropic sens in module, no test",
+        "anisotropic thermal TO sensitivity + FD test",
+    )
 
 
 def check_v7_2_3_nsga3_density_field() -> tuple[int, str, str]:
     """§2.3 NSGA-III directly on density fields, not proxies (7 pts)."""
     return _mod_and_test(
-        "structure_optimizer/core/multi_objective_to.py", r"def .*multi_objective|nsga3.*density|density.*genome|hypervolume",
-        r"multi_objective.*to|density.*pareto|hypervolume", 7, "density-field MO module, no test", "NSGA-III density-field TO + hypervolume test")
+        "structure_optimizer/core/multi_objective_to.py",
+        r"def .*multi_objective|nsga3.*density|density.*genome|hypervolume",
+        r"multi_objective.*to|density.*pareto|hypervolume",
+        7,
+        "density-field MO module, no test",
+        "NSGA-III density-field TO + hypervolume test",
+    )
 
 
 def check_v7_3_1_nataf() -> tuple[int, str, str]:
     """§3.1 Nataf transform for correlated Gaussians (4 pts)."""
     return _mod_and_test(
-        "structure_optimizer/core/reliability.py", r"NatafTransform|build_nataf|correlated_gaussian_reliability|_equivalent_normal_correlation",
-        r"nataf|correlated.*gaussian|correlation.*reliab", 4, "Nataf in module, no test", "Nataf transform + correlated mapping test")
+        "structure_optimizer/core/reliability.py",
+        r"NatafTransform|build_nataf|correlated_gaussian_reliability|_equivalent_normal_correlation",
+        r"nataf|correlated.*gaussian|correlation.*reliab",
+        4,
+        "Nataf in module, no test",
+        "Nataf transform + correlated mapping test",
+    )
 
 
 def check_v7_3_2_correlated_form() -> tuple[int, str, str]:
@@ -963,8 +1049,13 @@ def check_v7_3_2_correlated_form() -> tuple[int, str, str]:
 def check_v7_3_3_earclip_stl() -> tuple[int, str, str]:
     """§3.3 ear-clipping general-polygon STL triangulation (4 pts)."""
     return _mod_and_test(
-        "structure_optimizer/core/stl_export.py", r"ear_clip|earclip|triangulate_polygon|def .*triangulate",
-        r"ear_clip|earclip|triangulate.*polygon|concave.*stl", 4, "ear-clipping in module, no test", "ear-clipping + concave-polygon area test")
+        "structure_optimizer/core/stl_export.py",
+        r"ear_clip|earclip|triangulate_polygon|def .*triangulate",
+        r"ear_clip|earclip|triangulate.*polygon|concave.*stl",
+        4,
+        "ear-clipping in module, no test",
+        "ear-clipping + concave-polygon area test",
+    )
 
 
 def check_v7_3_4_hole_handling() -> tuple[int, str, str]:
@@ -1011,7 +1102,11 @@ def check_v7_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v7_4_7_v7_in_agent_ci() -> tuple[int, str, str]:
@@ -1075,14 +1170,20 @@ def check_v7_6_3_arch_v7() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v7 section present") if ("## 17." in p.read_text() and "driver" in txt) else (0, "FAIL", "no v7 section")
+    return (
+        (3, "PASS", "v7 section present")
+        if ("## 17." in p.read_text() and "driver" in txt)
+        else (0, "FAIL", "no v7 section")
+    )
 
 
 def check_v7_6_4_adrs_v7() -> tuple[int, str, str]:
     """§6.4 ADRs D042+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D04*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 42]
-    return (3, "PASS", f"{len(new_adrs)} v7 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v7 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v7_6_5_anchors_documented() -> tuple[int, str, str]:
@@ -1359,7 +1460,10 @@ def check_v8_1_1_nonlinear_oc() -> tuple[int, str, str]:
         "structure_optimizer/core/nonlinear_simp.py",
         r"nonlinear_to_oc|geometric_nonlinear_optimize|tl_simp_optimize|def .*nonlinear.*optimize",
         r"nonlinear.*oc|nonlinear.*loop|large_deformation.*topolog|nonlinear_to_optimize",
-        8, "nonlinear OC loop in module, no test", "nonlinear TO OC loop + large-deformation-vs-linear test")
+        8,
+        "nonlinear OC loop in module, no test",
+        "nonlinear TO OC loop + large-deformation-vs-linear test",
+    )
 
 
 def check_v8_1_2_dynamic_oc() -> tuple[int, str, str]:
@@ -1368,7 +1472,10 @@ def check_v8_1_2_dynamic_oc() -> tuple[int, str, str]:
         "structure_optimizer/core/freq_response.py",
         r"dynamic_compliance_to|band_dynamic|multi_omega|def .*dynamic.*optimize",
         r"dynamic.*to.*loop|band.*dynamic|multi_omega|dynamic_compliance_to",
-        8, "dynamic OC loop in module, no test", "filtered multi-ω dynamic-compliance TO loop + test")
+        8,
+        "dynamic OC loop in module, no test",
+        "filtered multi-ω dynamic-compliance TO loop + test",
+    )
 
 
 def check_v8_1_3_seeded_nsga3() -> tuple[int, str, str]:
@@ -1377,7 +1484,10 @@ def check_v8_1_3_seeded_nsga3() -> tuple[int, str, str]:
         "structure_optimizer/core/multi_objective_to.py",
         r"seed.*simp|warm_start|gradient_seed|seeded_pareto",
         r"seed.*nsga|warm_start|gradient_seed|seeded.*hypervolume",
-        8, "seeded NSGA-III in module, no test", "gradient-seeded NSGA-III + HV-vs-budget test")
+        8,
+        "seeded NSGA-III in module, no test",
+        "gradient-seeded NSGA-III + HV-vs-budget test",
+    )
 
 
 def check_v8_2_1_general_nataf() -> tuple[int, str, str]:
@@ -1386,7 +1496,10 @@ def check_v8_2_1_general_nataf() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"gauss_hermite|nataf_integral|def .*weibull|def .*gumbel|equivalent_correlation_integral",
         r"gauss_hermite|weibull|gumbel|nataf.*integral",
-        8, "general-marginal Nataf in module, no test", "Gauss-Hermite Nataf + Weibull/Gumbel test")
+        8,
+        "general-marginal Nataf in module, no test",
+        "Gauss-Hermite Nataf + Weibull/Gumbel test",
+    )
 
 
 def check_v8_2_2_system_reliability() -> tuple[int, str, str]:
@@ -1395,7 +1508,10 @@ def check_v8_2_2_system_reliability() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"system_reliability|ditlevsen|series_system|parallel_system",
         r"system_reliability|ditlevsen|series.*system|parallel.*system",
-        8, "system reliability in module, no test", "system reliability + Ditlevsen-bounds test")
+        8,
+        "system reliability in module, no test",
+        "system reliability + Ditlevsen-bounds test",
+    )
 
 
 def check_v8_3_1_fibre_steering() -> tuple[int, str, str]:
@@ -1404,7 +1520,10 @@ def check_v8_3_1_fibre_steering() -> tuple[int, str, str]:
         "structure_optimizer/core/thermal_simp.py",
         r"fibre_steer|orientation_sensitivity|optimize_orientation|steer.*thermal",
         r"fibre_steer|orientation.*sensitivity|steer.*thermal|orientation.*fd",
-        8, "fibre-steering in module, no test", "fibre-steering orientation sensitivity + FD test")
+        8,
+        "fibre-steering in module, no test",
+        "fibre-steering orientation sensitivity + FD test",
+    )
 
 
 def check_v8_3_2_ms_nesting() -> tuple[int, str, str]:
@@ -1413,7 +1532,10 @@ def check_v8_3_2_ms_nesting() -> tuple[int, str, str]:
         "structure_optimizer/core/stl_export.py",
         r"nested.*loop|detect.*hole|even_odd.*loop|classify_loops|write_stl_smooth_holes",
         r"nested.*loop|ms.*hole|smooth.*hole|nesting.*stl",
-        7, "MS nesting in module, no test", "MS nested-loop detection + holed-STL area test")
+        7,
+        "MS nesting in module, no test",
+        "MS nested-loop detection + holed-STL area test",
+    )
 
 
 def check_v8_4_1_test_count_920() -> tuple[int, str, str]:
@@ -1454,7 +1576,11 @@ def check_v8_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v8_4_7_v8_in_agent_ci() -> tuple[int, str, str]:
@@ -1473,7 +1599,11 @@ def check_v8_4_7_v8_in_agent_ci() -> tuple[int, str, str]:
 def check_v8_5_1_nonlinear_dynamic_demo() -> tuple[int, str, str]:
     """§5.1 nonlinear / dynamic OC-loop demo (3 pts)."""
     n = _grep_count(r"nonlinear_oc_demo|dynamic_oc_demo|nonlinear_loop_demo|render.*nonlinear.*loop", "**/*.py")
-    return (3, "PASS", f"{n} nonlinear/dynamic-loop demo refs") if n >= 1 else (0, "FAIL", "no nonlinear/dynamic-loop demo")
+    return (
+        (3, "PASS", f"{n} nonlinear/dynamic-loop demo refs")
+        if n >= 1
+        else (0, "FAIL", "no nonlinear/dynamic-loop demo")
+    )
 
 
 def check_v8_5_2_seeded_nsga_demo() -> tuple[int, str, str]:
@@ -1518,19 +1648,27 @@ def check_v8_6_3_arch_v8() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v8 section present") if ("## 18." in p.read_text() and "loop" in txt) else (0, "FAIL", "no v8 section")
+    return (
+        (3, "PASS", "v8 section present")
+        if ("## 18." in p.read_text() and "loop" in txt)
+        else (0, "FAIL", "no v8 section")
+    )
 
 
 def check_v8_6_4_adrs_v8() -> tuple[int, str, str]:
     """§6.4 ADRs D050+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D05*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 50]
-    return (3, "PASS", f"{len(new_adrs)} v8 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v8 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v8_6_5_anchors_documented() -> tuple[int, str, str]:
     """§6.5 v8 quantitative anchors present in tests (3 pts)."""
-    n = _grep_count(r"large_deformation|gauss_hermite|ditlevsen|fibre_steer|hypervolume.*budget|nested.*loop", "tests/**/*.py")
+    n = _grep_count(
+        r"large_deformation|gauss_hermite|ditlevsen|fibre_steer|hypervolume.*budget|nested.*loop", "tests/**/*.py"
+    )
     return (3, "PASS", f"{n} v8-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
 
 
@@ -1636,7 +1774,10 @@ def check_v9_1_1_mma_tl() -> tuple[int, str, str]:
         "structure_optimizer/core/nonlinear_simp.py",
         r"mma_nonlinear_to|nonlinear_to_mma|mma.*tl.*to|tl.*mma_to",
         r"mma.*nonlinear|nonlinear.*mma|mma_tl",
-        8, "MMA-TL in module, no test", "MMA-driven TL nonlinear TO + convergence-vs-OC test")
+        8,
+        "MMA-TL in module, no test",
+        "MMA-driven TL nonlinear TO + convergence-vs-OC test",
+    )
 
 
 def check_v9_1_2_band_gap() -> tuple[int, str, str]:
@@ -1645,7 +1786,10 @@ def check_v9_1_2_band_gap() -> tuple[int, str, str]:
         "structure_optimizer/core/freq_response.py",
         r"band_gap|minimax_band|eigenfrequency_gap|maximize_band|band_stop",
         r"band_gap|minimax_band|band_stop|eigenfrequency_gap",
-        8, "band objective in module, no test", "band-gap/minimax band objective + sensitivity test")
+        8,
+        "band objective in module, no test",
+        "band-gap/minimax band objective + sensitivity test",
+    )
 
 
 def check_v9_1_3_three_objective() -> tuple[int, str, str]:
@@ -1654,7 +1798,10 @@ def check_v9_1_3_three_objective() -> tuple[int, str, str]:
         "structure_optimizer/core/multi_objective_to.py",
         r"multi_load_case|three_objective|n_objectives|multi_objective.*3|three_obj",
         r"three_objective|multi_load|3.*objective|n_obj",
-        8, "3-objective in module, no test", "≥3-objective multi-load NSGA-III + hypervolume test")
+        8,
+        "3-objective in module, no test",
+        "≥3-objective multi-load NSGA-III + hypervolume test",
+    )
 
 
 def check_v9_2_1_rosenblatt() -> tuple[int, str, str]:
@@ -1663,13 +1810,21 @@ def check_v9_2_1_rosenblatt() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"rosenblatt|RosenblattTransform|conditional_cdf",
         r"rosenblatt|conditional_cdf",
-        8, "Rosenblatt in module, no test", "Rosenblatt transform vs Nataf + round-trip test")
+        8,
+        "Rosenblatt in module, no test",
+        "Rosenblatt transform vs Nataf + round-trip test",
+    )
 
 
 def check_v9_2_2_system_rbto() -> tuple[int, str, str]:
     """§2.2 system-reliability-based TO (drive to a target system β) (8 pts)."""
-    has_rbto = _grep_count(r"system_rbto|system_reliability_to|target_system_beta", "structure_optimizer/core/rbto.py") >= 1
-    has_rel = _grep_count(r"system_rbto|system_reliability_to|target_system_beta", "structure_optimizer/core/reliability.py") >= 1
+    has_rbto = (
+        _grep_count(r"system_rbto|system_reliability_to|target_system_beta", "structure_optimizer/core/rbto.py") >= 1
+    )
+    has_rel = (
+        _grep_count(r"system_rbto|system_reliability_to|target_system_beta", "structure_optimizer/core/reliability.py")
+        >= 1
+    )
     has_test = _grep_count(r"system_rbto|system.*rbto|target_system_beta", "tests/**/*.py") >= 1
     if (has_rbto or has_rel) and has_test:
         return 8, "PASS", "system-reliability-based TO + target-β test"
@@ -1684,7 +1839,10 @@ def check_v9_3_1_coupled_orientation() -> tuple[int, str, str]:
         "structure_optimizer/core/thermal_simp.py",
         r"coupled_density_orientation|alternating_minim|coupled.*orientation|coupled_thermal_to",
         r"coupled.*orientation|alternating.*minim|coupled_density",
-        8, "coupled TO in module, no test", "coupled density+orientation TO + alternating-min test")
+        8,
+        "coupled TO in module, no test",
+        "coupled density+orientation TO + alternating-min test",
+    )
 
 
 def check_v9_3_2_slit_free() -> tuple[int, str, str]:
@@ -1693,7 +1851,10 @@ def check_v9_3_2_slit_free() -> tuple[int, str, str]:
         "structure_optimizer/core/stl_export.py",
         r"monotone.*triangulat|constrained_delaunay|slit_free|triangulate_monotone|triangulate_simple",
         r"monotone|slit_free|watertight.*annulus|robust.*hole|slitfree",
-        7, "slit-free triangulation in module, no test", "slit-free hole triangulation + annulus-watertight test")
+        7,
+        "slit-free triangulation in module, no test",
+        "slit-free hole triangulation + annulus-watertight test",
+    )
 
 
 def check_v9_4_1_test_count_960() -> tuple[int, str, str]:
@@ -1734,7 +1895,11 @@ def check_v9_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v9_4_7_v9_in_agent_ci() -> tuple[int, str, str]:
@@ -1770,7 +1935,9 @@ def check_v9_5_3_reliability_demo() -> tuple[int, str, str]:
 
 def check_v9_5_4_geometry_demo() -> tuple[int, str, str]:
     """§5.4 coupled-field / slit-free STL demo (2 pts)."""
-    n = _grep_count(r"coupled_field_demo|slit_free_demo|watertight_annulus_demo|monotone_demo|coupled_orientation_demo", "**/*.py")
+    n = _grep_count(
+        r"coupled_field_demo|slit_free_demo|watertight_annulus_demo|monotone_demo|coupled_orientation_demo", "**/*.py"
+    )
     return (2, "PASS", f"{n} geometry-demo refs") if n >= 1 else (0, "FAIL", "no geometry demo")
 
 
@@ -1798,19 +1965,28 @@ def check_v9_6_3_arch_v9() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v9 section present") if ("## 19." in p.read_text() and "loop" in txt) else (0, "FAIL", "no v9 section")
+    return (
+        (3, "PASS", "v9 section present")
+        if ("## 19." in p.read_text() and "loop" in txt)
+        else (0, "FAIL", "no v9 section")
+    )
 
 
 def check_v9_6_4_adrs_v9() -> tuple[int, str, str]:
     """§6.4 ADRs D058+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D05*.md")) + list((REPO_ROOT / "docs/decisions").glob("D06*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 58]
-    return (3, "PASS", f"{len(new_adrs)} v9 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v9 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v9_6_5_anchors_documented() -> tuple[int, str, str]:
     """§6.5 v9 quantitative anchors present in tests (3 pts)."""
-    n = _grep_count(r"mma.*tl|band_gap|three_objective|rosenblatt|coupled.*orientation|system_rbto|slit_free|monotone.*tri", "tests/**/*.py")
+    n = _grep_count(
+        r"mma.*tl|band_gap|three_objective|rosenblatt|coupled.*orientation|system_rbto|slit_free|monotone.*tri",
+        "tests/**/*.py",
+    )
     return (3, "PASS", f"{n} v9-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
 
 
@@ -1864,7 +2040,10 @@ def check_v10_1_1_multi_constraint_mma() -> tuple[int, str, str]:
         "structure_optimizer/core/nonlinear_simp.py",
         r"multi_constraint_mma|stress_constrained|mma.*stress|pnorm_stress",
         r"multi_constraint|stress_constrained|stress.*pnorm|pnorm.*stress",
-        8, "multi-constraint MMA in module, no test", "multi-constraint MMA (stress+volume) + test")
+        8,
+        "multi-constraint MMA in module, no test",
+        "multi-constraint MMA (stress+volume) + test",
+    )
 
 
 def check_v10_1_2_target_band() -> tuple[int, str, str]:
@@ -1873,7 +2052,10 @@ def check_v10_1_2_target_band() -> tuple[int, str, str]:
         "structure_optimizer/core/freq_response.py",
         r"target_band|band_placement|minimax_around|place_band",
         r"target_band|band_placement|minimax_around|place_band",
-        8, "target-band placement in module, no test", "target-band placement + sensitivity test")
+        8,
+        "target-band placement in module, no test",
+        "target-band placement + sensitivity test",
+    )
 
 
 def check_v10_1_3_generalized_nsga() -> tuple[int, str, str]:
@@ -1882,7 +2064,10 @@ def check_v10_1_3_generalized_nsga() -> tuple[int, str, str]:
         "structure_optimizer/core/multi_objective_to.py",
         r"nsga3_density_to|igd_plus|igd\+|generalized_nsga",
         r"nsga3_density_to|igd_plus|igd\+|generalised.*nsga|refactor.*identical",
-        8, "generalised NSGA in module, no test", "generalised nsga3_density_to + IGD+ test")
+        8,
+        "generalised NSGA in module, no test",
+        "generalised nsga3_density_to + IGD+ test",
+    )
 
 
 def check_v10_2_1_archimedean_copula() -> tuple[int, str, str]:
@@ -1891,7 +2076,10 @@ def check_v10_2_1_archimedean_copula() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"clayton|frank_copula|archimedean|copula_rosenblatt",
         r"clayton|frank_copula|archimedean|copula",
-        8, "Archimedean copula in module, no test", "Archimedean copula Rosenblatt + round-trip test")
+        8,
+        "Archimedean copula in module, no test",
+        "Archimedean copula Rosenblatt + round-trip test",
+    )
 
 
 def check_v10_2_2_correlated_system_rbto() -> tuple[int, str, str]:
@@ -1900,7 +2088,10 @@ def check_v10_2_2_correlated_system_rbto() -> tuple[int, str, str]:
         "structure_optimizer/core/rbto.py",
         r"correlated_system|system_rbto.*corr|rho_modes|correlated.*rbto",
         r"correlated_system|correlated.*system.*rbto|system.*corr",
-        8, "correlated-system RBTO in module, no test", "correlated-system-mode RBTO + test")
+        8,
+        "correlated-system RBTO in module, no test",
+        "correlated-system-mode RBTO + test",
+    )
 
 
 def check_v10_3_1_simultaneous_mma() -> tuple[int, str, str]:
@@ -1909,7 +2100,10 @@ def check_v10_3_1_simultaneous_mma() -> tuple[int, str, str]:
         "structure_optimizer/core/thermal_simp.py",
         r"simultaneous.*mma|joint.*mma|mma.*coupled|coupled_mma",
         r"simultaneous.*mma|joint.*mma|coupled_mma|simultaneous.*coupled",
-        8, "simultaneous MMA in module, no test", "simultaneous (ρ,θ) MMA + vs-alternating test")
+        8,
+        "simultaneous MMA in module, no test",
+        "simultaneous (ρ,θ) MMA + vs-alternating test",
+    )
 
 
 def check_v10_3_2_smooth_watertight() -> tuple[int, str, str]:
@@ -1918,7 +2112,10 @@ def check_v10_3_2_smooth_watertight() -> tuple[int, str, str]:
         "structure_optimizer/core/stl_export.py",
         r"smooth_watertight|monotone_contour|cdt_holes|smooth.*hole.*watertight|triangulate_contour",
         r"smooth_watertight|monotone_contour|cdt|smooth.*watertight",
-        7, "smooth-watertight triangulation in module, no test", "smooth+watertight holed contour + test")
+        7,
+        "smooth-watertight triangulation in module, no test",
+        "smooth+watertight holed contour + test",
+    )
 
 
 def check_v10_4_1_test_count_1000() -> tuple[int, str, str]:
@@ -1959,7 +2156,11 @@ def check_v10_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v10_4_7_v10_in_agent_ci() -> tuple[int, str, str]:
@@ -2023,19 +2224,28 @@ def check_v10_6_3_arch_v10() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v10 section present") if ("## 20." in p.read_text() and "constraint" in txt) else (0, "FAIL", "no v10 section")
+    return (
+        (3, "PASS", "v10 section present")
+        if ("## 20." in p.read_text() and "constraint" in txt)
+        else (0, "FAIL", "no v10 section")
+    )
 
 
 def check_v10_6_4_adrs_v10() -> tuple[int, str, str]:
     """§6.4 ADRs D066+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D0[67]*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 66]
-    return (3, "PASS", f"{len(new_adrs)} v10 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v10 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v10_6_5_anchors_documented() -> tuple[int, str, str]:
     """§6.5 v10 quantitative anchors present in tests (3 pts)."""
-    n = _grep_count(r"multi_constraint|target_band|igd_plus|clayton|frank|simultaneous.*mma|smooth_watertight|correlated_system", "tests/**/*.py")
+    n = _grep_count(
+        r"multi_constraint|target_band|igd_plus|clayton|frank|simultaneous.*mma|smooth_watertight|correlated_system",
+        "tests/**/*.py",
+    )
     return (3, "PASS", f"{n} v10-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
 
 
@@ -2100,7 +2310,10 @@ def check_v11_1_1_stress_relaxation_buckling() -> tuple[int, str, str]:
         "structure_optimizer/core/stress.py",
         r"qp_stress|relaxed_stress|epsilon_relax|stress_singularity|buckling",
         r"qp_stress|relaxed_stress|stress_singularity|buckling|relaxation",
-        8, "stress relaxation in module, no test", "qp-relaxed stress + qp-stress-constrained MMA + test (buckling-driving deferred to D074 reopening)")
+        8,
+        "stress relaxation in module, no test",
+        "qp-relaxed stress + qp-stress-constrained MMA + test (buckling-driving deferred to D074 reopening)",
+    )
 
 
 def check_v11_1_2_adaptive_band() -> tuple[int, str, str]:
@@ -2109,7 +2322,10 @@ def check_v11_1_2_adaptive_band() -> tuple[int, str, str]:
         "structure_optimizer/core/freq_response.py",
         r"adaptive_band|band_refine|peak_constraint|adaptive.*sampl",
         r"adaptive_band|peak_constraint|adaptive.*sampl|peak.*as.*constraint",
-        8, "adaptive band in module, no test", "adaptive band sampling + peak-as-constraint + test")
+        8,
+        "adaptive band in module, no test",
+        "adaptive band sampling + peak-as-constraint + test",
+    )
 
 
 def check_v11_1_3_reference_free_indicator() -> tuple[int, str, str]:
@@ -2118,7 +2334,10 @@ def check_v11_1_3_reference_free_indicator() -> tuple[int, str, str]:
         "structure_optimizer/core/multi_objective_to.py",
         r"hypervolume_indicator|r2_indicator|reference_free|hv_only",
         r"hypervolume_indicator|r2_indicator|reference_free|r2.*indicator",
-        8, "reference-free indicator in module, no test", "reference-free quality indicator + test")
+        8,
+        "reference-free indicator in module, no test",
+        "reference-free quality indicator + test",
+    )
 
 
 def check_v11_2_1_gumbel_dim_copula() -> tuple[int, str, str]:
@@ -2127,7 +2346,10 @@ def check_v11_2_1_gumbel_dim_copula() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"gumbel_copula|nested_copula|d_dim.*copula|copula.*nested",
         r"gumbel|nested_copula|d_dim.*copula|gumbel.*copula",
-        8, "Gumbel/nested copula in module, no test", "Gumbel / d-dim copula + round-trip test")
+        8,
+        "Gumbel/nested copula in module, no test",
+        "Gumbel / d-dim copula + round-trip test",
+    )
 
 
 def check_v11_2_2_genz_system() -> tuple[int, str, str]:
@@ -2136,7 +2358,10 @@ def check_v11_2_2_genz_system() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"genz|multivariate_normal_cdf|mvn_cdf|full_correlation",
         r"genz|multivariate_normal_cdf|mvn_cdf|full.*correlation",
-        8, "Genz/MVN-CDF in module, no test", "Genz multivariate system P_f + test")
+        8,
+        "Genz/MVN-CDF in module, no test",
+        "Genz multivariate system P_f + test",
+    )
 
 
 def check_v11_3_1_elastic_simultaneous_mma() -> tuple[int, str, str]:
@@ -2145,7 +2370,10 @@ def check_v11_3_1_elastic_simultaneous_mma() -> tuple[int, str, str]:
         "structure_optimizer/core/orthotropic_simp.py",
         r"elastic.*orientation|orthotropic.*mma|fibre_continuity|simultaneous.*elastic|elastic_simultaneous",
         r"elastic.*orientation|orthotropic|fibre_continuity|elastic.*simultaneous",
-        8, "elastic simultaneous MMA in module, no test", "elastic simultaneous (ρ,θ) MMA + fibre-continuity test")
+        8,
+        "elastic simultaneous MMA in module, no test",
+        "elastic simultaneous (ρ,θ) MMA + fibre-continuity test",
+    )
 
 
 def check_v11_3_2_constrained_delaunay() -> tuple[int, str, str]:
@@ -2154,7 +2382,10 @@ def check_v11_3_2_constrained_delaunay() -> tuple[int, str, str]:
         "structure_optimizer/core/stl_export.py",
         r"constrained_delaunay|cdt|multi_hole.*watertight|delaunay",
         r"constrained_delaunay|cdt|multi_hole|delaunay",
-        7, "constrained-Delaunay in module, no test", "constrained-Delaunay multi-hole + test")
+        7,
+        "constrained-Delaunay in module, no test",
+        "constrained-Delaunay multi-hole + test",
+    )
 
 
 def check_v11_4_1_test_count_1050() -> tuple[int, str, str]:
@@ -2195,7 +2426,11 @@ def check_v11_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v11_4_7_v11_in_agent_ci() -> tuple[int, str, str]:
@@ -2259,19 +2494,28 @@ def check_v11_6_3_arch_v11() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v11 section present") if ("## 21." in p.read_text() and "robust" in txt) else (0, "FAIL", "no v11 section")
+    return (
+        (3, "PASS", "v11 section present")
+        if ("## 21." in p.read_text() and "robust" in txt)
+        else (0, "FAIL", "no v11 section")
+    )
 
 
 def check_v11_6_4_adrs_v11() -> tuple[int, str, str]:
     """§6.4 ADRs D074+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D0[78]*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 74]
-    return (3, "PASS", f"{len(new_adrs)} v11 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v11 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v11_6_5_anchors_documented() -> tuple[int, str, str]:
     """§6.5 v11 quantitative anchors present in tests (3 pts)."""
-    n = _grep_count(r"qp_stress|buckling|adaptive_band|reference_free|gumbel|genz|elastic.*orientation|constrained_delaunay", "tests/**/*.py")
+    n = _grep_count(
+        r"qp_stress|buckling|adaptive_band|reference_free|gumbel|genz|elastic.*orientation|constrained_delaunay",
+        "tests/**/*.py",
+    )
     return (3, "PASS", f"{n} v11-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
 
 
@@ -2336,7 +2580,10 @@ def check_v12_1_1_design_buckling() -> tuple[int, str, str]:
         "structure_optimizer/core/buckling.py",
         r"design_grade|adjoint.*buckl|buckling.*adjoint|void_mode|du_drho|design_buckling",
         r"design_grade|void_mode|design_buckling|buckling.*adjoint|adjoint.*buckl",
-        8, "design-grade buckling in module, no test", "design-grade buckling adjoint + void-mode + test")
+        8,
+        "design-grade buckling in module, no test",
+        "design-grade buckling adjoint + void-mode + test",
+    )
 
 
 def check_v12_1_2_inloop_band() -> tuple[int, str, str]:
@@ -2345,7 +2592,10 @@ def check_v12_1_2_inloop_band() -> tuple[int, str, str]:
         "structure_optimizer/core/freq_response.py",
         r"inloop|in_loop|adaptive.*regrid|regrid|adaptive_peak_constrained",
         r"inloop|in_loop|regrid|adaptive_peak_constrained",
-        8, "in-loop re-grid in module, no test", "in-loop adaptive band re-gridding + test")
+        8,
+        "in-loop re-grid in module, no test",
+        "in-loop adaptive band re-gridding + test",
+    )
 
 
 def check_v12_1_3_augmented_r2() -> tuple[int, str, str]:
@@ -2354,7 +2604,10 @@ def check_v12_1_3_augmented_r2() -> tuple[int, str, str]:
         "structure_optimizer/core/multi_objective_to.py",
         r"augmented_r2|r2_augmented|spacing_indicator|diversity_indicator|augmented.*tcheb",
         r"augmented_r2|spacing_indicator|diversity_indicator|augmented",
-        8, "augmented R2 in module, no test", "augmented R2 + diversity indicator + test")
+        8,
+        "augmented R2 in module, no test",
+        "augmented R2 + diversity indicator + test",
+    )
 
 
 def check_v12_2_1_nested_copula() -> tuple[int, str, str]:
@@ -2363,7 +2616,10 @@ def check_v12_2_1_nested_copula() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"nested_copula|hierarchical_copula|NestedClayton|per_cluster|nested_clayton",
         r"nested_copula|hierarchical|nested_clayton|per_cluster",
-        8, "nested copula in module, no test", "nested/hierarchical copula + round-trip test")
+        8,
+        "nested copula in module, no test",
+        "nested/hierarchical copula + round-trip test",
+    )
 
 
 def check_v12_2_2_korobov_genz() -> tuple[int, str, str]:
@@ -2372,7 +2628,10 @@ def check_v12_2_2_korobov_genz() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"korobov|lattice_genz|genz_lattice|genz_mvn_cdf_lattice",
         r"korobov|lattice_genz|genz_lattice|standard_error",
-        8, "Korobov Genz in module, no test", "Korobov lattice Genz + error bound + test")
+        8,
+        "Korobov Genz in module, no test",
+        "Korobov lattice Genz + error bound + test",
+    )
 
 
 def check_v12_3_1_periodic_fibre() -> tuple[int, str, str]:
@@ -2381,7 +2640,10 @@ def check_v12_3_1_periodic_fibre() -> tuple[int, str, str]:
         "structure_optimizer/core/orthotropic_simp.py",
         r"period_aware|periodic_continuity|laminate|abd_matrix|sin.*continuity",
         r"period_aware|periodic|laminate|abd",
-        8, "period-aware fibre in module, no test", "period-aware fibre continuity + laminate + test")
+        8,
+        "period-aware fibre in module, no test",
+        "period-aware fibre continuity + laminate + test",
+    )
 
 
 def check_v12_3_2_cdt_flip_recovery() -> tuple[int, str, str]:
@@ -2390,7 +2652,10 @@ def check_v12_3_2_cdt_flip_recovery() -> tuple[int, str, str]:
         "structure_optimizer/core/stl_export.py",
         r"constraint_recovery|edge_flip|flip_recover|refine_triangulation|cdt_refine",
         r"constraint_recovery|edge_flip|flip|refine",
-        7, "CDT flip-recovery in module, no test", "flip constraint recovery + refinement + test")
+        7,
+        "CDT flip-recovery in module, no test",
+        "flip constraint recovery + refinement + test",
+    )
 
 
 def check_v12_4_1_test_count_1095() -> tuple[int, str, str]:
@@ -2431,7 +2696,11 @@ def check_v12_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v12_4_7_v12_in_agent_ci() -> tuple[int, str, str]:
@@ -2495,19 +2764,28 @@ def check_v12_6_3_arch_v12() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v12 section present") if ("## 22." in p.read_text() and "adaptive" in txt) else (0, "FAIL", "no v12 section")
+    return (
+        (3, "PASS", "v12 section present")
+        if ("## 22." in p.read_text() and "adaptive" in txt)
+        else (0, "FAIL", "no v12 section")
+    )
 
 
 def check_v12_6_4_adrs_v12() -> tuple[int, str, str]:
     """§6.4 ADRs D082+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D08[2-9]*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 82]
-    return (3, "PASS", f"{len(new_adrs)} v12 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v12 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v12_6_5_anchors_documented() -> tuple[int, str, str]:
     """§6.5 v12 quantitative anchors present in tests (3 pts)."""
-    n = _grep_count(r"design_grade|void_mode|inloop|augmented_r2|nested_copula|korobov|period_aware|laminate|constraint_recovery", "tests/**/*.py")
+    n = _grep_count(
+        r"design_grade|void_mode|inloop|augmented_r2|nested_copula|korobov|period_aware|laminate|constraint_recovery",
+        "tests/**/*.py",
+    )
     return (3, "PASS", f"{n} v12-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
 
 
@@ -2557,7 +2835,10 @@ def check_v13_1_1_buckling_constrained() -> tuple[int, str, str]:
         "structure_optimizer/core/buckling.py",
         r"buckling_constrained|lambda_safety|buckling_constraint|safety_constrained|constrained_buckling",
         r"buckling_constrained|lambda_safety|safety_constrained|constrained_buckling",
-        8, "buckling-constrained in module, no test", "buckling-constrained MMA + test")
+        8,
+        "buckling-constrained in module, no test",
+        "buckling-constrained MMA + test",
+    )
 
 
 def check_v13_1_2_bandwidth_adaptive() -> tuple[int, str, str]:
@@ -2572,7 +2853,10 @@ def check_v13_1_2_bandwidth_adaptive() -> tuple[int, str, str]:
         "structure_optimizer/core/freq_response.py",
         r"bandwidth_adaptive|half_power_relative_bandwidth|adaptive_window",
         r"bandwidth_adaptive|half_power",
-        8, "bandwidth-adaptive in module, no test", "half-power bandwidth-adaptive window + test")
+        8,
+        "bandwidth-adaptive in module, no test",
+        "half-power bandwidth-adaptive window + test",
+    )
 
 
 def check_v13_1_3_extent_adaptive_rho() -> tuple[int, str, str]:
@@ -2581,7 +2865,10 @@ def check_v13_1_3_extent_adaptive_rho() -> tuple[int, str, str]:
         "structure_optimizer/core/multi_objective_to.py",
         r"extent_indicator|spread_indicator|range_adaptive|adaptive_rho|delta_spread",
         r"extent_indicator|spread_indicator|range_adaptive|delta_spread",
-        8, "extent/adaptive-ρ in module, no test", "extent indicator + range-adaptive ρ + test")
+        8,
+        "extent/adaptive-ρ in module, no test",
+        "extent indicator + range-adaptive ρ + test",
+    )
 
 
 def check_v13_2_1_d_gumbel() -> tuple[int, str, str]:
@@ -2590,7 +2877,10 @@ def check_v13_2_1_d_gumbel() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"ExchangeableGumbel|gumbel_d_copula|d_gumbel|exchangeable_gumbel",
         r"gumbel_d|exchangeable_gumbel|d_gumbel",
-        8, "d-dim Gumbel in module, no test", "d-dim exchangeable Gumbel + test")
+        8,
+        "d-dim Gumbel in module, no test",
+        "d-dim exchangeable Gumbel + test",
+    )
 
 
 def check_v13_2_2_genz_reorder() -> tuple[int, str, str]:
@@ -2599,7 +2889,10 @@ def check_v13_2_2_genz_reorder() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"genz_reorder|variable_order|reorder.*genz|integration_order|reordered_genz",
         r"genz_reorder|reorder|variable_order|integration_order",
-        8, "Genz reorder in module, no test", "Genz variable reordering + test")
+        8,
+        "Genz reorder in module, no test",
+        "Genz variable reordering + test",
+    )
 
 
 def check_v13_3_1_stacking_sequence() -> tuple[int, str, str]:
@@ -2608,7 +2901,10 @@ def check_v13_3_1_stacking_sequence() -> tuple[int, str, str]:
         "structure_optimizer/core/orthotropic_simp.py",
         r"stacking_sequence|stacking_optimis|ply_sequence|optimize_stack|optimise_stack",
         r"stacking_sequence|stacking|ply_sequence|optimize_stack",
-        8, "stacking-sequence in module, no test", "stacking-sequence optimisation + test")
+        8,
+        "stacking-sequence in module, no test",
+        "stacking-sequence optimisation + test",
+    )
 
 
 def check_v13_3_2_ruppert_refine() -> tuple[int, str, str]:
@@ -2617,7 +2913,10 @@ def check_v13_3_2_ruppert_refine() -> tuple[int, str, str]:
         "structure_optimizer/core/stl_export.py",
         r"ruppert|steiner|min_angle_bound|quality_refine|refine_steiner",
         r"ruppert|steiner|min_angle_bound|quality_refine",
-        7, "Ruppert refine in module, no test", "Ruppert Steiner refinement + test")
+        7,
+        "Ruppert refine in module, no test",
+        "Ruppert Steiner refinement + test",
+    )
 
 
 def check_v13_4_1_test_count_1140() -> tuple[int, str, str]:
@@ -2658,7 +2957,11 @@ def check_v13_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v13_4_7_v13_in_agent_ci() -> tuple[int, str, str]:
@@ -2722,19 +3025,28 @@ def check_v13_6_3_arch_v13() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v13 section present") if ("## 23." in p.read_text() and "robust" in txt) else (0, "FAIL", "no v13 section")
+    return (
+        (3, "PASS", "v13 section present")
+        if ("## 23." in p.read_text() and "robust" in txt)
+        else (0, "FAIL", "no v13 section")
+    )
 
 
 def check_v13_6_4_adrs_v13() -> tuple[int, str, str]:
     """§6.4 ADRs D090+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D09[0-9]*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 90]
-    return (3, "PASS", f"{len(new_adrs)} v13 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v13 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v13_6_5_anchors_documented() -> tuple[int, str, str]:
     """§6.5 v13 quantitative anchors present in tests (3 pts)."""
-    n = _grep_count(r"buckling_constrained|peak_binding|extent_indicator|gumbel_d|genz_reorder|stacking_sequence|ruppert", "tests/**/*.py")
+    n = _grep_count(
+        r"buckling_constrained|peak_binding|extent_indicator|gumbel_d|genz_reorder|stacking_sequence|ruppert",
+        "tests/**/*.py",
+    )
     return (3, "PASS", f"{n} v13-anchor refs") if n >= 3 else (0, "PARTIAL", f"{n} (need ≥3)")
 
 
@@ -2781,7 +3093,10 @@ def check_v14_1_1_gumbel_series() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"system_reliability_series_copula|series_upper_tail|gumbel_series|series_gumbel",
         r"system_reliability_series_copula|series_upper_tail|gumbel_series|series_gumbel",
-        8, "Gumbel-series in module, no test", "Gumbel→series + test")
+        8,
+        "Gumbel-series in module, no test",
+        "Gumbel→series + test",
+    )
 
 
 def check_v14_1_2_genz_reorder_series() -> tuple[int, str, str]:
@@ -2790,7 +3105,10 @@ def check_v14_1_2_genz_reorder_series() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"system_reliability_series_exact_reordered|series_exact_reorder|series_reordered|reorder_series",
         r"series_exact_reordered|series_reordered|reorder_series",
-        8, "reorder-series in module, no test", "Genz-reorder→series + test")
+        8,
+        "reorder-series in module, no test",
+        "Genz-reorder→series + test",
+    )
 
 
 def check_v14_2_1_ruppert_export() -> tuple[int, str, str]:
@@ -2799,7 +3117,10 @@ def check_v14_2_1_ruppert_export() -> tuple[int, str, str]:
         "structure_optimizer/core/stl_export.py",
         r"write_stl_ruppert_multi_hole|ruppert_multi_hole|write_stl_refined_multi_hole",
         r"write_stl_ruppert_multi_hole|ruppert_multi_hole|refined_multi_hole",
-        8, "Ruppert-export in module, no test", "Ruppert→write_stl + test")
+        8,
+        "Ruppert-export in module, no test",
+        "Ruppert→write_stl + test",
+    )
 
 
 def check_v14_2_2_concentric_shell() -> tuple[int, str, str]:
@@ -2808,7 +3129,10 @@ def check_v14_2_2_concentric_shell() -> tuple[int, str, str]:
         "structure_optimizer/core/stl_export.py",
         r"concentric_shell|corner_lopping|split_small_angle|small_input_angle",
         r"concentric_shell|corner_lopping|small_angle|acute",
-        7, "concentric-shell in module, no test", "concentric-shell small-angle + test")
+        7,
+        "concentric-shell in module, no test",
+        "concentric-shell small-angle + test",
+    )
 
 
 def check_v14_3_1_balanced_laminate() -> tuple[int, str, str]:
@@ -2817,7 +3141,10 @@ def check_v14_3_1_balanced_laminate() -> tuple[int, str, str]:
         "structure_optimizer/core/orthotropic_simp.py",
         r"balanced_laminate|balanced_stack|balanced_sequence|a16_a26",
         r"balanced_laminate|balanced_stack|balanced|a16",
-        8, "balanced laminate in module, no test", "balanced laminate + test")
+        8,
+        "balanced laminate in module, no test",
+        "balanced laminate + test",
+    )
 
 
 def check_v14_3_2_angle_selection() -> tuple[int, str, str]:
@@ -2826,7 +3153,10 @@ def check_v14_3_2_angle_selection() -> tuple[int, str, str]:
         "structure_optimizer/core/orthotropic_simp.py",
         r"select_ply_angles|angle_set_selection|optimize_ply_angles|discrete_angle_select",
         r"select_ply_angles|angle_set_selection|optimize_ply_angles|angle_select",
-        8, "angle-selection in module, no test", "angle-set selection + test")
+        8,
+        "angle-selection in module, no test",
+        "angle-set selection + test",
+    )
 
 
 def check_v14_3_3_peak_binding() -> tuple[int, str, str]:
@@ -2835,7 +3165,10 @@ def check_v14_3_3_peak_binding() -> tuple[int, str, str]:
         "structure_optimizer/core/freq_response.py",
         r"flanking_mode|peak_binding|flanking_peak|binding_peak",
         r"flanking_mode|peak_binding|flanking|binding_peak",
-        8, "peak-binding in module, no test", "peak-binding flanking-mode + test")
+        8,
+        "peak-binding in module, no test",
+        "peak-binding flanking-mode + test",
+    )
 
 
 def check_v14_4_1_test_count_1185() -> tuple[int, str, str]:
@@ -2876,7 +3209,11 @@ def check_v14_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v14_4_7_v14_in_agent_ci() -> tuple[int, str, str]:
@@ -2940,14 +3277,20 @@ def check_v14_6_3_arch_v14() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v14 section present") if ("## 24." in p.read_text() and "integration" in txt) else (0, "FAIL", "no v14 section")
+    return (
+        (3, "PASS", "v14 section present")
+        if ("## 24." in p.read_text() and "integration" in txt)
+        else (0, "FAIL", "no v14 section")
+    )
 
 
 def check_v14_6_4_adrs_v14() -> tuple[int, str, str]:
     """§6.4 ADRs D098+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 98]
-    return (3, "PASS", f"{len(new_adrs)} v14 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v14 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v14_6_5_anchors_documented() -> tuple[int, str, str]:
@@ -3008,7 +3351,10 @@ def check_v15_1_1_balanced_embed() -> tuple[int, str, str]:
         "structure_optimizer/core/orthotropic_simp.py",
         r"balanced_stacking",
         r"balanced_stacking",
-        8, "balanced not embedded in optimizer", "balanced-embedded optimizer + test")
+        8,
+        "balanced not embedded in optimizer",
+        "balanced-embedded optimizer + test",
+    )
 
 
 def check_v15_1_2_constrained_selection() -> tuple[int, str, str]:
@@ -3019,7 +3365,10 @@ def check_v15_1_2_constrained_selection() -> tuple[int, str, str]:
         "structure_optimizer/core/orthotropic_simp.py",
         r"constrained_select",
         r"constrained_select",
-        8, "constrained selection in module, no test", "constrained selection + test")
+        8,
+        "constrained selection in module, no test",
+        "constrained selection + test",
+    )
 
 
 def check_v15_1_3_anti_symmetric() -> tuple[int, str, str]:
@@ -3028,7 +3377,10 @@ def check_v15_1_3_anti_symmetric() -> tuple[int, str, str]:
         "structure_optimizer/core/orthotropic_simp.py",
         r"anti_symmetric|antisymmetric",
         r"anti_symmetric|antisymmetric",
-        8, "anti-symmetric in module, no test", "anti-symmetric decoupling + test")
+        8,
+        "anti-symmetric in module, no test",
+        "anti-symmetric decoupling + test",
+    )
 
 
 def check_v15_2_1_concentric_export() -> tuple[int, str, str]:
@@ -3040,12 +3392,17 @@ def check_v15_2_1_concentric_export() -> tuple[int, str, str]:
         "structure_optimizer/core/stl_export.py",
         r"concentric_export",
         r"concentric_export",
-        8, "concentric-export in module, no test", "concentric-export + test")
+        8,
+        "concentric-export in module, no test",
+        "concentric-export + test",
+    )
 
 
 def check_v15_2_2_multi_apex_or_qmc() -> tuple[int, str, str]:
     """§2.2 multi-apex concentric-shell / deterministic QMC bound (or honest defer) (7 pts)."""
-    mod = _grep_count(r"multi_apex|two_apex|cbc_korobov|korobov_worst_case|deterministic_qmc", "structure_optimizer/core/*.py")
+    mod = _grep_count(
+        r"multi_apex|two_apex|cbc_korobov|korobov_worst_case|deterministic_qmc", "structure_optimizer/core/*.py"
+    )
     test = _grep_count(r"multi_apex|two_apex|cbc|deterministic_qmc|deterministic_bound", "tests/**/*.py")
     if mod >= 1 and test >= 1:
         return 7, "PASS", "multi-apex / QMC-bound + test"
@@ -3063,7 +3420,10 @@ def check_v15_3_1_kkt_peak_binding() -> tuple[int, str, str]:
         "structure_optimizer/core/freq_response.py",
         r"kkt_binding|strictly_binding|active_multiplier",
         r"kkt_binding|strictly_binding|active_multiplier",
-        8, "KKT peak-binding in module, no test", "KKT-binding peak-binding + test")
+        8,
+        "KKT peak-binding in module, no test",
+        "KKT-binding peak-binding + test",
+    )
 
 
 def check_v15_3_2_copula_general_rosenblatt() -> tuple[int, str, str]:
@@ -3075,7 +3435,10 @@ def check_v15_3_2_copula_general_rosenblatt() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"copula_general|series_copula_general|multi_family_copula",
         r"copula_general|series_copula_general|multi_family_copula",
-        8, "copula-general in module, no test", "copula general Rosenblatt + test")
+        8,
+        "copula-general in module, no test",
+        "copula general Rosenblatt + test",
+    )
 
 
 def check_v15_4_1_test_count_1245() -> tuple[int, str, str]:
@@ -3116,7 +3479,11 @@ def check_v15_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v15_4_7_v15_in_agent_ci() -> tuple[int, str, str]:
@@ -3180,14 +3547,20 @@ def check_v15_6_3_arch_v15() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v15 section present") if ("## 25." in p.read_text() and "embedded" in txt) else (0, "FAIL", "no v15 section")
+    return (
+        (3, "PASS", "v15 section present")
+        if ("## 25." in p.read_text() and "embedded" in txt)
+        else (0, "FAIL", "no v15 section")
+    )
 
 
 def check_v15_6_4_adrs_v15() -> tuple[int, str, str]:
     """§6.4 ADRs D106+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 106]
-    return (3, "PASS", f"{len(new_adrs)} v15 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v15 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v15_6_5_anchors_documented() -> tuple[int, str, str]:
@@ -3250,7 +3623,10 @@ def check_v16_1_1_antisym_embed() -> tuple[int, str, str]:
         "structure_optimizer/core/orthotropic_simp.py",
         r"bending_shear_decoupled",
         r"bending_shear_decoupled",
-        8, "anti-symmetry not embedded in optimizer", "anti-symmetry-embedded optimizer + test")
+        8,
+        "anti-symmetry not embedded in optimizer",
+        "anti-symmetry-embedded optimizer + test",
+    )
 
 
 def check_v16_1_2_cbc_genz() -> tuple[int, str, str]:
@@ -3262,7 +3638,10 @@ def check_v16_1_2_cbc_genz() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"genz_mvn_cdf_cbc|cbc_lattice",
         r"genz_mvn_cdf_cbc|cbc_lattice",
-        8, "CBC not wired into Genz MVN CDF", "CBC deterministic Genz lattice + test")
+        8,
+        "CBC not wired into Genz MVN CDF",
+        "CBC deterministic Genz lattice + test",
+    )
 
 
 def check_v16_1_3_copula_marginals() -> tuple[int, str, str]:
@@ -3274,7 +3653,10 @@ def check_v16_1_3_copula_marginals() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"copula_marginals|general_marginal_series",
         r"copula_marginals|general_marginal_series",
-        8, "general marginals not wired into copula system reliability", "general-marginal copula + test")
+        8,
+        "general marginals not wired into copula system reliability",
+        "general-marginal copula + test",
+    )
 
 
 def check_v16_2_1_alpha_korobov() -> tuple[int, str, str]:
@@ -3286,7 +3668,10 @@ def check_v16_2_1_alpha_korobov() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"_korobov_kernel_omega_alpha",
         r"_korobov_kernel_omega_alpha",
-        8, "higher-smoothness Korobov in module, no test", "α≥2 Korobov worst-case error + test")
+        8,
+        "higher-smoothness Korobov in module, no test",
+        "α≥2 Korobov worst-case error + test",
+    )
 
 
 def check_v16_2_2_fast_cbc() -> tuple[int, str, str]:
@@ -3309,7 +3694,10 @@ def check_v16_3_1_exact_multiplier() -> tuple[int, str, str]:
         "structure_optimizer/core/freq_response.py",
         r"exact_multiplier|kkt_exact",
         r"exact_multiplier|kkt_exact",
-        8, "exact KKT multiplier in module, no test", "exact KKT multiplier + test")
+        8,
+        "exact KKT multiplier in module, no test",
+        "exact KKT multiplier + test",
+    )
 
 
 def check_v16_3_2_parallel_copula() -> tuple[int, str, str]:
@@ -3320,7 +3708,10 @@ def check_v16_3_2_parallel_copula() -> tuple[int, str, str]:
         "structure_optimizer/core/reliability.py",
         r"parallel_copula|system_reliability_parallel_copula",
         r"parallel_copula|system_reliability_parallel_copula",
-        8, "parallel-system copula in module, no test", "parallel/general system copula + test")
+        8,
+        "parallel-system copula in module, no test",
+        "parallel/general system copula + test",
+    )
 
 
 def check_v16_4_1_test_count_1290() -> tuple[int, str, str]:
@@ -3361,7 +3752,11 @@ def check_v16_4_6_pytest_gate() -> tuple[int, str, str]:
     """§4.6 pytest gate green / D033 mechanism present (2 pts)."""
     has_gate = _grep_count(r"def check_pytest_green", "scripts/test_agent.py") >= 1
     has_adr = _file_exists("docs/decisions/D033-pytest-green-no-regression-gate.md")
-    return (2, "PASS", "D033 gate + ADR") if (has_gate and has_adr) else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    return (
+        (2, "PASS", "D033 gate + ADR")
+        if (has_gate and has_adr)
+        else (0, "FAIL", f"gate={'✓' if has_gate else '✗'} ADR={'✓' if has_adr else '✗'}")
+    )
 
 
 def check_v16_4_7_v16_in_agent_ci() -> tuple[int, str, str]:
@@ -3425,14 +3820,20 @@ def check_v16_6_3_arch_v16() -> tuple[int, str, str]:
     if not p.exists():
         return 0, "FAIL", "missing"
     txt = p.read_text().lower()
-    return (3, "PASS", "v16 section present") if ("## 26." in p.read_text() and "embedding" in txt) else (0, "FAIL", "no v16 section")
+    return (
+        (3, "PASS", "v16 section present")
+        if ("## 26." in p.read_text() and "embedding" in txt)
+        else (0, "FAIL", "no v16 section")
+    )
 
 
 def check_v16_6_4_adrs_v16() -> tuple[int, str, str]:
     """§6.4 ADRs D114+ ≥ 7 (3 pts)."""
     files = list((REPO_ROOT / "docs/decisions").glob("D*.md"))
     new_adrs = [f for f in files if (m := re.search(r"D(\d+)", f.name)) and int(m.group(1)) >= 114]
-    return (3, "PASS", f"{len(new_adrs)} v16 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    return (
+        (3, "PASS", f"{len(new_adrs)} v16 ADRs") if len(new_adrs) >= 7 else (0, "PARTIAL", f"{len(new_adrs)} (need ≥7)")
+    )
 
 
 def check_v16_6_5_anchors_documented() -> tuple[int, str, str]:
@@ -3650,29 +4051,53 @@ def print_summary(sc: Scorecard) -> None:
     print(f"  v2 rubric  : {sc.v2_check.get('score')}/100  regression={sc.v2_check.get('regression')}")
     print(f"  v3 rubric  : {sc.v3_check.get('score')}/100  regression={sc.v3_check.get('regression')}")
     if sc.v4_check:
-        print(f"  v4 rubric  : {sc.v4_check.get('score')}/{sc.v4_check.get('max', 100)}  regression={sc.v4_check.get('regression')}")
+        print(
+            f"  v4 rubric  : {sc.v4_check.get('score')}/{sc.v4_check.get('max', 100)}  regression={sc.v4_check.get('regression')}"
+        )
     if sc.v5_check:
-        print(f"  v5 rubric  : {sc.v5_check.get('score')}/{sc.v5_check.get('max', 100)}  regression={sc.v5_check.get('regression')}")
+        print(
+            f"  v5 rubric  : {sc.v5_check.get('score')}/{sc.v5_check.get('max', 100)}  regression={sc.v5_check.get('regression')}"
+        )
     if sc.v6_check:
-        print(f"  v6 rubric  : {sc.v6_check.get('score')}/{sc.v6_check.get('max', 100)}  regression={sc.v6_check.get('regression')}")
+        print(
+            f"  v6 rubric  : {sc.v6_check.get('score')}/{sc.v6_check.get('max', 100)}  regression={sc.v6_check.get('regression')}"
+        )
     if sc.v7_check:
-        print(f"  v7 rubric  : {sc.v7_check.get('score')}/{sc.v7_check.get('max', 100)}  regression={sc.v7_check.get('regression')}")
+        print(
+            f"  v7 rubric  : {sc.v7_check.get('score')}/{sc.v7_check.get('max', 100)}  regression={sc.v7_check.get('regression')}"
+        )
     if sc.v8_check:
-        print(f"  v8 rubric  : {sc.v8_check.get('score')}/{sc.v8_check.get('max', 100)}  regression={sc.v8_check.get('regression')}")
+        print(
+            f"  v8 rubric  : {sc.v8_check.get('score')}/{sc.v8_check.get('max', 100)}  regression={sc.v8_check.get('regression')}"
+        )
     if sc.v9_check:
-        print(f"  v9 rubric  : {sc.v9_check.get('score')}/{sc.v9_check.get('max', 100)}  regression={sc.v9_check.get('regression')}")
+        print(
+            f"  v9 rubric  : {sc.v9_check.get('score')}/{sc.v9_check.get('max', 100)}  regression={sc.v9_check.get('regression')}"
+        )
     if sc.v10_check:
-        print(f"  v10 rubric : {sc.v10_check.get('score')}/{sc.v10_check.get('max', 100)}  regression={sc.v10_check.get('regression')}")
+        print(
+            f"  v10 rubric : {sc.v10_check.get('score')}/{sc.v10_check.get('max', 100)}  regression={sc.v10_check.get('regression')}"
+        )
     if sc.v11_check:
-        print(f"  v11 rubric : {sc.v11_check.get('score')}/{sc.v11_check.get('max', 100)}  regression={sc.v11_check.get('regression')}")
+        print(
+            f"  v11 rubric : {sc.v11_check.get('score')}/{sc.v11_check.get('max', 100)}  regression={sc.v11_check.get('regression')}"
+        )
     if sc.v12_check:
-        print(f"  v12 rubric : {sc.v12_check.get('score')}/{sc.v12_check.get('max', 100)}  regression={sc.v12_check.get('regression')}")
+        print(
+            f"  v12 rubric : {sc.v12_check.get('score')}/{sc.v12_check.get('max', 100)}  regression={sc.v12_check.get('regression')}"
+        )
     if sc.v13_check:
-        print(f"  v13 rubric : {sc.v13_check.get('score')}/{sc.v13_check.get('max', 100)}  regression={sc.v13_check.get('regression')}")
+        print(
+            f"  v13 rubric : {sc.v13_check.get('score')}/{sc.v13_check.get('max', 100)}  regression={sc.v13_check.get('regression')}"
+        )
     if sc.v14_check:
-        print(f"  v14 rubric : {sc.v14_check.get('score')}/{sc.v14_check.get('max', 100)}  regression={sc.v14_check.get('regression')}")
+        print(
+            f"  v14 rubric : {sc.v14_check.get('score')}/{sc.v14_check.get('max', 100)}  regression={sc.v14_check.get('regression')}"
+        )
     if sc.v15_check:
-        print(f"  v15 rubric : {sc.v15_check.get('score')}/{sc.v15_check.get('max', 100)}  regression={sc.v15_check.get('regression')}")
+        print(
+            f"  v15 rubric : {sc.v15_check.get('score')}/{sc.v15_check.get('max', 100)}  regression={sc.v15_check.get('regression')}"
+        )
     if sc.pytest_check:
         pc = sc.pytest_check
         marker = "✓" if pc.get("green") else "✗"

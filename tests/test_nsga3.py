@@ -24,7 +24,7 @@ from structure_optimizer.core.pareto_nsga import (
 def _dtlz2(x: np.ndarray, n_obj: int = 3) -> tuple[float, ...]:
     """DTLZ2 benchmark — Pareto-optimal iff g = 0, where Σf_i² = 1."""
     x = np.asarray(x, dtype=float)
-    xm = x[n_obj - 1:]
+    xm = x[n_obj - 1 :]
     g = float(np.sum((xm - 0.5) ** 2))
     f = []
     for i in range(n_obj):
@@ -66,8 +66,14 @@ def test_nsga3_dtlz2_converges_to_unit_sphere():
     init_radius = float(np.mean(np.sum(init**2, axis=1)))
 
     front = nsga3(
-        lambda x: _dtlz2(x, n_obj), n_vars, bl, bu,
-        n_obj=n_obj, n_divisions=12, n_generations=80, rng_seed=0,
+        lambda x: _dtlz2(x, n_obj),
+        n_vars,
+        bl,
+        bu,
+        n_obj=n_obj,
+        n_divisions=12,
+        n_generations=80,
+        rng_seed=0,
     )
     radii = np.sum(front.objectives**2, axis=1)
     mean_radius = float(np.mean(radii))
@@ -80,8 +86,14 @@ def test_nsga3_front_is_nondominated():
     n_obj, k = 3, 3
     n_vars = n_obj - 1 + k
     front = nsga3(
-        lambda x: _dtlz2(x, n_obj), n_vars, np.zeros(n_vars), np.ones(n_vars),
-        n_obj=n_obj, n_divisions=8, n_generations=40, rng_seed=1,
+        lambda x: _dtlz2(x, n_obj),
+        n_vars,
+        np.zeros(n_vars),
+        np.ones(n_vars),
+        n_obj=n_obj,
+        n_divisions=8,
+        n_generations=40,
+        rng_seed=1,
     )
     fronts = _non_dominated_sort(front.objectives)
     assert len(fronts[0]) == front.objectives.shape[0], "returned front contains dominated points"
@@ -92,8 +104,14 @@ def test_nsga3_three_objective_diversity():
     n_obj, k = 3, 3
     n_vars = n_obj - 1 + k
     front = nsga3(
-        lambda x: _dtlz2(x, n_obj), n_vars, np.zeros(n_vars), np.ones(n_vars),
-        n_obj=n_obj, n_divisions=10, n_generations=60, rng_seed=2,
+        lambda x: _dtlz2(x, n_obj),
+        n_vars,
+        np.zeros(n_vars),
+        np.ones(n_vars),
+        n_obj=n_obj,
+        n_divisions=10,
+        n_generations=60,
+        rng_seed=2,
     )
     spreads = front.objectives.max(axis=0) - front.objectives.min(axis=0)
     assert (spreads > 0.3).all(), f"front collapsed, per-objective spread={spreads}"

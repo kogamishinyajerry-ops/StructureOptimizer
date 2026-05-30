@@ -88,7 +88,9 @@ def test_production_active_regime_positive_shadow_price(request):
     init = max(_dynamic_compliance_objective(config, mesh, rho0, ww, beta=beta) for ww in np.linspace(flo, fhi, 120))
 
     def j_star(limit):
-        return peak_binding_mma(config, mesh, w_op, flo, fhi, peak_limit=limit, beta=beta, max_iter=20).dyn_compliance_history[-1]
+        return peak_binding_mma(
+            config, mesh, w_op, flo, fhi, peak_limit=limit, beta=beta, max_iter=20
+        ).dyn_compliance_history[-1]
 
     lam = peak_binding_exact_multiplier(j_star, 0.08 * init, rel_delta=0.125)
     assert lam > 0.0  # firmly-active ⟹ relaxing the limit lowers J* ⟹ positive shadow price

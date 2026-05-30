@@ -143,9 +143,15 @@ def rbto_simp(
     if beta_hi < beta_target:
         # Even the densest design in-bracket cannot reach the target.
         return RBTOResult(
-            densities=r_hi.densities, volume_fraction=vf_high, d_nominal=d_hi,
-            beta=beta_hi, p_failure=pf_hi, beta_target=beta_target, feasible=False,
-            n_simp_runs=n_runs, deterministic_volume_fraction=opt.volume_fraction,
+            densities=r_hi.densities,
+            volume_fraction=vf_high,
+            d_nominal=d_hi,
+            beta=beta_hi,
+            p_failure=pf_hi,
+            beta_target=beta_target,
+            feasible=False,
+            n_simp_runs=n_runs,
+            deterministic_volume_fraction=opt.volume_fraction,
         )
 
     r_lo, d_lo, beta_lo, pf_lo = _eval(vf_low)
@@ -167,9 +173,15 @@ def rbto_simp(
 
     vf, r, d_nom, beta, pf = best
     return RBTOResult(
-        densities=r.densities, volume_fraction=float(vf), d_nominal=d_nom,
-        beta=beta, p_failure=pf, beta_target=beta_target, feasible=True,
-        n_simp_runs=n_runs, deterministic_volume_fraction=opt.volume_fraction,
+        densities=r.densities,
+        volume_fraction=float(vf),
+        d_nominal=d_nom,
+        beta=beta,
+        p_failure=pf,
+        beta_target=beta_target,
+        feasible=True,
+        n_simp_runs=n_runs,
+        deterministic_volume_fraction=opt.volume_fraction,
     )
 
 
@@ -274,9 +286,15 @@ def system_rbto_simp(
     r_hi, d_hi, beta_hi, pf_hi, betas_hi = _eval(vf_high)
     if beta_hi < beta_target:
         return SystemRBTOResult(
-            densities=r_hi.densities, volume_fraction=vf_high, d_nominal=d_hi,
-            per_mode_betas=betas_hi, beta_system=beta_hi, p_failure_system=pf_hi,
-            beta_target=beta_target, feasible=False, n_simp_runs=n_runs,
+            densities=r_hi.densities,
+            volume_fraction=vf_high,
+            d_nominal=d_hi,
+            per_mode_betas=betas_hi,
+            beta_system=beta_hi,
+            p_failure_system=pf_hi,
+            beta_target=beta_target,
+            feasible=False,
+            n_simp_runs=n_runs,
             deterministic_volume_fraction=opt.volume_fraction,
         )
 
@@ -299,9 +317,15 @@ def system_rbto_simp(
 
     vf, r, d_nom, beta_sys, pf_sys, betas = best
     return SystemRBTOResult(
-        densities=r.densities, volume_fraction=float(vf), d_nominal=d_nom,
-        per_mode_betas=betas, beta_system=beta_sys, p_failure_system=pf_sys,
-        beta_target=beta_target, feasible=True, n_simp_runs=n_runs,
+        densities=r.densities,
+        volume_fraction=float(vf),
+        d_nominal=d_nom,
+        per_mode_betas=betas,
+        beta_system=beta_sys,
+        p_failure_system=pf_sys,
+        beta_target=beta_target,
+        feasible=True,
+        n_simp_runs=n_runs,
         deterministic_volume_fraction=opt.volume_fraction,
     )
 
@@ -321,8 +345,9 @@ def _correlated_system_beta(
     """
     from structure_optimizer.core.reliability import _standard_normal_ppf, system_reliability_series
 
-    betas: list[float] = [float(displacement_reliability(d_nominal, da, c).beta)
-                          for da, c in zip(d_allows, load_covs, strict=True)]
+    betas: list[float] = [
+        float(displacement_reliability(d_nominal, da, c).beta) for da, c in zip(d_allows, load_covs, strict=True)
+    ]
     m = len(betas)
     corr = (1.0 - rho_modes) * np.eye(m) + rho_modes * np.ones((m, m))
     res = system_reliability_series(betas, corr)
@@ -395,9 +420,15 @@ def correlated_system_rbto_simp(
     r_hi, d_hi, beta_hi, pf_hi, betas_hi = _eval(vf_high)
     if beta_hi < beta_target:
         return SystemRBTOResult(
-            densities=r_hi.densities, volume_fraction=vf_high, d_nominal=d_hi,
-            per_mode_betas=betas_hi, beta_system=beta_hi, p_failure_system=pf_hi,
-            beta_target=beta_target, feasible=False, n_simp_runs=n_runs,
+            densities=r_hi.densities,
+            volume_fraction=vf_high,
+            d_nominal=d_hi,
+            per_mode_betas=betas_hi,
+            beta_system=beta_hi,
+            p_failure_system=pf_hi,
+            beta_target=beta_target,
+            feasible=False,
+            n_simp_runs=n_runs,
             deterministic_volume_fraction=opt.volume_fraction,
         )
 
@@ -420,8 +451,14 @@ def correlated_system_rbto_simp(
 
     vf, r, d_nom, beta_sys, pf_sys, betas = best
     return SystemRBTOResult(
-        densities=r.densities, volume_fraction=float(vf), d_nominal=d_nom,
-        per_mode_betas=betas, beta_system=beta_sys, p_failure_system=pf_sys,
-        beta_target=beta_target, feasible=True, n_simp_runs=n_runs,
+        densities=r.densities,
+        volume_fraction=float(vf),
+        d_nominal=d_nom,
+        per_mode_betas=betas,
+        beta_system=beta_sys,
+        p_failure_system=pf_sys,
+        beta_target=beta_target,
+        feasible=True,
+        n_simp_runs=n_runs,
         deterministic_volume_fraction=opt.volume_fraction,
     )

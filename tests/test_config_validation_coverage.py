@@ -204,9 +204,7 @@ def test_load_case_with_empty_name_rejected():
 
 def test_load_case_with_nonpositive_weight_rejected():
     raw = _base_raw()
-    raw["load_cases"] = [
-        {"name": "primary", "weight": 0.0, "loads": [{"selector": "right_mid", "fx": 1.0}]}
-    ]
+    raw["load_cases"] = [{"name": "primary", "weight": 0.0, "loads": [{"selector": "right_mid", "fx": 1.0}]}]
     with pytest.raises(ConfigError, match="load case weight"):
         validate_config(parse_config(raw))
 
@@ -220,9 +218,7 @@ def test_load_case_without_loads_rejected():
 
 def test_load_case_load_with_zero_force_rejected():
     raw = _base_raw()
-    raw["load_cases"] = [
-        {"name": "primary", "weight": 1.0, "loads": [{"selector": "right_mid", "fx": 0.0, "fy": 0.0}]}
-    ]
+    raw["load_cases"] = [{"name": "primary", "weight": 1.0, "loads": [{"selector": "right_mid", "fx": 0.0, "fy": 0.0}]}]
     with pytest.raises(ConfigError, match="load case load must define nonzero"):
         validate_config(parse_config(raw))
 

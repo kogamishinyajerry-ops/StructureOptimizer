@@ -52,14 +52,19 @@ def gen_tl_adjoint() -> None:
     mesh = create_structured_mesh(config)
     densities = np.full(mesh.elements.shape[0], 0.6)
     r = tl_adjoint_compliance_sensitivity(config, mesh, densities, n_load_steps=3)
-    _write("tl_adjoint_cantilever__smoke", {
-        "benchmark": "cantilever", "preset": "smoke",
-        "rubric_version": "v7.0-wave-OO", "kind": "tl_adjoint",
-        "n_load_steps": 3,
-        "sensitivity_sha256": _sha256(np.asarray(r.sensitivity)),
-        "compliance": float(r.compliance),
-        "converged": bool(r.converged),
-    })
+    _write(
+        "tl_adjoint_cantilever__smoke",
+        {
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v7.0-wave-OO",
+            "kind": "tl_adjoint",
+            "n_load_steps": 3,
+            "sensitivity_sha256": _sha256(np.asarray(r.sensitivity)),
+            "compliance": float(r.compliance),
+            "converged": bool(r.converged),
+        },
+    )
 
 
 def gen_nataf_form() -> None:
@@ -67,16 +72,23 @@ def gen_nataf_form() -> None:
 
     a0, a = NATAF_A0, np.asarray(NATAF_A)
     r = correlated_gaussian_reliability(NATAF_MEAN, NATAF_STD, NATAF_CORR, lambda x: a0 - a @ x)
-    _write("nataf_correlated_form", {
-        "benchmark": "correlated_gaussian",
-        "rubric_version": "v7.0-wave-PP", "kind": "nataf_correlated_form",
-        "mean": NATAF_MEAN, "std": NATAF_STD, "correlation": NATAF_CORR,
-        "a0": NATAF_A0, "a": NATAF_A,
-        "mpp_sha256": _sha256(np.asarray(r.mpp)),
-        "beta": float(r.beta),
-        "p_failure": float(r.p_failure),
-        "converged": bool(r.converged),
-    })
+    _write(
+        "nataf_correlated_form",
+        {
+            "benchmark": "correlated_gaussian",
+            "rubric_version": "v7.0-wave-PP",
+            "kind": "nataf_correlated_form",
+            "mean": NATAF_MEAN,
+            "std": NATAF_STD,
+            "correlation": NATAF_CORR,
+            "a0": NATAF_A0,
+            "a": NATAF_A,
+            "mpp_sha256": _sha256(np.asarray(r.mpp)),
+            "beta": float(r.beta),
+            "p_failure": float(r.p_failure),
+            "converged": bool(r.converged),
+        },
+    )
 
 
 def gen_dynamic_compliance() -> None:
@@ -86,15 +98,22 @@ def gen_dynamic_compliance() -> None:
     mesh = create_structured_mesh(config)
     densities = np.full(mesh.elements.shape[0], 0.6)
     r = dynamic_compliance_sensitivity(config, mesh, densities, omega=8.0, alpha=0.5, beta=1e-4)
-    _write("dynamic_compliance_cantilever__smoke", {
-        "benchmark": "cantilever", "preset": "smoke",
-        "rubric_version": "v7.0-wave-RR", "kind": "dynamic_compliance",
-        "omega": 8.0, "alpha": 0.5, "beta": 1e-4,
-        "sensitivity_sha256": _sha256(np.asarray(r.sensitivity)),
-        "objective": float(r.objective),
-        "c_real": float(r.dynamic_compliance.real),
-        "c_imag": float(r.dynamic_compliance.imag),
-    })
+    _write(
+        "dynamic_compliance_cantilever__smoke",
+        {
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v7.0-wave-RR",
+            "kind": "dynamic_compliance",
+            "omega": 8.0,
+            "alpha": 0.5,
+            "beta": 1e-4,
+            "sensitivity_sha256": _sha256(np.asarray(r.sensitivity)),
+            "objective": float(r.objective),
+            "c_real": float(r.dynamic_compliance.real),
+            "c_imag": float(r.dynamic_compliance.imag),
+        },
+    )
 
 
 def gen_anisotropic_thermal_field() -> None:
@@ -107,14 +126,20 @@ def gen_anisotropic_thermal_field() -> None:
     densities = np.full(n_elem, 1.0)
     field = orientation_field_to_tensors(5.0, 1.0, np.linspace(0.0, np.pi / 2, n_elem))
     r = solve_thermal(config, mesh, densities, k_scalar, sources, bcs, conductivity_tensor_field=field)
-    _write("anisotropic_thermal_field_heat_sink__smoke", {
-        "benchmark": "heat_sink", "preset": "smoke",
-        "rubric_version": "v7.0-wave-NN", "kind": "anisotropic_thermal_field",
-        "kxx": 5.0, "kyy": 1.0,
-        "temperatures_sha256": _sha256(np.asarray(r.temperatures)),
-        "thermal_compliance": float(r.thermal_compliance),
-        "max_temperature": float(r.max_temperature),
-    })
+    _write(
+        "anisotropic_thermal_field_heat_sink__smoke",
+        {
+            "benchmark": "heat_sink",
+            "preset": "smoke",
+            "rubric_version": "v7.0-wave-NN",
+            "kind": "anisotropic_thermal_field",
+            "kxx": 5.0,
+            "kyy": 1.0,
+            "temperatures_sha256": _sha256(np.asarray(r.temperatures)),
+            "thermal_compliance": float(r.thermal_compliance),
+            "max_temperature": float(r.max_temperature),
+        },
+    )
 
 
 def gen_earclip_polygon() -> None:
@@ -124,13 +149,17 @@ def gen_earclip_polygon() -> None:
     hole = [(1.0, 1.0), (3.0, 1.0), (3.0, 3.0), (1.0, 3.0)]
     pts, tris = triangulate_with_holes(outer, [hole])
     area = sum(_tri_area(pts[i], pts[j], pts[k]) for i, j, k in tris)
-    _write("earclip_holed_polygon", {
-        "benchmark": "L_shape_with_hole",
-        "rubric_version": "v7.0-wave-SS", "kind": "earclip_polygon",
-        "vertices_sha256": _sha256(np.asarray(pts)),
-        "n_triangles": len(tris),
-        "cross_section_area": float(area),
-    })
+    _write(
+        "earclip_holed_polygon",
+        {
+            "benchmark": "L_shape_with_hole",
+            "rubric_version": "v7.0-wave-SS",
+            "kind": "earclip_polygon",
+            "vertices_sha256": _sha256(np.asarray(pts)),
+            "n_triangles": len(tris),
+            "cross_section_area": float(area),
+        },
+    )
 
 
 def main() -> None:

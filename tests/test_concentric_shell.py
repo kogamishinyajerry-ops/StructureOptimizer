@@ -34,8 +34,10 @@ def _refine(poly, shells, cap):
     m = outer.shape[0]
     for k in range(m):
         cons.add(tuple(sorted((k, (k + 1) % m))))
-    return outer, cons, ruppert_refine(
-        ptl, set(cons), outer, [], min_angle_deg=20.0, max_steiner=cap, concentric_shells=shells
+    return (
+        outer,
+        cons,
+        ruppert_refine(ptl, set(cons), outer, [], min_angle_deg=20.0, max_steiner=cap, concentric_shells=shells),
     )
 
 

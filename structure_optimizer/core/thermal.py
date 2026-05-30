@@ -123,10 +123,10 @@ def element_thermal_conductivity_tensor(k_matrix: np.ndarray, thickness: float =
     for xi, eta in _GAUSS_PTS:
         dn_dxi = 0.25 * _NODE_XI * (1.0 + _NODE_ETA * eta)
         dn_deta = 0.25 * _NODE_ETA * (1.0 + _NODE_XI * xi)
-        dn_nat = np.column_stack([dn_dxi, dn_deta])      # (4,2)
-        jac = dn_nat.T @ _UNIT_SQUARE                    # (2,2)
+        dn_nat = np.column_stack([dn_dxi, dn_deta])  # (4,2)
+        jac = dn_nat.T @ _UNIT_SQUARE  # (2,2)
         detj = np.linalg.det(jac)
-        dn_dx = dn_nat @ np.linalg.inv(jac).T            # (4,2) ∂N/∂x,∂N/∂y
+        dn_dx = dn_nat @ np.linalg.inv(jac).T  # (4,2) ∂N/∂x,∂N/∂y
         # Ke += (∂N/∂x)·k·(∂N/∂x)ᵀ · detJ · t   (weight = 1 for 2×2 Gauss)
         ke += dn_dx @ k_matrix @ dn_dx.T * detj * thickness
     return ke

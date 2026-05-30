@@ -47,9 +47,7 @@ def test_extent_complements_spacing_on_two_extreme():
     uniform (S=0) — it cannot tell a 2-point gap-front from a dense even one. Extent is
     therefore the necessary diversity *partner*, not a substitute.
     """
-    assert extent_indicator(TWO_EXTREME) == pytest.approx(
-        extent_indicator(SPREAD), rel=1e-12
-    )
+    assert extent_indicator(TWO_EXTREME) == pytest.approx(extent_indicator(SPREAD), rel=1e-12)
     # spacing is blind to the difference: both are "uniform" (NN gaps all equal ⟹ S=0)
     assert spacing_indicator(SPREAD) == pytest.approx(0.0, abs=1e-12)
     assert spacing_indicator(TWO_EXTREME) == pytest.approx(0.0, abs=1e-12)

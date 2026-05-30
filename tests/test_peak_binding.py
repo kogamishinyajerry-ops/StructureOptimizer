@@ -49,7 +49,9 @@ def _dense_flank(config, mesh, rho, lo, hi, n=150):
 def runs():
     config, mesh, rho0, w_op, flo, fhi = _setup()
     init = _dense_flank(config, mesh, rho0, flo, fhi)
-    unconstr = peak_binding_mma(config, mesh, w_op, flo, fhi, peak_limit=1e9 * init, beta=_BETA, max_iter=25, regrid=True)
+    unconstr = peak_binding_mma(
+        config, mesh, w_op, flo, fhi, peak_limit=1e9 * init, beta=_BETA, max_iter=25, regrid=True
+    )
     lim = 1.2 * init
     regrid = peak_binding_mma(config, mesh, w_op, flo, fhi, peak_limit=lim, beta=_BETA, max_iter=25, regrid=True)
     stale = peak_binding_mma(config, mesh, w_op, flo, fhi, peak_limit=lim, beta=_BETA, max_iter=25, regrid=False)

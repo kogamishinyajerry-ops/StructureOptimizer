@@ -79,7 +79,8 @@ def test_smaller_worst_case_error_than_textbook_korobov():
         e_cbc = korobov_worst_case_error(z, n, gamma)
         best_korobov = min(
             korobov_worst_case_error(_korobov_generating_vector(d, a, n), n, gamma)
-            for a in (3, 5, 7, int(n**0.5)) if 1 < a < n
+            for a in (3, 5, 7, int(n**0.5))
+            if 1 < a < n
         )
         assert e_cbc <= best_korobov + 1e-12
 
@@ -93,8 +94,7 @@ def test_beats_random_generating_vectors():
     e_cbc = korobov_worst_case_error(z, n, gamma)
     rng = np.random.default_rng(0)
     e_rand = [
-        korobov_worst_case_error(np.concatenate([[1], rng.integers(1, n, size=d - 1)]), n, gamma)
-        for _ in range(30)
+        korobov_worst_case_error(np.concatenate([[1], rng.integers(1, n, size=d - 1)]), n, gamma) for _ in range(30)
     ]
     assert e_cbc <= min(e_rand) + 1e-12
 
@@ -121,8 +121,7 @@ def test_naive_cbc_unchanged_adjacent():
     z_naive = cbc_korobov_generating_vector(d, n, gamma)
     z_fast = fast_cbc_korobov_generating_vector(d, n, gamma)
     best_korobov = min(
-        korobov_worst_case_error(_korobov_generating_vector(d, a, n), n, gamma)
-        for a in (3, 5, 7) if a < n
+        korobov_worst_case_error(_korobov_generating_vector(d, a, n), n, gamma) for a in (3, 5, 7) if a < n
     )
     assert korobov_worst_case_error(z_naive, n, gamma) <= best_korobov + 1e-12
     assert korobov_worst_case_error(z_fast, n, gamma) <= best_korobov + 1e-12
@@ -155,7 +154,6 @@ def test_fast_cbc_speedup_vs_naive(request):
     t_fast = time.perf_counter() - t0
     assert t_naive / max(t_fast, 1e-9) >= 10.0
     best_korobov = min(
-        korobov_worst_case_error(_korobov_generating_vector(d, a, n), n, gamma)
-        for a in (3, 5, 7) if a < n
+        korobov_worst_case_error(_korobov_generating_vector(d, a, n), n, gamma) for a in (3, 5, 7) if a < n
     )
     assert korobov_worst_case_error(z_fast, n, gamma) <= best_korobov + 1e-12

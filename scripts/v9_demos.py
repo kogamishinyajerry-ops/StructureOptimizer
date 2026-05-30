@@ -58,7 +58,9 @@ def mma_tl_demo(out_path: str | Path, benchmark: str = "cantilever") -> dict:
     body = "<p>MMA TL end-compliance per iteration:</p><table><tr><th>iter</th><th>C</th></tr>"
     for i, c in enumerate(h):
         if i % 4 == 0 or i == len(h) - 1:
-            body += f"<tr><td>{i}</td><td>{c:.4g} <span class='bar' style='width:{200 * c / hmax:.0f}px'></span></td></tr>"
+            body += (
+                f"<tr><td>{i}</td><td>{c:.4g} <span class='bar' style='width:{200 * c / hmax:.0f}px'></span></td></tr>"
+            )
     ratio = h[-1] / oc.compliance_history[-1]
     body += f"</table><p>C {h[0]:.4g} → {h[-1]:.4g}; MMA/OC = <b>{ratio:.3f}</b> at the same volume.</p>"
     Path(out_path).write_text(_html("MMA-driven Total-Lagrangian nonlinear TO", body))
@@ -85,8 +87,10 @@ def three_objective_demo(out_path: str | Path, benchmark: str = "cantilever") ->
     config = load_benchmark(benchmark, preset="smoke")
     mesh = create_structured_mesh(config)
     design = mesh.design_mask
-    seeds = [run_simp(replace(config, optimization=replace(config.optimization, volume_fraction=vf)), mesh).densities[design]
-             for vf in (0.3, 0.5, 0.7)]
+    seeds = [
+        run_simp(replace(config, optimization=replace(config.optimization, volume_fraction=vf)), mesh).densities[design]
+        for vf in (0.3, 0.5, 0.7)
+    ]
     rand = multi_load_case_to(config, mesh, n_generations=8, population_size=16, rng_seed=0)
     seeded = multi_load_case_to(config, mesh, n_generations=8, population_size=16, rng_seed=0, seed_genomes=seeds)
     body = (
@@ -120,9 +124,15 @@ def system_rbto_demo(out_path: str | Path, benchmark: str = "cantilever") -> dic
     """System-reliability-based TO: drive a 2-mode series system to a target β."""
     config = load_benchmark(benchmark, preset="smoke")
     mesh = create_structured_mesh(config)
-    d_mid = float(run_simp(replace(config, optimization=replace(config.optimization, volume_fraction=0.45)), mesh).final_analysis.max_displacement)
+    d_mid = float(
+        run_simp(
+            replace(config, optimization=replace(config.optimization, volume_fraction=0.45)), mesh
+        ).final_analysis.max_displacement
+    )
     da = d_mid * 1.6
-    res = system_rbto_simp(config, mesh, [da, da * 1.1], beta_target=2.0, load_covs=[0.15, 0.15], vf_low=0.2, vf_high=0.85)
+    res = system_rbto_simp(
+        config, mesh, [da, da * 1.1], beta_target=2.0, load_covs=[0.15, 0.15], vf_low=0.2, vf_high=0.85
+    )
     body = (
         f"<p>2-mode series system, target β = 2.0.</p>"
         f"<p>Selected volume fraction <b>{res.volume_fraction:.3f}</b>; system β = "
@@ -137,8 +147,12 @@ def coupled_orientation_demo(out_path: str | Path) -> dict:
     """Coupled density + orientation thermal TO vs each single field."""
     config, _k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
     mesh = create_structured_mesh(config)
-    coupled = coupled_density_orientation_to(config, mesh, 5.0, 1.0, n_outer=8, n_orient_steps=8, heat_sources=sources, thermal_bcs=bcs)
-    density_only = coupled_density_orientation_to(config, mesh, 5.0, 1.0, n_outer=8, n_orient_steps=0, heat_sources=sources, thermal_bcs=bcs)
+    coupled = coupled_density_orientation_to(
+        config, mesh, 5.0, 1.0, n_outer=8, n_orient_steps=8, heat_sources=sources, thermal_bcs=bcs
+    )
+    density_only = coupled_density_orientation_to(
+        config, mesh, 5.0, 1.0, n_outer=8, n_orient_steps=0, heat_sources=sources, thermal_bcs=bcs
+    )
     c, d = coupled.compliance_history[-1], density_only.compliance_history[-1]
     body = (
         f"<p>Alternating density + fibre-orientation thermal TO.</p>"
@@ -180,7 +194,12 @@ def main(out_dir: str | Path = "build/v9_demos") -> None:
     c = coupled_orientation_demo(out_dir / "coupled_orientation.html")
     print("coupled_orientation_demo: coupled", f"{c['coupled']:.4g}", "vs density-only", f"{c['density_only']:.4g}")
     sf = slit_free_demo(out_dir)
-    print("slit_free_demo: annulus watertight", sf["slit_free_stl"]["is_watertight"], "area", sf["slit_free_stl"]["cross_section_area"])
+    print(
+        "slit_free_demo: annulus watertight",
+        sf["slit_free_stl"]["is_watertight"],
+        "area",
+        sf["slit_free_stl"]["cross_section_area"],
+    )
     print(f"v9 demos written to {out_dir}/")
 
 

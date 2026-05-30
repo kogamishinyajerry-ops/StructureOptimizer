@@ -43,6 +43,7 @@ def _write(name: str, rec: dict) -> None:
 def _annulus_40():
     config = load_benchmark("cantilever", preset="smoke")
     from dataclasses import replace
+
     config = replace(config, mesh=replace(config.mesh, nelx=40, nely=40, width=40.0, height=40.0))
     mesh = create_structured_mesh(config)
     rho = np.zeros(mesh.nelx * mesh.nely)
@@ -59,14 +60,20 @@ def gen_mma_nonlinear() -> None:
     config = load_benchmark("cantilever", preset="smoke")
     mesh = create_structured_mesh(config)
     r = mma_nonlinear_to(config, mesh, n_load_steps=3, max_iter=6)
-    _write("mma_nonlinear_cantilever__smoke", {
-        "benchmark": "cantilever", "preset": "smoke",
-        "rubric_version": "v9.0-wave-CCC", "kind": "mma_nonlinear",
-        "n_load_steps": 3, "max_iter": 6,
-        "densities_sha256": _sha256(np.asarray(r.densities)),
-        "compliance_final": float(r.compliance_history[-1]),
-        "converged": bool(r.converged),
-    })
+    _write(
+        "mma_nonlinear_cantilever__smoke",
+        {
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v9.0-wave-CCC",
+            "kind": "mma_nonlinear",
+            "n_load_steps": 3,
+            "max_iter": 6,
+            "densities_sha256": _sha256(np.asarray(r.densities)),
+            "compliance_final": float(r.compliance_history[-1]),
+            "converged": bool(r.converged),
+        },
+    )
 
 
 def gen_band_gap() -> None:
@@ -76,13 +83,19 @@ def gen_band_gap() -> None:
     mesh = create_structured_mesh(config)
     densities = np.full(mesh.elements.shape[0], 0.6)
     gap, dgap = band_gap_sensitivity(config, mesh, densities, lower_mode=0)
-    _write("band_gap_cantilever__smoke", {
-        "benchmark": "cantilever", "preset": "smoke",
-        "rubric_version": "v9.0-wave-DDD", "kind": "band_gap",
-        "lower_mode": 0, "density_fill": 0.6,
-        "dgap_sha256": _sha256(np.asarray(dgap)),
-        "gap": float(gap),
-    })
+    _write(
+        "band_gap_cantilever__smoke",
+        {
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v9.0-wave-DDD",
+            "kind": "band_gap",
+            "lower_mode": 0,
+            "density_fill": 0.6,
+            "dgap_sha256": _sha256(np.asarray(dgap)),
+            "gap": float(gap),
+        },
+    )
 
 
 def gen_rosenblatt() -> None:
@@ -90,13 +103,19 @@ def gen_rosenblatt() -> None:
 
     rt = build_rosenblatt_normal(np.asarray(ROSEN_MEAN), np.asarray(ROSEN_COV))
     u = rt.x_to_u(np.asarray(ROSEN_X))
-    _write("rosenblatt_trivariate", {
-        "benchmark": "trivariate_normal",
-        "rubric_version": "v9.0-wave-FFF", "kind": "rosenblatt",
-        "mean": ROSEN_MEAN, "cov": ROSEN_COV, "x": ROSEN_X,
-        "u_sha256": _sha256(np.asarray(u)),
-        "u0": float(u[0]),
-    })
+    _write(
+        "rosenblatt_trivariate",
+        {
+            "benchmark": "trivariate_normal",
+            "rubric_version": "v9.0-wave-FFF",
+            "kind": "rosenblatt",
+            "mean": ROSEN_MEAN,
+            "cov": ROSEN_COV,
+            "x": ROSEN_X,
+            "u_sha256": _sha256(np.asarray(u)),
+            "u0": float(u[0]),
+        },
+    )
 
 
 def gen_coupled_thermal() -> None:
@@ -104,15 +123,24 @@ def gen_coupled_thermal() -> None:
 
     config, _k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
     mesh = create_structured_mesh(config)
-    r = coupled_density_orientation_to(config, mesh, 5.0, 1.0, n_outer=4, n_orient_steps=5,
-                                       heat_sources=sources, thermal_bcs=bcs)
-    _write("coupled_thermal_heat_sink__smoke", {
-        "benchmark": "heat_sink", "preset": "smoke",
-        "rubric_version": "v9.0-wave-GGG", "kind": "coupled_thermal",
-        "kxx": 5.0, "kyy": 1.0, "n_outer": 4, "n_orient_steps": 5,
-        "densities_sha256": _sha256(np.asarray(r.densities)),
-        "compliance_final": float(r.compliance_history[-1]),
-    })
+    r = coupled_density_orientation_to(
+        config, mesh, 5.0, 1.0, n_outer=4, n_orient_steps=5, heat_sources=sources, thermal_bcs=bcs
+    )
+    _write(
+        "coupled_thermal_heat_sink__smoke",
+        {
+            "benchmark": "heat_sink",
+            "preset": "smoke",
+            "rubric_version": "v9.0-wave-GGG",
+            "kind": "coupled_thermal",
+            "kxx": 5.0,
+            "kyy": 1.0,
+            "n_outer": 4,
+            "n_orient_steps": 5,
+            "densities_sha256": _sha256(np.asarray(r.densities)),
+            "compliance_final": float(r.compliance_history[-1]),
+        },
+    )
 
 
 def gen_slit_free() -> None:
@@ -122,14 +150,19 @@ def gen_slit_free() -> None:
 
     mesh, rho = _annulus_40()
     info = write_stl_slit_free_holes(mesh, rho, tempfile.mktemp(suffix=".stl"))
-    _write("slit_free_annulus", {
-        "benchmark": "annulus_40", "preset": "smoke",
-        "rubric_version": "v9.0-wave-III", "kind": "slit_free",
-        "densities_sha256": _sha256(rho),
-        "n_solid_cells": int(info["n_solid_cells"]),
-        "cross_section_area": float(info["cross_section_area"]),
-        "is_watertight": bool(info["is_watertight"]),
-    })
+    _write(
+        "slit_free_annulus",
+        {
+            "benchmark": "annulus_40",
+            "preset": "smoke",
+            "rubric_version": "v9.0-wave-III",
+            "kind": "slit_free",
+            "densities_sha256": _sha256(rho),
+            "n_solid_cells": int(info["n_solid_cells"]),
+            "cross_section_area": float(info["cross_section_area"]),
+            "is_watertight": bool(info["is_watertight"]),
+        },
+    )
 
 
 def main() -> None:

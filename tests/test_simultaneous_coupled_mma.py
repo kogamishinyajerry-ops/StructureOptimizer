@@ -38,8 +38,13 @@ def _compliance(config, mesh, rho, angles, sources, bcs):
     field = orientation_field_to_tensors(KXX, KYY, angles, 0.0)
     return float(
         solve_thermal(
-            config, mesh, rho, conductivity=1.0,
-            heat_sources=sources, thermal_bcs=bcs, conductivity_tensor_field=field,
+            config,
+            mesh,
+            rho,
+            conductivity=1.0,
+            heat_sources=sources,
+            thermal_bcs=bcs,
+            conductivity_tensor_field=field,
         ).thermal_compliance
     )
 
@@ -66,7 +71,9 @@ def test_combined_sensitivity_matches_central_fd():
         rp[e] += h
         rm = rho.copy()
         rm[e] -= h
-        fd = (_compliance(config, mesh, rp, angles, sources, bcs) - _compliance(config, mesh, rm, angles, sources, bcs)) / (2 * h)
+        fd = (
+            _compliance(config, mesh, rp, angles, sources, bcs) - _compliance(config, mesh, rm, angles, sources, bcs)
+        ) / (2 * h)
         rel = abs(d_rho[e] - fd) / (abs(fd) + 1e-30)
         assert rel <= 1e-4, f"dC/dρ e{e}: {d_rho[e]:.4e} vs {fd:.4e} (rel {rel:.2e})"
 
@@ -77,7 +84,9 @@ def test_combined_sensitivity_matches_central_fd():
         ap[e] += h
         am = angles.copy()
         am[e] -= h
-        fd = (_compliance(config, mesh, rho, ap, sources, bcs) - _compliance(config, mesh, rho, am, sources, bcs)) / (2 * h)
+        fd = (_compliance(config, mesh, rho, ap, sources, bcs) - _compliance(config, mesh, rho, am, sources, bcs)) / (
+            2 * h
+        )
         rel = abs(d_theta[e] - fd) / (abs(fd) + 1e-30)
         assert rel <= 1e-4, f"dC/dθ e{e}: {d_theta[e]:.4e} vs {fd:.4e} (rel {rel:.2e})"
 

@@ -61,10 +61,7 @@ def test_reordering_cuts_fixed_sample_error_in_production_path():
         [abs(system_reliability_series_exact(_BETAS, _R, n_samples=400, seed=s) - ref) for s in range(60)]
     )
     err_ord = np.mean(
-        [
-            abs(system_reliability_series_exact(_BETAS, _R, n_samples=400, seed=s, reorder=True) - ref)
-            for s in range(60)
-        ]
+        [abs(system_reliability_series_exact(_BETAS, _R, n_samples=400, seed=s, reorder=True) - ref) for s in range(60)]
     )
     assert err_ord < 0.5 * err_nat  # measured ratio ≈ 0.11 (≈9× reduction)
 

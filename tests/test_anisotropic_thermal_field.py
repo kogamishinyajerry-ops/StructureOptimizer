@@ -75,8 +75,9 @@ def test_anisotropic_sensitivity_matches_central_fd():
     densities = np.clip(0.5 + 0.1 * rng.standard_normal(n), 0.2, 0.95)
     tensor = conductivity_tensor(4.0, 1.5, 0.4)
 
-    sens = anisotropic_thermal_sensitivity(config, mesh, densities, conductivity_tensor=tensor,
-                                           heat_sources=sources, thermal_bcs=bcs)
+    sens = anisotropic_thermal_sensitivity(
+        config, mesh, densities, conductivity_tensor=tensor, heat_sources=sources, thermal_bcs=bcs
+    )
 
     def compliance(rho):
         return solve_thermal(config, mesh, rho, 1.0, sources, bcs, conductivity_tensor=tensor).thermal_compliance

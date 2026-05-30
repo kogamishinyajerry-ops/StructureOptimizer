@@ -57,17 +57,22 @@ def gen_total_lagrangian() -> None:
     mesh = create_structured_mesh(config)
     densities = np.full(mesh.elements.shape[0], 1.0)
     r = solve_total_lagrangian(config, mesh, densities, n_load_steps=3)
-    _write("tl_cantilever__smoke", {
-        "benchmark": "cantilever", "preset": "smoke",
-        "rubric_version": "v6.0-wave-EE", "kind": "total_lagrangian",
-        "n_load_steps": 3,
-        "displacements_sha256": _sha256(np.asarray(r.displacements)),
-        "max_displacement": float(r.max_displacements[-1]),
-        "n_newton_iters": int(r.n_newton_iters),
-        "converged": bool(r.converged),
-        "load_steps": [float(x) for x in r.load_steps],
-        "max_disp_per_step": [float(x) for x in r.max_displacements],
-    })
+    _write(
+        "tl_cantilever__smoke",
+        {
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v6.0-wave-EE",
+            "kind": "total_lagrangian",
+            "n_load_steps": 3,
+            "displacements_sha256": _sha256(np.asarray(r.displacements)),
+            "max_displacement": float(r.max_displacements[-1]),
+            "n_newton_iters": int(r.n_newton_iters),
+            "converged": bool(r.converged),
+            "load_steps": [float(x) for x in r.load_steps],
+            "max_disp_per_step": [float(x) for x in r.max_displacements],
+        },
+    )
 
 
 def gen_damped_fr() -> None:
@@ -77,14 +82,21 @@ def gen_damped_fr() -> None:
     mesh = create_structured_mesh(config)
     densities = np.full(mesh.elements.shape[0], 1.0)
     r = solve_damped_frequency_response(config, mesh, densities, omega=8.0, alpha=0.5, beta=1e-4)
-    _write("damped_fr_cantilever__smoke", {
-        "benchmark": "cantilever", "preset": "smoke",
-        "rubric_version": "v6.0-wave-FF", "kind": "damped_frequency_response",
-        "omega": 8.0, "alpha": 0.5, "beta": 1e-4,
-        "magnitude_sha256": _sha256(np.asarray(r.magnitude)),
-        "max_magnitude": float(r.max_magnitude),
-        "response_norm": float(r.response_norm),
-    })
+    _write(
+        "damped_fr_cantilever__smoke",
+        {
+            "benchmark": "cantilever",
+            "preset": "smoke",
+            "rubric_version": "v6.0-wave-FF",
+            "kind": "damped_frequency_response",
+            "omega": 8.0,
+            "alpha": 0.5,
+            "beta": 1e-4,
+            "magnitude_sha256": _sha256(np.asarray(r.magnitude)),
+            "max_magnitude": float(r.max_magnitude),
+            "response_norm": float(r.response_norm),
+        },
+    )
 
 
 def gen_anisotropic_thermal() -> None:
@@ -96,29 +108,40 @@ def gen_anisotropic_thermal() -> None:
     densities = np.full(mesh.elements.shape[0], 1.0)
     ktensor = conductivity_tensor(5.0, 1.0, 0.3)
     r = solve_thermal(config, mesh, densities, k_scalar, sources, bcs, conductivity_tensor=ktensor)
-    _write("anisotropic_thermal_heat_sink__smoke", {
-        "benchmark": "heat_sink", "preset": "smoke",
-        "rubric_version": "v6.0-wave-GG", "kind": "anisotropic_thermal",
-        "kxx": 5.0, "kyy": 1.0, "kxy": 0.3,
-        "temperatures_sha256": _sha256(np.asarray(r.temperatures)),
-        "thermal_compliance": float(r.thermal_compliance),
-        "max_temperature": float(r.max_temperature),
-    })
+    _write(
+        "anisotropic_thermal_heat_sink__smoke",
+        {
+            "benchmark": "heat_sink",
+            "preset": "smoke",
+            "rubric_version": "v6.0-wave-GG",
+            "kind": "anisotropic_thermal",
+            "kxx": 5.0,
+            "kyy": 1.0,
+            "kxy": 0.3,
+            "temperatures_sha256": _sha256(np.asarray(r.temperatures)),
+            "thermal_compliance": float(r.thermal_compliance),
+            "max_temperature": float(r.max_temperature),
+        },
+    )
 
 
 def gen_form() -> None:
     from structure_optimizer.core.reliability import form_hlrf
 
     r = form_hlrf(_linear_limit_state, n_vars=2)
-    _write("form_linear_limit_state", {
-        "benchmark": "linear_limit_state",
-        "rubric_version": "v6.0-wave-II", "kind": "form_reliability",
-        "n_vars": 2,
-        "mpp_sha256": _sha256(np.asarray(r.mpp)),
-        "beta": float(r.beta),
-        "p_failure": float(r.p_failure),
-        "converged": bool(r.converged),
-    })
+    _write(
+        "form_linear_limit_state",
+        {
+            "benchmark": "linear_limit_state",
+            "rubric_version": "v6.0-wave-II",
+            "kind": "form_reliability",
+            "n_vars": 2,
+            "mpp_sha256": _sha256(np.asarray(r.mpp)),
+            "beta": float(r.beta),
+            "p_failure": float(r.p_failure),
+            "converged": bool(r.converged),
+        },
+    )
 
 
 def gen_marching_squares() -> None:
@@ -126,14 +149,19 @@ def gen_marching_squares() -> None:
     loops = [lp for lp in marching_squares_contours(field, xs, ys, level=0.0) if polygon_area(lp) > 1e-12]
     total_area = sum(polygon_area(lp) for lp in loops)
     pts = np.vstack([np.asarray(lp, dtype=float) for lp in loops]) if loops else np.zeros((0, 2))
-    _write("marching_squares_disk", {
-        "benchmark": "disk_field",
-        "rubric_version": "v6.0-wave-JJ", "kind": "marching_squares",
-        "grid_n": 65, "radius": 0.3,
-        "contour_sha256": _sha256(pts),
-        "total_area": float(total_area),
-        "n_loops": len(loops),
-    })
+    _write(
+        "marching_squares_disk",
+        {
+            "benchmark": "disk_field",
+            "rubric_version": "v6.0-wave-JJ",
+            "kind": "marching_squares",
+            "grid_n": 65,
+            "radius": 0.3,
+            "contour_sha256": _sha256(pts),
+            "total_area": float(total_area),
+            "n_loops": len(loops),
+        },
+    )
 
 
 def main() -> None:

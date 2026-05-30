@@ -292,8 +292,9 @@ def _niching_select(
     while len(chosen) < n_needed and available:
         # reference(s) with the smallest niche count
         min_count = min(niche[assoc[p]] for p in available)
-        cand_refs = [j for j in range(ref_dirs.shape[0])
-                     if niche[j] == min_count and any(assoc[p] == j for p in available)]
+        cand_refs = [
+            j for j in range(ref_dirs.shape[0]) if niche[j] == min_count and any(assoc[p] == j for p in available)
+        ]
         j = int(rng.choice(cand_refs))
         members = [p for p in available if assoc[p] == j]
         # empty niche → take the point closest to the reference line; else random
@@ -361,9 +362,7 @@ def nsga3(
                 continue
             # `front` is the splitting front F_l → reference-point niching
             n_needed = population_size - len(selected)
-            picked = _niching_select(
-                front, np.array(selected, dtype=int), combined_objs, ref_dirs, n_needed, rng
-            )
+            picked = _niching_select(front, np.array(selected, dtype=int), combined_objs, ref_dirs, n_needed, rng)
             selected.extend(picked)
             break
         sel = np.array(selected, dtype=int)

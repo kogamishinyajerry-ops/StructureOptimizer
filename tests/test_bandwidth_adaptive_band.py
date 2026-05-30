@@ -71,8 +71,12 @@ def test_adaptive_window_robust_across_sharpness():
         true_peak = _true_peak(config, mesh, rho, lo, hi, beta)
         ab = adaptive_band_sample(config, mesh, rho, lo, hi, n_init=9, n_refine=16, beta=beta)
         relw = half_power_relative_bandwidth(ab.peak_omega, 0.0, beta)
-        p_adapt, _, _ = target_band_peak_sensitivity(config, mesh, rho, _band(ab.peak_omega, lo, hi, relw), 0.0, beta, 12.0, "consistent")
-        p_fixed, _, _ = target_band_peak_sensitivity(config, mesh, rho, _band(ab.peak_omega, lo, hi, 0.05), 0.0, beta, 12.0, "consistent")
+        p_adapt, _, _ = target_band_peak_sensitivity(
+            config, mesh, rho, _band(ab.peak_omega, lo, hi, relw), 0.0, beta, 12.0, "consistent"
+        )
+        p_fixed, _, _ = target_band_peak_sensitivity(
+            config, mesh, rho, _band(ab.peak_omega, lo, hi, 0.05), 0.0, beta, 12.0, "consistent"
+        )
         adaptive_errs.append(abs(p_adapt - true_peak) / true_peak)
         fixed_errs.append(abs(p_fixed - true_peak) / true_peak)
     # worst-case robustness: the adaptive band's max error is well below the fixed band's
@@ -86,9 +90,7 @@ def test_adaptive_driver_runs_feasible():
     lo, hi = 0.6 * w1, 2.1 * w1
     beta = 2e-6
     tp0 = _true_peak(config, mesh, rho, lo, hi, beta)
-    r = adaptive_peak_constrained_mma(
-        config, mesh, 3.0 * tp0, lo, hi, beta=beta, max_iter=25, bandwidth_adaptive=True
-    )
+    r = adaptive_peak_constrained_mma(config, mesh, 3.0 * tp0, lo, hi, beta=beta, max_iter=25, bandwidth_adaptive=True)
     true_peak = _true_peak(config, mesh, r.densities, lo, hi, beta)
     assert true_peak <= 1.05 * 3.0 * tp0
     # the recorded bands use the half-power width, not the fixed default. Check the

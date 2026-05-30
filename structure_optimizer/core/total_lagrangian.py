@@ -83,9 +83,7 @@ def _shape_grad_natural(xi: float, eta: float) -> np.ndarray:
 
 def _plane_stress_D(young: float, nu: float) -> np.ndarray:
     """SVK plane-stress constitutive matrix (Voigt: [E11, E22, 2E12])."""
-    return young / (1.0 - nu**2) * np.array(
-        [[1.0, nu, 0.0], [nu, 1.0, 0.0], [0.0, 0.0, 0.5 * (1.0 - nu)]]
-    )
+    return young / (1.0 - nu**2) * np.array([[1.0, nu, 0.0], [nu, 1.0, 0.0], [0.0, 0.0, 0.5 * (1.0 - nu)]])
 
 
 def _density_scale(config: BenchmarkConfig, mesh: StructuredMesh, densities: np.ndarray) -> np.ndarray:
@@ -124,16 +122,16 @@ def _element_internal_force_and_tangent(
     energy = 0.0
 
     for (xi, eta), w in zip(_GAUSS, _GAUSS_W, strict=True):
-        dn_nat = _shape_grad_natural(xi, eta)          # (4,2) ∂N/∂(ξ,η)
-        jac = dn_nat.T @ coords                        # (2,2) ∂X/∂(ξ,η)
+        dn_nat = _shape_grad_natural(xi, eta)  # (4,2) ∂N/∂(ξ,η)
+        jac = dn_nat.T @ coords  # (2,2) ∂X/∂(ξ,η)
         detj = np.linalg.det(jac)
         if detj <= 0:
             raise SolverError("total_lagrangian_nonpositive_jacobian")
-        dn_dx = dn_nat @ np.linalg.inv(jac).T          # (4,2) ∂N/∂X
+        dn_dx = dn_nat @ np.linalg.inv(jac).T  # (4,2) ∂N/∂X
         dvol = detj * w
 
         # Deformation gradient F = I + ∂u/∂X = I + Σ_a u_a ⊗ ∂N_a/∂X
-        grad_u = u_nodes.T @ dn_dx                     # (2,2): grad_u[i,J] = ∂u_i/∂X_J
+        grad_u = u_nodes.T @ dn_dx  # (2,2): grad_u[i,J] = ∂u_i/∂X_J
         F = np.eye(2) + grad_u
 
         # Green-Lagrange strain E = ½(FᵀF − I), Voigt [E11, E22, 2E12]
@@ -182,7 +180,7 @@ def _assemble(
     k_t = np.zeros((n_dof, n_dof))
     energy = 0.0
     for e, nodes in enumerate(mesh.elements):
-        coords = mesh.nodes[nodes]                     # (4,2)
+        coords = mesh.nodes[nodes]  # (4,2)
         dofs = np.empty(8, dtype=int)
         dofs[0::2] = 2 * nodes
         dofs[1::2] = 2 * nodes + 1

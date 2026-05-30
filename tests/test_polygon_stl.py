@@ -84,9 +84,7 @@ def test_two_holes_area_conservation():
 def test_extruded_concave_prism_is_watertight(tmp_path):
     info = write_stl_polygon(_star(), tmp_path / "star.stl", z_thickness=1.5)
     assert info["is_watertight"]
-    assert info["cross_section_area"] == pytest.approx(
-        polygon_area([np.asarray(p, float) for p in _star()]), abs=1e-12
-    )
+    assert info["cross_section_area"] == pytest.approx(polygon_area([np.asarray(p, float) for p in _star()]), abs=1e-12)
 
 
 def test_extruded_holed_prism_is_watertight_and_area_exact(tmp_path):

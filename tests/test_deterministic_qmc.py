@@ -83,8 +83,7 @@ def test_koksma_hlawka_deterministic_bound_holds():
 def test_worst_case_error_decreases_with_n():
     """Convergence: refining N (with a CBC vector each time) lowers the certified bound
     monotonically — a deterministic O(N^{−1+δ}) decay, not a noisy MC trend."""
-    es = [korobov_worst_case_error(cbc_korobov_generating_vector(_D, n, _GAMMA), n, _GAMMA)
-          for n in (31, 61, 127, 257)]
+    es = [korobov_worst_case_error(cbc_korobov_generating_vector(_D, n, _GAMMA), n, _GAMMA) for n in (31, 61, 127, 257)]
     assert all(es[i] > es[i + 1] for i in range(len(es) - 1))
 
 

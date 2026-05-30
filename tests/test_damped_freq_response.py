@@ -66,8 +66,10 @@ def test_rayleigh_half_power_bandwidth_matches_analytical(cantilever_smoke):
 
     omegas = np.linspace(0.85 * omega1, 1.15 * omega1, 401)
     mag = np.array(
-        [solve_damped_frequency_response(config, mesh, densities, float(w), alpha=alpha, beta=0.0).response_norm
-         for w in omegas]
+        [
+            solve_damped_frequency_response(config, mesh, densities, float(w), alpha=alpha, beta=0.0).response_norm
+            for w in omegas
+        ]
     )
     bw = half_power_bandwidth(omegas, mag)
     assert bw["damping_ratio"] == pytest.approx(zeta_target, rel=0.25), (

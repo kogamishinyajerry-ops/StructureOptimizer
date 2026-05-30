@@ -96,9 +96,7 @@ def test_stress_constraint_binds_and_changes_design():
 
     # the stress constraint actually bit: the optimised σ_PN is driven well
     # below the unconstrained baseline, down to (near) the limit
-    assert r.stress_history[-1] < spn_base, (
-        f"stress not reduced: {r.stress_history[-1]:.3e} vs baseline {spn_base:.3e}"
-    )
+    assert r.stress_history[-1] < spn_base, f"stress not reduced: {r.stress_history[-1]:.3e} vs baseline {spn_base:.3e}"
     # binding (active), not merely slack-feasible: within 5% of the limit
     assert r.stress_history[-1] >= 0.9 * sigma_limit, (
         f"stress constraint slack, not binding: {r.stress_history[-1]:.3e} vs limit {sigma_limit:.3e}"

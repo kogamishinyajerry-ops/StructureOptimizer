@@ -65,6 +65,7 @@ def test_undamped_dynamic_compliance_is_real_and_matches_real_solver():
     # J = (fᵀu)² of the undamped real solver
     real = solve_frequency_response(config, mesh, rho, OMEGA)
     from structure_optimizer.core.freq_response import _build_harmonic_load
+
     f = _build_harmonic_load(config, mesh)
     c_real = float(f @ real.displacements)
     assert out.objective == pytest.approx(c_real**2, rel=1e-8)
@@ -87,10 +88,7 @@ def test_descent_cuts_the_resonance_peak():
     sweep = np.linspace(10.0, 120.0, 28)
 
     def peak(r):
-        return max(
-            solve_damped_frequency_response(config, mesh, r, float(w), ALPHA, BETA).max_magnitude
-            for w in sweep
-        )
+        return max(solve_damped_frequency_response(config, mesh, r, float(w), ALPHA, BETA).max_magnitude for w in sweep)
 
     assert peak(res.densities) < peak(rho0)
     # volume preserved by the descent

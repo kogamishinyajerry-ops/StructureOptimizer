@@ -69,6 +69,7 @@ def test_geometric_nonlinearity_changes_compliance():
     # 1 load step from zero is still the full nonlinear solve; compare TL
     # compliance against the linear-elastic compliance of the same design.
     from structure_optimizer.core.fem2d import solve_linear_elastic
+
     tl_c = tl_adjoint_compliance_sensitivity(config, mesh, rho, n_load_steps=N_STEPS).compliance
     lin_c = float(solve_linear_elastic(config, mesh, rho).compliance)
     assert abs(tl_c - lin_c) / lin_c > 1e-6, "TL compliance indistinguishable from linear"
@@ -77,5 +78,6 @@ def test_geometric_nonlinearity_changes_compliance():
 def test_tl_adjoint_rejects_density_mismatch():
     config, mesh = _smoke()
     from structure_optimizer.core.fem2d import SolverError
+
     with pytest.raises(SolverError, match="density_count_mismatch"):
         tl_adjoint_compliance_sensitivity(config, mesh, np.zeros(3), n_load_steps=N_STEPS)

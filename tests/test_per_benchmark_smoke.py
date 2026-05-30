@@ -40,11 +40,7 @@ def _smoke_preset_or_default(name: str) -> str | None:
     return None
 
 
-_BENCHMARKS = [
-    n
-    for n in available_benchmarks()
-    if n not in {"large_cantilever", "xlarge_cantilever"}
-]
+_BENCHMARKS = [n for n in available_benchmarks() if n not in {"large_cantilever", "xlarge_cantilever"}]
 
 
 @pytest.mark.parametrize("benchmark", _BENCHMARKS)

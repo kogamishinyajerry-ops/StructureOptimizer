@@ -52,7 +52,7 @@ def test_disk_area_second_order_convergence():
     err2 = abs(_ms_area(129) - EXACT_AREA)  # halve h
     # O(h²) → error roughly quarters; demand clearly better than O(h)'s ½.
     assert err2 < 0.45 * err1, f"not 2nd-order: err1={err1:.2e} err2={err2:.2e}"
-    assert err2 / EXACT_AREA < 0.005, f"fine-grid area error too large: {err2/EXACT_AREA:.4f}"
+    assert err2 / EXACT_AREA < 0.005, f"fine-grid area error too large: {err2 / EXACT_AREA:.4f}"
 
 
 def test_marching_squares_beats_voxel():
@@ -72,8 +72,7 @@ def test_contours_are_closed():
 
 
 def test_polygon_area_unit_square_exact():
-    square = [np.array([0.0, 0.0]), np.array([2.0, 0.0]),
-              np.array([2.0, 3.0]), np.array([0.0, 3.0])]
+    square = [np.array([0.0, 0.0]), np.array([2.0, 0.0]), np.array([2.0, 3.0]), np.array([0.0, 3.0])]
     assert polygon_area(square) == pytest.approx(6.0, abs=1e-12)
 
 
@@ -99,6 +98,7 @@ def test_write_stl_marching_squares_valid_ascii():
 
     import tempfile
     from pathlib import Path
+
     with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as f:
         path = Path(f.name)
     try:

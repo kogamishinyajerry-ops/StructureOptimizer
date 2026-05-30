@@ -145,8 +145,12 @@ def main() -> int:
 
     bad_vf = client.post(
         "/api/runs",
-        json={"benchmark_id": "cantilever", "overrides": {"optimization": {
-            "volume_fraction": 1.5, "penalty": 3.0, "filter_radius": 1.5, "max_iterations": 12}}},
+        json={
+            "benchmark_id": "cantilever",
+            "overrides": {
+                "optimization": {"volume_fraction": 1.5, "penalty": 3.0, "filter_radius": 1.5, "max_iterations": 12}
+            },
+        },
     )
     assert bad_vf.status_code == 400, f"invalid volume_fraction should 400, got {bad_vf.status_code}"
     print(f"invalid volume_fraction -> 400: {bad_vf.json()['detail']}")

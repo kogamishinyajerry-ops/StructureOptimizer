@@ -81,8 +81,7 @@ def seeded_nsga_demo(out_path: str | Path, benchmark: str = "cantilever") -> dic
     mesh = create_structured_mesh(config)
     kw = dict(n_generations=8, population_size=12, rng_seed=0)
     rand = multi_objective_to(config, mesh, **kw)
-    seeded = gradient_seeded_multi_objective_to(
-        config, mesh, seed_volume_fractions=(0.25, 0.45, 0.65), **kw)
+    seeded = gradient_seeded_multi_objective_to(config, mesh, seed_volume_fractions=(0.25, 0.45, 0.65), **kw)
     hv_r, hv_s = rand.hv_history[-1], seeded.hv_history[-1]
     gain = 100.0 * (hv_s - hv_r) / (hv_r + 1e-30)
     body = (
@@ -102,8 +101,7 @@ def system_reliability_demo(out_path: str | Path) -> dict:
     # Mode 1: g = R - S with R~lognormal (resistance), S~gumbel (max load).
     # Mode 2: g = R2 - S with R2~weibull (resistance), S~gumbel (shared load).
     betas = []
-    for r_marginal in (Marginal("lognormal", float(np.log(120.0)), 0.15),
-                       Marginal("weibull", 5.0, 130.0)):
+    for r_marginal in (Marginal("lognormal", float(np.log(120.0)), 0.15), Marginal("weibull", 5.0, 130.0)):
         load = Marginal("gumbel", 70.0, 12.0)
         nataf = build_nataf_general([r_marginal, load])
         g = nataf.wrap_limit_state(lambda x: float(x[0] - x[1]))
@@ -123,8 +121,12 @@ def system_reliability_demo(out_path: str | Path) -> dict:
         "use the bivariate-normal CDF of the correlated modes.</p>"
     )
     Path(out_path).write_text(_html("System reliability: general-marginal FORM + Ditlevsen", body))
-    return {"out_path": str(out_path), "betas": betas,
-            "p_lower": sysr["p_failure_lower"], "p_upper": sysr["p_failure_upper"]}
+    return {
+        "out_path": str(out_path),
+        "betas": betas,
+        "p_lower": sysr["p_failure_lower"],
+        "p_upper": sysr["p_failure_upper"],
+    }
 
 
 def fibre_steer_demo(out_path: str | Path) -> dict:
@@ -132,14 +134,17 @@ def fibre_steer_demo(out_path: str | Path) -> dict:
     config, _k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
     mesh = create_structured_mesh(config)
     rho = np.full(mesh.elements.shape[0], 1.0)
-    res = fibre_steering_thermal_to(config, mesh, rho, kxx=5.0, kyy=1.0, n_steps=20, step=0.3,
-                                    heat_sources=sources, thermal_bcs=bcs)
+    res = fibre_steering_thermal_to(
+        config, mesh, rho, kxx=5.0, kyy=1.0, n_steps=20, step=0.3, heat_sources=sources, thermal_bcs=bcs
+    )
     h = res.compliance_history
     hmax = max(h) or 1.0
     body = "<p>Thermal compliance as fibre angles are steered:</p><table><tr><th>step</th><th>C</th></tr>"
     for i, c in enumerate(h):
         if i % 4 == 0 or i == len(h) - 1:
-            body += f"<tr><td>{i}</td><td>{c:.4g} <span class='bar' style='width:{200 * c / hmax:.0f}px'></span></td></tr>"
+            body += (
+                f"<tr><td>{i}</td><td>{c:.4g} <span class='bar' style='width:{200 * c / hmax:.0f}px'></span></td></tr>"
+            )
     drop = 100.0 * (h[0] - h[-1]) / (h[0] + 1e-30)
     body += (
         f"</table><p>C {h[0]:.4g} → {h[-1]:.4g} (<b>-{drop:.0f}%</b>) by aligning the "
@@ -173,9 +178,20 @@ def main(out_dir: str | Path = "build/v8_demos") -> None:
     d = nonlinear_oc_demo(out_dir / "nonlinear_oc.html")
     print("nonlinear_oc_demo: C", f"{d['c0']:.4g} → {d['c_final']:.4g}", "converged", d["converged"])
     s = seeded_nsga_demo(out_dir / "seeded_nsga.html")
-    print("seeded_nsga_demo: HV random", f"{s['hv_random']:.4g}", "seeded", f"{s['hv_seeded']:.4g}", f"({s['gain_pct']:+.0f}%)")
+    print(
+        "seeded_nsga_demo: HV random",
+        f"{s['hv_random']:.4g}",
+        "seeded",
+        f"{s['hv_seeded']:.4g}",
+        f"({s['gain_pct']:+.0f}%)",
+    )
     r = system_reliability_demo(out_dir / "system_reliability.html")
-    print("system_reliability_demo: betas", [f"{b:.3f}" for b in r["betas"]], "Pf∈", f"[{r['p_lower']:.2e},{r['p_upper']:.2e}]")
+    print(
+        "system_reliability_demo: betas",
+        [f"{b:.3f}" for b in r["betas"]],
+        "Pf∈",
+        f"[{r['p_lower']:.2e},{r['p_upper']:.2e}]",
+    )
     f = fibre_steer_demo(out_dir / "fibre_steer.html")
     print("fibre_steer_demo: C", f"{f['c0']:.4g} → {f['c_final']:.4g}", f"(-{f['drop_pct']:.0f}%)")
     g = holed_stl_demo(out_dir)

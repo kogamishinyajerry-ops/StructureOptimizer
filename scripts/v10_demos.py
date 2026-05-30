@@ -63,7 +63,9 @@ def multi_constraint_demo(out_path: str | Path, benchmark: str = "cantilever") -
     from structure_optimizer.core.stress import element_von_mises_stresses, p_norm_stress
 
     base = run_simp(config, mesh)
-    spn_base = p_norm_stress(element_von_mises_stresses(config, mesh, solve_linear_elastic(config, mesh, base.densities).displacements), 8.0)
+    spn_base = p_norm_stress(
+        element_von_mises_stresses(config, mesh, solve_linear_elastic(config, mesh, base.densities).displacements), 8.0
+    )
     sigma_limit = 0.7 * spn_base
     r = multi_constraint_mma(config, mesh, sigma_limit=sigma_limit, p=8.0, vf=vf, max_iter=60)
     body = (
@@ -97,7 +99,9 @@ def generalized_nsga_demo(out_path: str | Path, benchmark: str = "cantilever") -
     config = load_benchmark(benchmark, preset="smoke")
     mesh = create_structured_mesh(config)
     pub = multi_objective_to(config, mesh, n_generations=6, population_size=12, rng_seed=0)
-    gen = nsga3_density_to(config, mesh, load_cases=[list(config.loads)], n_generations=6, population_size=12, rng_seed=0)
+    gen = nsga3_density_to(
+        config, mesh, load_cases=[list(config.loads)], n_generations=6, population_size=12, rng_seed=0
+    )
     identical = bool(np.array_equal(pub.front_objectives, gen.front_objectives))
     body = (
         f"<p>multi_objective_to vs nsga3_density_to(1 load case): "
@@ -153,8 +157,12 @@ def simultaneous_mma_demo(out_path: str | Path) -> dict:
     """Simultaneous (ρ,θ) coupled MMA vs alternating minimisation (OOO)."""
     config, _k, sources, bcs = load_thermal_benchmark("heat_sink", preset="smoke")
     mesh = create_structured_mesh(config)
-    sim = simultaneous_density_orientation_mma(config, mesh, 5.0, 1.0, max_iter=40, heat_sources=sources, thermal_bcs=bcs)
-    alt = coupled_density_orientation_to(config, mesh, 5.0, 1.0, n_outer=8, n_orient_steps=8, heat_sources=sources, thermal_bcs=bcs)
+    sim = simultaneous_density_orientation_mma(
+        config, mesh, 5.0, 1.0, max_iter=40, heat_sources=sources, thermal_bcs=bcs
+    )
+    alt = coupled_density_orientation_to(
+        config, mesh, 5.0, 1.0, n_outer=8, n_orient_steps=8, heat_sources=sources, thermal_bcs=bcs
+    )
     cs, ca = sim.compliance_history[-1], alt.compliance_history[-1]
     body = (
         f"<p>Thermal compliance: simultaneous MMA <b>{cs:.4g}</b> vs alternating <b>{ca:.4g}</b> "

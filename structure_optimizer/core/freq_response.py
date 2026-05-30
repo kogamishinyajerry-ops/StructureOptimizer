@@ -592,7 +592,11 @@ def dynamic_compliance_to(
     rho = np.where(mesh.void_mask, opt.min_density, target_vol)
 
     def band_objective(r: np.ndarray) -> float:
-        return float(np.mean([dynamic_compliance_sensitivity(config, mesh, r, w, alpha, beta, mass_type).objective for w in omegas]))
+        return float(
+            np.mean(
+                [dynamic_compliance_sensitivity(config, mesh, r, w, alpha, beta, mass_type).objective for w in omegas]
+            )
+        )
 
     def band_peak(r: np.ndarray) -> float:
         return max(
@@ -996,9 +1000,7 @@ def adaptive_band_sample(
     if n_init < 2:
         raise SolverError("adaptive_band_too_few_initial")
     omegas = list(np.linspace(float(omega_lo), float(omega_hi), n_init))
-    values = [
-        _dynamic_compliance_objective(config, mesh, densities, w, alpha, beta, mass_type) for w in omegas
-    ]
+    values = [_dynamic_compliance_objective(config, mesh, densities, w, alpha, beta, mass_type) for w in omegas]
     for _ in range(max(0, n_refine)):
         i_peak = int(np.argmax(values))
         candidates: list[tuple[int, int]] = []
@@ -1248,17 +1250,11 @@ def adaptive_peak_constrained_mma(
     converged = False
 
     def _regrid(r: np.ndarray) -> tuple[float, np.ndarray]:
-        ab = adaptive_band_sample(
-            config, mesh, r, omega_lo, omega_hi, n_init, n_refine, alpha, beta, mass_type
-        )
+        ab = adaptive_band_sample(config, mesh, r, omega_lo, omega_hi, n_init, n_refine, alpha, beta, mass_type)
         # Wave BBBBB (D091): size the window to the resonance's half-power bandwidth
         # when bandwidth_adaptive, instead of a fixed fractional width — a sharp
         # resonance gets a narrow band, a broad one a wide band.
-        width = (
-            half_power_relative_bandwidth(ab.peak_omega, alpha, beta)
-            if bandwidth_adaptive
-            else band_rel_width
-        )
+        width = half_power_relative_bandwidth(ab.peak_omega, alpha, beta) if bandwidth_adaptive else band_rel_width
         spread = np.linspace(1.0 - width, 1.0 + width, n_band)
         band = np.clip(ab.peak_omega * spread, omega_lo, omega_hi)
         return ab.peak_omega, band
@@ -1400,9 +1396,7 @@ def peak_binding_mma(
     state = MMAState()
 
     def _flanking_band(r: np.ndarray) -> tuple[float, np.ndarray]:
-        ab = adaptive_band_sample(
-            config, mesh, r, flanking_lo, flanking_hi, n_init, n_refine, alpha, beta, mass_type
-        )
+        ab = adaptive_band_sample(config, mesh, r, flanking_lo, flanking_hi, n_init, n_refine, alpha, beta, mass_type)
         spread = np.linspace(1.0 - band_rel_width, 1.0 + band_rel_width, n_band)
         return ab.peak_omega, np.clip(ab.peak_omega * spread, flanking_lo, flanking_hi)
 

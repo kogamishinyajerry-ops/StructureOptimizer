@@ -100,9 +100,7 @@ def test_solve_multi_material_single_material_matches_linear_elastic(bimaterial_
 
     config, mesh = bimaterial_smoke
     n_elem = mesh.elements.shape[0]
-    only_material = [
-        MaterialProperty(name="only", young_modulus=70_000.0, poisson_ratio=0.3, density=2.7)
-    ]
+    only_material = [MaterialProperty(name="only", young_modulus=70_000.0, poisson_ratio=0.3, density=2.7)]
     # Multi-material with one material at full density
     densities = np.full((1, n_elem), 1.0)
     r_multi = solve_multi_material(config, mesh, densities, only_material, e_min=1.0)

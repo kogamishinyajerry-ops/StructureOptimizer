@@ -61,5 +61,5 @@ def test_property_mma_nonlinear_volume_non_increasing_tail():
     config, mesh = _setup()
     vf = config.optimization.volume_fraction
     res = mma_nonlinear_to(config, mesh, n_load_steps=3, max_iter=25)
-    tail = res.volume_history[len(res.volume_history) // 2:]
+    tail = res.volume_history[len(res.volume_history) // 2 :]
     assert all(v <= vf + 0.03 for v in tail), f"volume drifts above constraint: {max(tail):.4f}"
