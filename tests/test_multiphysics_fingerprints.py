@@ -899,6 +899,78 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
         ]
         return np.asarray(z, dtype=float), ("z_sha256", rec["z_sha256"]), checks
 
+    if kind == "fast_cbc":
+        from structure_optimizer.core.reliability import (
+            _korobov_generating_vector,
+            fast_cbc_korobov_generating_vector,
+            korobov_worst_case_error,
+        )
+
+        w = rec["weights"]
+        z = fast_cbc_korobov_generating_vector(rec["dim"], rec["n_points"], w)
+        e = korobov_worst_case_error(z, rec["n_points"], w)
+        e_kor = korobov_worst_case_error(
+            _korobov_generating_vector(rec["dim"], rec["korobov_a"], rec["n_points"]), rec["n_points"], w
+        )
+        checks = [
+            ("z", rec["z"], np.asarray(z).tolist()),
+            ("e_fast", rec["e_fast"], e),
+            ("e_korobov", rec["e_korobov"], e_kor),
+            ("fast_le_korobov", rec["fast_le_korobov"], bool(e <= e_kor)),
+        ]
+        return np.asarray(z, dtype=float), ("z_sha256", rec["z_sha256"]), checks
+
+    if kind == "genz_cbc":
+        from structure_optimizer.core.reliability import genz_mvn_cdf_cbc
+
+        res = genz_mvn_cdf_cbc(np.asarray(rec["upper"]), np.asarray(rec["correlation"]), n_points=rec["n_points"])
+        checks = [
+            ("value", rec["value"], res.value),
+            ("worst_case_error", rec["worst_case_error"], res.worst_case_error),
+        ]
+        return np.array([res.value, res.worst_case_error]), ("value_sha256", rec["value_sha256"]), checks
+
+    if kind == "copula_marginals":
+        from structure_optimizer.core.reliability import (
+            Marginal,
+            gumbel_d_copula,
+            system_reliability_series_copula_marginals,
+        )
+
+        mg = [Marginal(k, a, b) for (k, a, b) in rec["marginals"]]
+        pf = system_reliability_series_copula_marginals(mg, rec["points"], gumbel_d_copula(len(mg), rec["theta"]))
+        checks = [("p_f", rec["p_f"], pf)]
+        return np.array([pf]), ("p_f_sha256", rec["p_f_sha256"]), checks
+
+    if kind == "parallel_copula":
+        from structure_optimizer.core.reliability import (
+            gumbel_d_copula,
+            system_reliability_k_out_of_n_copula,
+            system_reliability_parallel_copula,
+            system_reliability_series_copula,
+        )
+
+        betas = np.asarray(rec["betas"])
+        cop = gumbel_d_copula(len(betas), rec["theta"])
+        pf_par = system_reliability_parallel_copula(betas, cop)
+        pf_ser = system_reliability_series_copula(betas, cop)
+        ks = [system_reliability_k_out_of_n_copula(betas, cop, k) for k in range(1, len(betas) + 1)]
+        checks = [("p_f_parallel", rec["p_f_parallel"], pf_par), ("p_f_series", rec["p_f_series"], pf_ser)]
+        return np.asarray(ks), ("ks_sha256", rec["ks_sha256"]), checks
+
+    if kind == "alpha_korobov":
+        from structure_optimizer.core.reliability import korobov_worst_case_error
+
+        z = np.asarray(rec["z"], dtype=np.int64)
+        w = rec["weights"]
+        es = [korobov_worst_case_error(z, rec["n_points"], w, smoothness=a) for a in (1, 2, 3)]
+        checks = [
+            ("e_alpha1", rec["e_alpha1"], es[0]),
+            ("e_alpha2", rec["e_alpha2"], es[1]),
+            ("e_alpha3", rec["e_alpha3"], es[2]),
+        ]
+        return np.asarray(es), ("es_sha256", rec["es_sha256"]), checks
+
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
@@ -998,6 +1070,12 @@ def test_multiphysics_fingerprint_set_present():
         "constrained_select_balanced",
         "multi_family_copula_gumbel_clayton",
         "cbc_korobov_3d",
+        # v16 deep embedding & exact generalization (Wave HHHHHHHH closure)
+        "copula_marginals_weibull_gumbel",
+        "genz_cbc_bivariate",
+        "alpha_korobov_smoothness",
+        "parallel_copula_gumbel",
+        "fast_cbc_korobov_5d",
     }
     missing = expected - stems
     assert not missing, f"missing multi-physics fingerprints: {sorted(missing)}"

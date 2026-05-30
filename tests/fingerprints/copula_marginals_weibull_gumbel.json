@@ -1,0 +1,25 @@
+{
+  "benchmark": "reliability",
+  "preset": "smoke",
+  "rubric_version": "v16.0-wave-HHHHHHHH",
+  "kind": "copula_marginals",
+  "marginals": [
+    [
+      "weibull",
+      2.0,
+      3.0
+    ],
+    [
+      "gumbel",
+      1.0,
+      0.5
+    ]
+  ],
+  "points": [
+    2.5,
+    1.2
+  ],
+  "theta": 2.0,
+  "p_f": 0.618376641264472,
+  "p_f_sha256": "sha256:836b83de8f2cc39c9ffd07a0ae4b0373142c4db245327d271033fe1e5699311b"
+}

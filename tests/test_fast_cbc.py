@@ -128,14 +128,21 @@ def test_naive_cbc_unchanged_adjacent():
 
 
 def test_fast_cbc_guards():
-    """Guards: non-prime N, dim<1, and weight-length mismatch raise SolverError."""
+    """Guards: non-prime N (even and odd composite), N<2, dim<1, weight-length mismatch,
+    and negative weights all raise SolverError."""
     gamma = np.array([1.0, 0.25, 0.11])
     with pytest.raises(SolverError, match="fast_cbc_n_not_prime"):
-        fast_cbc_korobov_generating_vector(3, 1024, gamma)  # 1024 composite
+        fast_cbc_korobov_generating_vector(3, 1024, gamma)  # even composite
+    with pytest.raises(SolverError, match="fast_cbc_n_not_prime"):
+        fast_cbc_korobov_generating_vector(3, 15, gamma)  # odd composite (3·5)
+    with pytest.raises(SolverError, match="korobov_wce_too_few_points"):
+        fast_cbc_korobov_generating_vector(2, 1, np.array([1.0, 0.25]))  # N < 2
     with pytest.raises(SolverError, match="cbc_dim_too_small"):
         fast_cbc_korobov_generating_vector(0, 127, np.array([]))
     with pytest.raises(SolverError, match="cbc_weights_dim_mismatch"):
         fast_cbc_korobov_generating_vector(3, 127, np.array([1.0, 0.25]))
+    with pytest.raises(SolverError, match="korobov_wce_negative_weight"):
+        fast_cbc_korobov_generating_vector(2, 127, np.array([1.0, -0.5]))
 
 
 def test_fast_cbc_speedup_vs_naive(request):
