@@ -186,7 +186,6 @@ def _oc_update_per_material(
 ) -> np.ndarray:
     """Bisection-OC update for one material's density field."""
     l1, l2 = 0.0, 1e9
-    n = densities_row.size
     updated = densities_row.copy()
     for _ in range(80):
         mid = 0.5 * (l1 + l2)

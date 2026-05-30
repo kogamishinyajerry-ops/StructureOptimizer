@@ -48,7 +48,7 @@ def _non_dominated_sort(objectives: np.ndarray) -> list[np.ndarray]:
 
     Front 0 = Pareto-optimal; front 1 = dominated only by front 0; ...
     """
-    n, m = objectives.shape
+    n, _m = objectives.shape
     # domination_count[i] = number of solutions that dominate i
     # dominated_by[i] = list of solutions that i dominates
     dom_count = np.zeros(n, dtype=int)
@@ -140,7 +140,7 @@ def nsga_ii(
     objs = np.array([eval_fn(x) for x in pop])
     history = []
 
-    for gen in range(n_generations):
+    for _gen in range(n_generations):
         # Combined population: parents + offspring (use SBX + polynomial mutation)
         offspring = _generate_offspring(pop, bl, bu, crossover_eta, mutation_prob, rng)
         off_objs = np.array([eval_fn(x) for x in offspring])
@@ -405,7 +405,7 @@ def render_pareto(front: ParetoFront, html_path: str, title: str = "Pareto Front
         x_range = max(x_max - x_min, 1e-9)
         y_range = max(y_max - y_min, 1e-9)
         points = []
-        for xi, yi in zip(x, y):
+        for xi, yi in zip(x, y, strict=True):
             px = margin + (xi - x_min) / x_range * (w - 2 * margin)
             py = h - margin - (yi - y_min) / y_range * (h - 2 * margin)
             points.append(f'<circle cx="{px:.2f}" cy="{py:.2f}" r="4" fill="#0066cc"/>')

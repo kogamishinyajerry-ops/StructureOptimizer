@@ -142,9 +142,9 @@ def test_modal_cantilever_first_freq_matches_euler_bernoulli_order_of_magnitude(
     t = config.thickness
     L = config.mesh.width
     h = config.mesh.height
-    I = h**3 * t / 12.0
+    second_moment = h**3 * t / 12.0
     A = h * t
-    omega_eb = (1.875104**2 / L**2) * np.sqrt(E * I / (rho * A))
+    omega_eb = (1.875104**2 / L**2) * np.sqrt(E * second_moment / (rho * A))
 
     # Within 4× either direction (FEM 2D plate > EB beam due to shear)
     ratio = omega_fem / omega_eb

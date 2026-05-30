@@ -135,7 +135,7 @@ def solve_geometric_nonlinear(
 
     for step_idx, frac in enumerate(load_fractions):
         f_step = f_total * frac
-        for it in range(max_inner_iter):
+        for _it in range(max_inner_iter):
             K_g = assemble_geometric_stiffness(config, mesh, densities, u)
             K_T = K + K_g
             # Residual R = f_ext - f_int with f_int ≈ K u + (1/2) K_g u

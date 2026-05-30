@@ -21,7 +21,7 @@ def small_mesh():
 
 
 def test_write_stl_creates_valid_ascii_file(small_mesh):
-    config, mesh = small_mesh
+    _config, mesh = small_mesh
     densities = np.full(mesh.elements.shape[0], 0.7)  # all solid (above 0.5)
     with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as f:
         path = Path(f.name)
@@ -44,7 +44,7 @@ def test_write_stl_creates_valid_ascii_file(small_mesh):
 
 
 def test_write_stl_skips_void_cells(small_mesh):
-    config, mesh = small_mesh
+    _config, mesh = small_mesh
     densities = np.full(mesh.elements.shape[0], 0.0)  # all void
     with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as f:
         path = Path(f.name)
@@ -59,7 +59,7 @@ def test_write_stl_skips_void_cells(small_mesh):
 
 
 def test_write_stl_respects_threshold(small_mesh):
-    config, mesh = small_mesh
+    _config, mesh = small_mesh
     n_elem = mesh.elements.shape[0]
     densities = np.linspace(0.0, 1.0, n_elem)
     with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as f:
@@ -74,7 +74,7 @@ def test_write_stl_respects_threshold(small_mesh):
 
 
 def test_write_stl_rejects_density_mismatch(small_mesh):
-    config, mesh = small_mesh
+    _config, mesh = small_mesh
     bad = np.zeros(mesh.elements.shape[0] + 1)
     with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as f:
         path = Path(f.name)
@@ -86,7 +86,7 @@ def test_write_stl_rejects_density_mismatch(small_mesh):
 
 
 def test_write_stl_rejects_nonpositive_thickness(small_mesh):
-    config, mesh = small_mesh
+    _config, mesh = small_mesh
     densities = np.full(mesh.elements.shape[0], 1.0)
     with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as f:
         path = Path(f.name)
@@ -100,7 +100,7 @@ def test_write_stl_rejects_nonpositive_thickness(small_mesh):
 def test_property_stl_triangle_count_is_12_per_solid_cell(small_mesh):
     """Every solid axis-aligned box contributes exactly 12 triangles
     (6 faces × 2)."""
-    config, mesh = small_mesh
+    _config, mesh = small_mesh
     n_elem = mesh.elements.shape[0]
     densities = np.random.default_rng(0).uniform(0.0, 1.0, n_elem)
     with tempfile.NamedTemporaryFile(suffix=".stl", delete=False) as f:

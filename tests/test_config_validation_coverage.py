@@ -235,21 +235,21 @@ def test_load_case_load_with_zero_force_rejected():
 def test_symmetry_with_bad_axis_rejected():
     raw = _base_raw()
     raw["manufacturing_constraints"] = {"symmetry": {"axis": "z", "position": 0.5}}
-    with pytest.raises(ConfigError, match="symmetry.axis must be"):
+    with pytest.raises(ConfigError, match=r"symmetry\.axis must be"):
         validate_config(parse_config(raw))
 
 
 def test_symmetry_with_out_of_range_position_rejected():
     raw = _base_raw()
     raw["manufacturing_constraints"] = {"symmetry": {"axis": "x", "position": 1.5}}
-    with pytest.raises(ConfigError, match="symmetry.position must be in"):
+    with pytest.raises(ConfigError, match=r"symmetry\.position must be in"):
         validate_config(parse_config(raw))
 
 
 def test_extrusion_with_bad_axis_rejected():
     raw = _base_raw()
     raw["manufacturing_constraints"] = {"extrusion": {"axis": "z"}}
-    with pytest.raises(ConfigError, match="extrusion.axis must be"):
+    with pytest.raises(ConfigError, match=r"extrusion\.axis must be"):
         validate_config(parse_config(raw))
 
 

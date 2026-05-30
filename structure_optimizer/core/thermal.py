@@ -274,7 +274,7 @@ def solve_thermal(
 
     # De-dup fixed nodes (last value wins, matching elastic BC semantics)
     fixed_dict: dict[int, float] = {}
-    for n, t in zip(fixed_nodes, fixed_temps):
+    for n, t in zip(fixed_nodes, fixed_temps, strict=True):
         fixed_dict[int(n)] = float(t)
 
     if not fixed_dict:

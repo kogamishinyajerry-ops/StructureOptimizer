@@ -41,7 +41,7 @@ def two_materials():
 
 
 def test_effective_modulus_returns_correct_shape(bimaterial_smoke, two_materials):
-    config, mesh = bimaterial_smoke
+    _config, mesh = bimaterial_smoke
     n_elem = mesh.elements.shape[0]
     densities = np.full((2, n_elem), 0.5)
     E = effective_modulus_per_element(densities, two_materials, penalty=3.0, e_min=1.0)
