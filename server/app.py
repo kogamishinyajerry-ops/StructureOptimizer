@@ -144,6 +144,7 @@ def get_benchmark_config(benchmark_id: str) -> BenchmarkConfigEditable:
             penalty=cfg.optimization.penalty,
             filter_radius=cfg.optimization.filter_radius,
             max_iterations=cfg.optimization.max_iterations,
+            algorithm=cfg.optimization.algorithm,
         ),
         mesh=MeshOverride(nelx=cfg.mesh.nelx, nely=cfg.mesh.nely),
         loads=loads,

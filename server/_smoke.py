@@ -96,6 +96,9 @@ def main() -> int:
     assert cfg_body["benchmark_id"] == "cantilever"
     assert cfg_body["loads_editable"] is True, "cantilever should be loads_editable"
     assert len(cfg_body["selectors"]) == 13, f"expected 13 selectors, got {len(cfg_body['selectors'])}"
+    assert cfg_body["optimization"].get("algorithm") in {"simp", "beso"}, (
+        f"config missing/invalid optimization.algorithm: {cfg_body['optimization'].get('algorithm')!r}"
+    )
     assert cfg_body["limits"] == {
         "nelx_max": 160,
         "nely_max": 160,
@@ -182,6 +185,52 @@ def main() -> int:
         f"M4 history: {len(runs)} runs; mbb_beam compliance={mbb['compliance']:.3f} "
         f"verified={mbb['verified']} metrics={len(metrics)} rows"
     )
+
+    # ---- Milestone 7: algorithm selector (run BESO from the web) -------------
+    # A complete optimization block is required (the four fields stay mandatory),
+    # so a bare {"algorithm": "beso"} 422s. Keep the run fast with a small mesh +
+    # low max_iterations so BESO converges quickly in the smoke run.
+    beso_opt = dict(cfg_body["optimization"])
+    beso_opt["algorithm"] = "beso"
+    beso_opt["max_iterations"] = 12
+    beso_start = client.post(
+        "/api/runs",
+        json={
+            "benchmark_id": "cantilever",
+            "overrides": {"optimization": beso_opt, "mesh": {"nelx": 40, "nely": 20}},
+        },
+    )
+    assert beso_start.status_code == 200, f"beso run -> {beso_start.status_code}: {beso_start.text}"
+    beso_run_id = beso_start.json()["run_id"]
+
+    beso_done = None
+    beso_live_frames = 0
+    with client.websocket_connect(f"/api/runs/{beso_run_id}/stream") as ws:
+        while True:
+            frame = ws.receive_json()
+            if frame["type"] == "iteration":
+                beso_live_frames += 1
+            elif frame["type"] == "done":
+                beso_done = frame
+                break
+            elif frame["type"] == "error":
+                print("ERROR frame (beso run):", frame["message"])
+                return 1
+    # BESO ignores on_iteration, so it streams no live frames — only a terminal
+    # done. Assert it COMPLETES (not that verification passed: a smoke-size BESO
+    # run legitimately reports volume_constraint_failed).
+    assert beso_done is not None, "beso run produced no done frame"
+    print(f"beso run reached done: stop_reason={beso_done['stop_reason']} live_frames={beso_live_frames}")
+
+    bad_alg = client.post(
+        "/api/runs",
+        json={
+            "benchmark_id": "cantilever",
+            "overrides": {"optimization": {**dict(cfg_body["optimization"]), "algorithm": "mma"}},
+        },
+    )
+    assert bad_alg.status_code == 400, f"invalid algorithm should 400, got {bad_alg.status_code}: {bad_alg.text}"
+    print(f"invalid algorithm -> 400: {bad_alg.json()['detail']}")
 
     print("SMOKE OK")
     return 0

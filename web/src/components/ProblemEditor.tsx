@@ -88,6 +88,12 @@ export function ProblemEditor(props: ProblemEditorProps) {
     emit(next);
   };
 
+  const setAlgorithm = (algorithm: "simp" | "beso") => {
+    const next = baseOverrides();
+    next.optimization = { ...opt, algorithm };
+    emit(next);
+  };
+
   const setMesh = (key: "nelx" | "nely", raw: number) => {
     const next = baseOverrides();
     next.mesh = { ...mesh, [key]: raw };
@@ -124,6 +130,34 @@ export function ProblemEditor(props: ProblemEditorProps) {
       {open && (
         <div className="problem-editor-body" id="problem-editor-body">
           <Section label="Optimization">
+            <div className="problem-editor-field">
+              <label className="problem-editor-field-label">Algorithm</label>
+              <div
+                className="problem-editor-segmented"
+                role="group"
+                aria-label="Optimization algorithm"
+              >
+                {(["simp", "beso"] as const).map((alg) => {
+                  const active = (opt.algorithm ?? "simp") === alg;
+                  return (
+                    <button
+                      key={alg}
+                      type="button"
+                      className={
+                        active
+                          ? "problem-editor-segment is-active"
+                          : "problem-editor-segment"
+                      }
+                      aria-pressed={active}
+                      disabled={disabled}
+                      onClick={() => setAlgorithm(alg)}
+                    >
+                      {alg.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <RangeField
               id="pe-vf"
               label="Volume fraction"

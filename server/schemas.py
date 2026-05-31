@@ -38,6 +38,12 @@ class OptimizationOverride(BaseModel):
     penalty: float
     filter_radius: float
     max_iterations: int
+    # M7 algorithm selector (SIMP ↔ BESO). Optional + ``None`` is dropped on the
+    # wire (``model_dump(exclude_none=True)``), so existing 4-field payloads are
+    # unchanged. A plain ``str`` (not a ``Literal``) keeps the engine registry's
+    # ``available_algorithms()`` the single source of truth: an unknown value is
+    # rejected at the override layer (HTTP 400), not at parse time (422).
+    algorithm: str | None = None
 
 
 class MeshOverride(BaseModel):

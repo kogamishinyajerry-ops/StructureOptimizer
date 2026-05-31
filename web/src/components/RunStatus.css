@@ -44,11 +44,17 @@
   min-height: var(--space-6);
 }
 
-.run-status-done {
+.run-status-done,
+.run-status-running {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-3);
+}
+
+.run-status-note {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
 }
 
 .run-status-badge {

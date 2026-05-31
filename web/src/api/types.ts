@@ -93,6 +93,7 @@ export interface BenchmarkConfigEditable {
     penalty: number;
     filter_radius: number;
     max_iterations: number;
+    algorithm?: "simp" | "beso";
   };
   mesh: { nelx: number; nely: number };
   loads: EditableLoad[];
@@ -112,6 +113,7 @@ export interface RunOverrides {
     penalty: number;
     filter_radius: number;
     max_iterations: number;
+    algorithm?: "simp" | "beso";
   };
   mesh?: { nelx: number; nely: number };
   loads?: EditableLoad[];
