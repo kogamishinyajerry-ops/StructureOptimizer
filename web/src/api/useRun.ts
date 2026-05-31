@@ -8,6 +8,8 @@ export interface RunSnapshot {
   status: RunStatus;
   runId: string | null;
   benchmarkId: string | null;
+  /** Algorithm this run was launched with (null for reopened/idle runs). */
+  algorithm: "simp" | "beso" | null;
   shape: [number, number] | null; // [nely, nelx]
   /** Latest density frame (base64 uint8), updated per iteration. */
   density: string | null;
@@ -20,6 +22,7 @@ const EMPTY: RunSnapshot = {
   status: "idle",
   runId: null,
   benchmarkId: null,
+  algorithm: null,
   shape: null,
   density: null,
   iterations: [],
@@ -66,7 +69,10 @@ export function useRun() {
     }
 
     const shape: [number, number] = [start.nely, start.nelx];
-    setSnap({ ...EMPTY, status: "running", runId: start.run_id, benchmarkId, shape });
+    // BESO emits no live iteration frames (the engine ignores on_iteration), so
+    // carry the chosen algorithm into the snapshot to explain the empty viewport.
+    const algorithm = overrides?.optimization?.algorithm ?? "simp";
+    setSnap({ ...EMPTY, status: "running", runId: start.run_id, benchmarkId, algorithm, shape });
 
     const ws = new WebSocket(streamUrl(start.run_id));
     wsRef.current = ws;
@@ -149,6 +155,7 @@ export function useRun() {
       status: "done",
       runId: detail.run_id,
       benchmarkId: detail.benchmark_id,
+      algorithm: null,
       shape: detail.shape,
       density: detail.density_b64,
       iterations: detail.metrics,

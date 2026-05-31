@@ -25,6 +25,11 @@ export function RunStatus({ snap }: RunStatusProps) {
       value: latest ? pct(latest.volume_fraction) : "—",
     },
     { label: "Change", value: latest ? fmt(latest.change) : "—" },
+    { label: "Mass", value: latest ? fmt(latest.mass) : "—" },
+    {
+      label: "Max displacement",
+      value: latest ? fmt(latest.max_displacement) : "—",
+    },
   ];
 
   return (
@@ -54,10 +59,17 @@ function renderState(snap: RunSnapshot) {
       );
     case "running":
       return (
-        <span className="run-status-badge run-status-badge--running">
-          <span className="run-status-dot" aria-hidden="true" />
-          Optimizing…
-        </span>
+        <div className="run-status-running">
+          <span className="run-status-badge run-status-badge--running">
+            <span className="run-status-dot" aria-hidden="true" />
+            Optimizing…
+          </span>
+          {snap.algorithm === "beso" && (
+            <span className="run-status-note">
+              BESO — final result only, no live preview
+            </span>
+          )}
+        </div>
       );
     case "done": {
       const done = snap.done;

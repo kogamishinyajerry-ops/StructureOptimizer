@@ -8,7 +8,8 @@ benchmark. This module is the single enforcement point for that subset:
 
     {
       "optimization": {"volume_fraction": float, "penalty": float,
-                       "filter_radius": float, "max_iterations": int},
+                       "filter_radius": float, "max_iterations": int,
+                       "algorithm": str (optional, "simp" | "beso")},
       "mesh": {"nelx": int, "nely": int},
       "loads": [{"selector": str, "fx": float, "fy": float}, ...],
     }
@@ -101,6 +102,19 @@ def _apply_optimization(config: BenchmarkConfig, override: dict[str, Any]) -> An
         if max_iterations > MAX_ITERATIONS_MAX:
             raise ValueError(f"max_iterations {max_iterations} exceeds cap of {MAX_ITERATIONS_MAX}")
         new_values["max_iterations"] = max_iterations
+    if "algorithm" in override:
+        # Validate against the engine registry (the SSOT) so an unknown value
+        # surfaces as a user-facing HTTP 400 here rather than only via the deeper
+        # validate_config backstop. The patched config is re-checked there too.
+        from structure_optimizer.adapters.algorithm_base import available_algorithms
+
+        algorithm = str(override["algorithm"]).lower()
+        if algorithm not in available_algorithms():
+            raise ValueError(
+                f"unknown algorithm '{override['algorithm']}'; "
+                f"must be one of {', '.join(available_algorithms())}"
+            )
+        new_values["algorithm"] = algorithm
     return replace(opt, **new_values)
 
 
