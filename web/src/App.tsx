@@ -16,6 +16,7 @@ import { ProblemEditor } from "./components/ProblemEditor";
 import { RunHistory } from "./components/RunHistory";
 import { CompareView } from "./components/CompareView";
 import { DensityViewport } from "./viewport/DensityViewport";
+import { GuidedMode } from "./guided/GuidedMode";
 import "./App.css";
 
 export function App() {
@@ -29,6 +30,7 @@ export function App() {
   const [configReload, setConfigReload] = useState(0);
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [comparePair, setComparePair] = useState<[string, string] | null>(null);
+  const [guided, setGuided] = useState(false);
   const { snap, launch, loadRun } = useRun();
 
   useEffect(() => {
@@ -152,6 +154,14 @@ export function App() {
             onPresetChange={setPreset}
             onRun={onRun}
           />
+          <button
+            type="button"
+            className="app-guided-btn"
+            onClick={() => setGuided(true)}
+            disabled={running}
+          >
+            ▶ 讲解模式
+          </button>
         </div>
       </header>
 
@@ -206,6 +216,10 @@ export function App() {
 
       {comparePair && (
         <CompareView pair={comparePair} onClose={() => setComparePair(null)} />
+      )}
+
+      {guided && (
+        <GuidedMode snap={snap} onLaunch={(id) => launch(id)} onExit={() => setGuided(false)} />
       )}
     </div>
   );
