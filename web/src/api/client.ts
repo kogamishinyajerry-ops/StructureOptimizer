@@ -4,6 +4,7 @@ import type {
   RunDetail,
   RunListItem,
   RunOverrides,
+  StageRecord,
   StartRunResponse,
 } from "./types";
 
@@ -45,6 +46,11 @@ export function fetchRuns(): Promise<RunListItem[]> {
 /** Full payload (summary + verification + metrics + density) for one run. */
 export function fetchRun(run_id: string): Promise<RunDetail> {
   return fetch(`${BASE}/api/runs/${run_id}`).then(json<RunDetail>);
+}
+
+/** The run's per-stage agent-rail records (agents_trace.json), for history replay. */
+export function fetchTrace(run_id: string): Promise<StageRecord[]> {
+  return fetch(`${BASE}/api/runs/${run_id}/trace`).then(json<StageRecord[]>);
 }
 
 /** WebSocket URL for a run's live stream (handles ws/wss + dev proxy). */

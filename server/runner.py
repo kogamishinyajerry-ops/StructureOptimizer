@@ -46,12 +46,17 @@ class RunState:
     error: str | None = None
     thread: threading.Thread | None = None
     # The frame queue is a single destructive stream with exactly one SENTINEL,
-    # so only one WebSocket may drain it. These flags let the stream endpoint
-    # reject a second concurrent consumer (which would steal frames and then
-    # block forever on the already-consumed SENTINEL) and a late consumer
-    # connecting after the stream is finished.
+    # so only one WebSocket may EVER drain it. These flags let the stream
+    # endpoint reject a second concurrent consumer (which would steal frames and
+    # then block forever on the already-consumed SENTINEL), a late consumer
+    # connecting after the stream finished, AND a reconnect after a mid-stream
+    # disconnect (which would otherwise drain the residual queue and show a
+    # partial view). ``consumed`` latches True on the first accepted consumer and
+    # never resets — a reconnect is told to fetch the final result + trace via
+    # the REST endpoints instead.
     streaming: bool = False
     stream_done: bool = False
+    consumed: bool = False
 
 
 class RunManager:

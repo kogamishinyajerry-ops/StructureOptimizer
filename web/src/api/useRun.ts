@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchRun, startRun, streamUrl } from "./client";
+import { fetchRun, fetchTrace, startRun, streamUrl } from "./client";
 import type { DoneFrame, MetricPoint, RunOverrides, StageFrame, StreamFrame } from "./types";
 
 export type RunStatus = "idle" | "starting" | "running" | "done" | "error";
@@ -151,6 +151,18 @@ export function useRun() {
       density_b64: detail.density_b64,
     };
 
+    // Rebuild the agent rail from the persisted trace (best-effort): each trace
+    // record becomes a synthetic "end" stage frame, so a reopened run shows the
+    // identical rail without re-running. Older runs (evicted from the manager) or
+    // an engine-only backend simply replay with an empty rail.
+    let stages: StageFrame[] = [];
+    try {
+      const records = await fetchTrace(runId);
+      stages = records.map((r): StageFrame => ({ type: "stage", phase: "end", agent: r.name, record: r }));
+    } catch {
+      stages = [];
+    }
+
     setSnap({
       status: "done",
       runId: detail.run_id,
@@ -158,7 +170,7 @@ export function useRun() {
       shape: detail.shape,
       density: detail.density_b64,
       iterations: detail.metrics,
-      stages: [], // reopened runs have no live rail yet (history replay via /trace is deferred)
+      stages,
       done,
       error: null,
     });

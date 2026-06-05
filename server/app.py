@@ -224,18 +224,24 @@ async def stream_run(websocket: WebSocket, run_id: str) -> None:
         return
 
     # A run's frame queue is a single destructive stream with one SENTINEL, so it
-    # supports exactly one consumer. Reject a second concurrent consumer (two tabs,
-    # a StrictMode double-mount, a reconnect race) or a late one connecting after
-    # the stream finished — either would otherwise steal frames or block forever on
-    # the missing SENTINEL, leaking a thread + socket. The check/set pair has no
-    # await between it, so it is atomic on the event loop.
-    if state.streaming or state.stream_done:
+    # supports exactly one consumer EVER. Reject a second concurrent consumer (two
+    # tabs, a StrictMode double-mount, a reconnect race), a late one connecting
+    # after the stream finished, OR a reconnect after a mid-stream disconnect —
+    # each would otherwise steal/lose frames or block forever on the missing
+    # SENTINEL. ``consumed`` latches on the first accepted consumer and never
+    # resets, so a reconnect is told to fetch the final result + trace via REST.
+    # The check/set pair has no await between it, so it is atomic on the event loop.
+    if state.consumed or state.stream_done:
         await websocket.send_json(
-            {"type": "error", "message": "Run stream is unavailable; fetch the result via GET /api/runs/{id}"}
+            {
+                "type": "error",
+                "message": "Run stream already consumed; fetch the result via GET /api/runs/{id} and /api/runs/{id}/trace",
+            }
         )
         await websocket.close()
         return
     state.streaming = True
+    state.consumed = True
 
     try:
         while True:
@@ -292,6 +298,30 @@ def get_run(run_id: str) -> RunResult:
         density_b64=density_b64,
         metrics=metrics,
     )
+
+
+@app.get("/api/runs/{run_id}/trace")
+def get_run_trace(run_id: str) -> list[dict[str, Any]]:
+    """Return the run's ``agents_trace.json`` ``agents`` list — the per-stage
+    agent rail, for history replay (rebuild the rail without re-running).
+
+    Serves the on-disk artifact verbatim (each entry's ``artifacts`` were
+    filesystem-measured by the orchestrator, so a stage cannot lie about what it
+    produced). Only runs still tracked by the manager (the most recent
+    ``max_runs``) are served; the run_id↔run_dir map is in-memory, so older runs
+    return 404.
+    """
+    state = manager.get(run_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail=f"Unknown run '{run_id}'")
+    if state.run_dir is None:
+        raise HTTPException(status_code=409, detail="Run not finished")
+    try:
+        trace = read_json(state.run_dir / "agents_trace.json")
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail="Run trace is unavailable") from exc
+    agents: list[dict[str, Any]] = trace.get("agents", [])
+    return agents
 
 
 @app.get("/api/runs/{run_id}/export")
