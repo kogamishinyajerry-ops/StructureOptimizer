@@ -35,7 +35,7 @@
   "solver": { "backend": "cg" },
   "presets": {
     "smoke": {
-      "mesh": {"nelx": 60, "nely": 20, "width": 60.0, "height": 20.0},
+      "mesh": {"nelx": 40, "nely": 15, "width": 40.0, "height": 15.0},
       "optimization": {"max_iterations": 8, "min_iterations": 8}
     }
   }
