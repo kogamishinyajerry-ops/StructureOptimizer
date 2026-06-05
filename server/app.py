@@ -73,13 +73,13 @@ _BLURBS = {
     "loaded_hook": "Loaded hook — non-rectangular design domain.",
     "simple_bracket": "2.5D bracket — frozen/void selectors and multiple load cases.",
     "multi_load_cantilever": "Cantilever under multiple load cases (weighted / worst-case).",
-    "stress_limited_bracket": "Bracket with a stress constraint (p-norm / KS + adjoint).",
+    "stress_limited_bracket": "Bracket — compliance with a p-norm/KS stress constraint enforced in verification.",
     "stress_multi_load_bracket": "Stress constraint plus multiple load cases.",
-    "heat_sink": "2D heat-conduction SIMP (Poisson).",
-    "vibrating_beam": "Modal / frequency-response benchmark.",
-    "nonlinear_cantilever": "Geometric-nonlinear cantilever (simplified TL).",
-    "bimaterial_beam": "Multi-material SIMP beam.",
-    "uncertain_load_bracket": "Reliability / Monte-Carlo robust SIMP.",
+    "heat_sink": "Heat-sink domain — compliance run (thermal SIMP is not on the live path).",
+    "vibrating_beam": "Beam — compliance run (modal / frequency-response is not on the live path).",
+    "nonlinear_cantilever": "Cantilever — linear compliance run (geometric-nonlinear TL is not on the live path).",
+    "bimaterial_beam": "Beam — single-material compliance run (multi-material is not on the live path).",
+    "uncertain_load_bracket": "Bracket — deterministic compliance run (robust / Monte-Carlo is not on the live path).",
 }
 
 
