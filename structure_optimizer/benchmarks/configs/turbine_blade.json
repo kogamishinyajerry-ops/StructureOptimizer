@@ -1,0 +1,42 @@
+{
+  "name": "turbine_blade",
+  "dimension": "2d",
+  "units": "mm_N_MPa",
+  "thickness": 1.0,
+  "mesh": {
+    "type": "structured_quad",
+    "nelx": 80,
+    "nely": 40,
+    "width": 40.0,
+    "height": 20.0
+  },
+  "material": {
+    "young_modulus": 200000.0,
+    "poisson_ratio": 0.3,
+    "density": 8.0e-9
+  },
+  "boundary_conditions": [
+    { "selector": "bottom_edge", "components": ["ux","uy"] }
+  ],
+  "loads": [
+    { "selector": "top_mid",   "fx": 200.0,  "fy": -3000.0 },
+    { "selector": "right_mid", "fx": 0.0,    "fy": -2000.0 },
+    { "selector": "left_mid",  "fx": 150.0,  "fy": -1500.0 }
+  ],
+  "optimization": {
+    "objective": "min_compliance",
+    "volume_fraction": 0.40,
+    "penalty": 3.0,
+    "filter_radius": 1.8,
+    "max_iterations": 80,
+    "min_iterations": 8,
+    "change_tolerance": 0.008,
+    "min_density": 0.001
+  },
+  "presets": {
+    "smoke": {
+      "mesh": { "nelx": 40, "nely": 20, "width": 40.0, "height": 20.0 },
+      "optimization": { "max_iterations": 8, "min_iterations": 8 }
+    }
+  }
+}
