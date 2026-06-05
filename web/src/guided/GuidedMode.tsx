@@ -111,6 +111,49 @@ const MIN_CARD_MS = 1400; // presentational floor so each narration card is read
 const MIN_SOLVE_MS = 8000; // hero density hold so the converging "carve" never blinks past
 
 type CellPhase = "idle" | "start" | "end" | "error";
+type CellTone = "idle" | "active" | "ok" | "warn" | "error";
+
+// Honest per-cell tone, derived from the REAL stage record (Phase 2 gate-state
+// nuance — green is NOT the only "done"):
+//   - end + gate.ok === false                         -> warn  (Verification engineering veto)
+//   - convergence end + verdict_status max_iterations -> warn  (converged-by-budget, not true convergence)
+//   - otherwise end -> ok ; start -> active ; error (structural abort) -> error
+function cellTone(agent: string, cs: { phase: CellPhase; record: StageRecord | null }): CellTone {
+  if (cs.phase === "start") return "active";
+  if (cs.phase === "error") return "error";
+  if (cs.phase !== "end") return "idle";
+  const rec = cs.record;
+  if (!rec) return "ok";
+  if (!rec.gate.ok) return "warn";
+  if (agent === "convergence_gate" && rec.gate.verdict_status === "max_iterations") return "warn";
+  return "ok";
+}
+
+const TONE_CLASS: Record<CellTone, string> = {
+  idle: "guided-step",
+  active: "guided-step is-active",
+  ok: "guided-step is-done",
+  warn: "guided-step is-warn",
+  error: "guided-step is-error",
+};
+const TONE_DOT: Record<CellTone, string | null> = { idle: null, active: null, ok: "✓", warn: "!", error: "×" };
+
+// Verification constraint name -> short label. Unknown names fall back to the raw
+// name, so chips always map 1:1 to real verification.json constraints (no fabrication).
+const CHECK_LABELS: Record<string, string> = {
+  volume_fraction: "体积",
+  load_to_support_connectivity: "连通性",
+  frozen_solid_regions: "冻结区",
+  void_regions: "挖空区",
+  stress: "应力",
+  max_stress: "应力",
+  manufacturability: "可制造性",
+};
+
+interface VerifyCheck {
+  name: string;
+  status: string;
+}
 
 export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
   const [idx, setIdx] = useState(0); // narration FOCUS (card). The RAIL is real-driven, below.
@@ -189,6 +232,9 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
   const latest = snap.iterations.length > 0 ? snap.iterations[snap.iterations.length - 1] : null;
   const verification = (snap.done?.verification ?? {}) as Record<string, unknown>;
   const verifyPassed = verification.status === "passed";
+  // Real per-constraint results (authoritative top-level constraints[]); each chip
+  // maps 1:1 to a real verification.json entry — only present once the run is done.
+  const checks = (Array.isArray(verification.constraints) ? verification.constraints : []) as VerifyCheck[];
   const showViewport = idx >= 2;
 
   const replay = () => {
@@ -212,23 +258,10 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
         </div>
         <ol className="guided-stepper">
           {STAGES.map((s, i) => {
-            const cs = cellStates[i];
-            const ok = cs.record ? cs.record.gate.ok : true;
-            const cls =
-              cs.phase === "start"
-                ? "guided-step is-active"
-                : cs.phase === "error"
-                  ? "guided-step is-error"
-                  : cs.phase === "end"
-                    ? ok
-                      ? "guided-step is-done"
-                      : "guided-step is-warn"
-                    : "guided-step";
-            const dot =
-              cs.phase === "end" ? (ok ? "✓" : "!") : cs.phase === "error" ? "×" : s.no;
+            const tone = cellTone(AGENT_BY_CELL[i], cellStates[i]);
             return (
-              <li key={s.no} className={cls}>
-                <span className="guided-step-dot">{dot}</span>
+              <li key={s.no} className={TONE_CLASS[tone]}>
+                <span className="guided-step-dot">{TONE_DOT[tone] ?? s.no}</span>
                 <span className="guided-step-label">{s.name}</span>
               </li>
             );
@@ -258,9 +291,9 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
               优化中…
             </span>
           )}
-          {idx >= 4 && (
+          {idx >= 4 && snap.done && (
             <span className={verifyPassed ? "guided-chip guided-chip--ok" : "guided-chip guided-chip--warn"}>
-              {verifyPassed ? "✓ Verified · 独立复核通过" : "复核完成"}
+              {verifyPassed ? "✓ Verified · 独立复核通过" : "⚠ 工程负结果 · 见失败项"}
             </span>
           )}
 
@@ -290,11 +323,28 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
             <Row k="过程产物" v={idx === 5 && exportInfo ? exportInfo : stage.artifact} />
             <Row k="门控" v={stage.gate} />
           </dl>
+          {/* Phase 2: real per-constraint verdict chips (verification cell), each
+              mapping 1:1 to a verification.json constraint — the independent critic. */}
+          {idx === 4 && checks.length > 0 && (
+            <div className="guided-checks">
+              {checks.map((c) => (
+                <span
+                  key={c.name}
+                  className={`guided-check ${c.status === "passed" ? "is-ok" : "is-warn"}`}
+                >
+                  {CHECK_LABELS[c.name] ?? c.name} {c.status === "passed" ? "✓" : "!"}
+                </span>
+              ))}
+            </div>
+          )}
         </aside>
       </main>
 
       <footer className="guided-foot">
-        优化候选 · 需工程复核 · 非认证结论
+        <span className="guided-foot-honest">
+          每个亮起 = 真实引擎阶段完成（非脚本）· 绿 通过 · 琥珀 工程负结果/预算截断待复核 · 仅「独立验证」可否决优化器
+        </span>
+        <span>优化候选 · 需工程复核 · 非认证结论</span>
       </footer>
 
       {finished && (
