@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "structure-optimizer"
-version = "5.0.0"
+version = "0.5.0"
 description = "Local, dependency-light (numpy-only) 2D/2.5D SIMP topology-optimization engine with independent verification, fronted by a React/FastAPI live web workbench."
 requires-python = ">=3.11"
 dependencies = [

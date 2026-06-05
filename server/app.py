@@ -48,7 +48,7 @@ from server.schemas import (
     StartRunResponse,
 )
 
-app = FastAPI(title="StructureOptimizer Workbench API", version="0.1.0")
+app = FastAPI(title="StructureOptimizer Workbench API", version="0.5.0")
 
 app.add_middleware(
     CORSMiddleware,
