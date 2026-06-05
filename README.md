@@ -50,7 +50,7 @@
   async 任务把队列排到 WebSocket。`RunManager` 在内存里保留最近 16 个 run。端点：
   `GET /api/benchmarks`、`GET /api/benchmarks/{id}/config`、`POST /api/runs`、
   `GET /api/runs`、`GET /api/runs/{id}`、`WS /api/runs/{id}/stream`、
-  `GET /api/runs/{id}/export`、`GET /api/health`。
+  `GET /api/runs/{id}/trace`、`GET /api/runs/{id}/export`、`GET /api/health`。
 - **前端**（`web/`）—— React 18 + TypeScript（strict）+ Vite。CSS design-token 系统
   （`web/src/theme/tokens.css`）是样式的唯一真相源 —— 只用 token，不引图表库（收敛
   曲线是手写 SVG），密度视口用 canvas。
@@ -65,7 +65,7 @@
 可校验的不变量 —— input_hash 溯源、`OptimizationResult` 形状、收敛 `stop_reason`、
 `summary.json` schema、验证状态。每次运行落一份 `agents_trace.json`，使管线**自描述**，
 并让 Web 端"讲解模式"渲染**真实执行过的阶段**而非脚本叙事。这里的 "agent" 指带契约的
-流水线阶段，**不含任何智能/自主/AI**；详见 [`docs/ARCHITECTURE.md` §2.5](docs/ARCHITECTURE.md)。
+流水线阶段，**不含任何智能/自主/AI**；详见 [`docs/architecture.md` §2.5](docs/architecture.md)。
 
 ## 运行
 
