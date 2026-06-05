@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { RunSnapshot } from "../api/useRun";
+import type { StageRecord } from "../api/types";
 import { DensityViewport } from "../viewport/DensityViewport";
 import { fmt, pct } from "../lib/format";
 import "./GuidedMode.css";
@@ -7,10 +8,12 @@ import "./GuidedMode.css";
 /**
  * Guided / 讲解 mode — a clean, presenter-grade "one take" walkthrough of the
  * real end-to-end pipeline on top of a REAL run. It auto-drives a cantilever
- * SIMP run and steps a 6-stage explainer in sync: 问题定义 → 离散化 → 优化求解
- * → 收敛门控 → 独立验证 → 结果解析/导出. Every visual is real (real density
- * stream, real verification status, a real export fetch); no backend text/JSON
- * is exposed. Built to be screen-recorded as the demo embedded in the deck.
+ * SIMP run; the six rail dots light from REAL per-stage engine events
+ * (``snap.stages``, sourced from the orchestrator's agents_trace seam) — NOT
+ * scripted timers. 问题定义 → 离散化 → 优化求解 → 收敛门控 → 独立验证 →
+ * 结果解析/导出. Every visual is real (real density stream, real verification
+ * status, a real export fetch). The narration card paces its catch-up to the
+ * real frontier for readability, but never runs ahead of the engine.
  */
 
 interface Stage {
@@ -93,75 +96,94 @@ interface GuidedModeProps {
   onExit: () => void;
 }
 
+// The six rail cells, in pipeline order, mapped to the orchestrator's agent
+// names. The internal "persistence" step is not a narrated cell.
+const AGENT_BY_CELL = [
+  "problem_definition",
+  "mesh",
+  "optimizer",
+  "convergence_gate",
+  "verification",
+  "export_report",
+] as const;
+
+const MIN_CARD_MS = 1400; // presentational floor so each narration card is readable
+const MIN_SOLVE_MS = 8000; // hero density hold so the converging "carve" never blinks past
+
+type CellPhase = "idle" | "start" | "end" | "error";
+
 export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx] = useState(0); // narration FOCUS (card). The RAIL is real-driven, below.
   const [finished, setFinished] = useState(false);
   const [exportInfo, setExportInfo] = useState<string | null>(null);
   const launchedRef = useRef(false);
   const exportRef = useRef(false);
-  const solveStartRef = useRef(0);
+  const focusStartRef = useRef(0);
 
-  // Narration-paced transitions (timers) + the run-gated solve transition below.
-  useEffect(() => {
-    if (finished) return;
-    if (idx === 0) {
-      const t = setTimeout(() => setIdx(1), 4800);
-      return () => clearTimeout(t);
+  // REAL per-cell state from the live engine trace (not scripted): the latest
+  // stage event for each agent. This is the truth the rail renders.
+  const cellStates = AGENT_BY_CELL.map((agent) => {
+    let phase: CellPhase = "idle";
+    let record: StageRecord | null = null;
+    for (const s of snap.stages) {
+      if (s.agent === agent) {
+        phase = s.phase;
+        record = s.record;
+      }
     }
-    if (idx === 1) {
-      const t = setTimeout(() => {
-        if (!launchedRef.current) {
-          launchedRef.current = true;
-          onLaunch("cantilever");
-        }
-        setIdx(2);
-      }, 3800);
-      return () => clearTimeout(t);
-    }
-    if (idx === 3) {
-      const t = setTimeout(() => setIdx(4), 3400);
-      return () => clearTimeout(t);
-    }
-    if (idx === 4) {
-      const t = setTimeout(() => {
-        if (!exportRef.current && snap.runId) {
-          exportRef.current = true;
-          // A REAL export fetch (proves the endpoint), shown without a save dialog.
-          fetch(`/api/runs/${snap.runId}/export?format=svg`)
-            .then((res) => res.blob())
-            .then((blob) =>
-              setExportInfo(`geometry.svg · ${(blob.size / 1024).toFixed(1)} KB · 内嵌 input_hash + 验证状态`),
-            )
-            .catch(() => setExportInfo("geometry.svg · 内嵌 input_hash + 验证状态"));
-        }
-        setIdx(5);
-      }, 4600);
-      return () => clearTimeout(t);
-    }
-    if (idx === 5) {
-      const t = setTimeout(() => setFinished(true), 5400);
-      return () => clearTimeout(t);
-    }
-  }, [idx, finished, onLaunch, snap.runId]);
+    return { phase, record };
+  });
+  // Frontier = furthest cell the real engine has reached (any non-idle event).
+  let frontier = 0;
+  cellStates.forEach((c, i) => {
+    if (c.phase !== "idle") frontier = i;
+  });
 
-  // Stage 03 (solve) holds until the REAL run reaches a terminal state — but for
-  // at least MIN_SOLVE_MS so the convergence "hero" never blinks past on a fast
-  // run (the converged X-truss then holds for the remainder).
-  const MIN_SOLVE_MS = 8000;
+  // Launch the REAL run once on entry.
   useEffect(() => {
-    if (idx === 2 && solveStartRef.current === 0) solveStartRef.current = Date.now();
+    if (!launchedRef.current) {
+      launchedRef.current = true;
+      onLaunch("cantilever");
+    }
+  }, [onLaunch]);
+
+  // Narration focus catches up to the real frontier — never ahead of the engine
+  // — with a per-card floor so each step is readable (the optimizer card also
+  // holds MIN_SOLVE_MS so the live carve is watchable). This paces the CARD only;
+  // the rail dots light from real events in real time.
+  useEffect(() => {
+    focusStartRef.current = Date.now();
   }, [idx]);
   useEffect(() => {
-    if (idx !== 2) return;
-    if (snap.status !== "done" && snap.status !== "error") return;
-    const remaining = MIN_SOLVE_MS - (Date.now() - solveStartRef.current);
-    if (remaining <= 0) {
-      setIdx(3);
-      return;
-    }
-    const t = setTimeout(() => setIdx(3), remaining);
+    if (finished || idx >= frontier) return;
+    const floor = idx === 2 ? MIN_SOLVE_MS : MIN_CARD_MS;
+    const wait = Math.max(0, floor - (Date.now() - focusStartRef.current));
+    const t = setTimeout(() => setIdx((i) => Math.min(i + 1, frontier)), wait);
     return () => clearTimeout(t);
-  }, [idx, snap.status]);
+  }, [idx, frontier, finished]);
+
+  // A REAL export fetch when the export stage actually completes (proves the
+  // endpoint), shown without a save dialog.
+  useEffect(() => {
+    if (exportRef.current || !snap.runId) return;
+    if (cellStates[5].phase !== "end") return;
+    exportRef.current = true;
+    fetch(`/api/runs/${snap.runId}/export?format=svg`)
+      .then((res) => res.blob())
+      .then((blob) =>
+        setExportInfo(`geometry.svg · ${(blob.size / 1024).toFixed(1)} KB · 内嵌 input_hash + 验证状态`),
+      )
+      .catch(() => setExportInfo("geometry.svg · 内嵌 input_hash + 验证状态"));
+  }, [cellStates, snap.runId]);
+
+  // Finish once the focus has reached the export cell and it has really ended.
+  useEffect(() => {
+    if (finished || idx !== 5) return;
+    const exp = cellStates[5].phase;
+    if (exp !== "end" && exp !== "error") return;
+    const t = setTimeout(() => setFinished(true), 2600);
+    return () => clearTimeout(t);
+  }, [idx, finished, cellStates]);
 
   const stage = STAGES[idx];
   const latest = snap.iterations.length > 0 ? snap.iterations[snap.iterations.length - 1] : null;
@@ -173,9 +195,9 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
     setFinished(false);
     setIdx(0);
     setExportInfo(null);
-    launchedRef.current = false;
     exportRef.current = false;
-    solveStartRef.current = 0;
+    focusStartRef.current = 0;
+    onLaunch("cantilever"); // re-run; useRun resets snap (incl. stages) on launch
   };
 
   return (
@@ -189,21 +211,28 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
           </div>
         </div>
         <ol className="guided-stepper">
-          {STAGES.map((s, i) => (
-            <li
-              key={s.no}
-              className={
-                i === idx
-                  ? "guided-step is-active"
-                  : i < idx
-                    ? "guided-step is-done"
-                    : "guided-step"
-              }
-            >
-              <span className="guided-step-dot">{i < idx ? "✓" : s.no}</span>
-              <span className="guided-step-label">{s.name}</span>
-            </li>
-          ))}
+          {STAGES.map((s, i) => {
+            const cs = cellStates[i];
+            const ok = cs.record ? cs.record.gate.ok : true;
+            const cls =
+              cs.phase === "start"
+                ? "guided-step is-active"
+                : cs.phase === "error"
+                  ? "guided-step is-error"
+                  : cs.phase === "end"
+                    ? ok
+                      ? "guided-step is-done"
+                      : "guided-step is-warn"
+                    : "guided-step";
+            const dot =
+              cs.phase === "end" ? (ok ? "✓" : "!") : cs.phase === "error" ? "×" : s.no;
+            return (
+              <li key={s.no} className={cls}>
+                <span className="guided-step-dot">{dot}</span>
+                <span className="guided-step-label">{s.name}</span>
+              </li>
+            );
+          })}
         </ol>
         <button type="button" className="guided-exit" onClick={onExit}>
           退出讲解

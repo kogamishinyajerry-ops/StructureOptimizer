@@ -59,6 +59,14 @@
 的 `on_iteration` 回调。默认值（`None`）下 CLI 和测试路径与改动前 byte-identical ——
 可复现性不受影响。正是这个回调让 worker 线程能在不分叉优化主循环的前提下吐出实时帧。
 
+**流水线即确定性契约阶段（"六小匠"）。** 运行管线被组织为 **6 个确定性、非 LLM 的阶段**，
+每个阶段都有显式的 precondition / 网关 / postcondition；`run_config` 委托给这个编排器
+（`core/pipeline.py`，单一代码路径，无平行实现）。每个阶段封装一个既有 core 函数并加一条
+可校验的不变量 —— input_hash 溯源、`OptimizationResult` 形状、收敛 `stop_reason`、
+`summary.json` schema、验证状态。每次运行落一份 `agents_trace.json`，使管线**自描述**，
+并让 Web 端"讲解模式"渲染**真实执行过的阶段**而非脚本叙事。这里的 "agent" 指带契约的
+流水线阶段，**不含任何智能/自主/AI**；详见 [`docs/ARCHITECTURE.md` §2.5](docs/ARCHITECTURE.md)。
+
 ## 运行
 
 两个服务（后端 `:8000`，Vite 开发服务器 `:5173`，后者把 `/api` 代理过去）。确切的

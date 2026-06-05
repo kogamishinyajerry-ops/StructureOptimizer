@@ -63,13 +63,46 @@ BenchmarkConfig (JSON)
 | `structure_optimizer/core/verification.py` | 独立验证：最终密度场重装配 + 重求解 + 约束检查 | 不能与迭代指标混用 |
 | `structure_optimizer/core/reporting.py` | 生成 `report.md` | 不生成 HTML（`demo.py` / `study.py` 各自负责） |
 | `structure_optimizer/core/run_store.py` | run 目录创建 + 输入/输出文件序列化 + input hash | 不知道任何模型语义 |
-| `structure_optimizer/core/workflow.py` | 流水线编排：mesh → SIMP → 产物落盘 → verify → report | 不直接做计算 |
+| `structure_optimizer/core/workflow.py` | 入口 `run_benchmark` / `run_config`；`run_config` 现**委托**给 `core/pipeline.py` 编排器（单一代码路径） | 不直接做计算 |
+| `structure_optimizer/core/pipeline.py` | 确定性契约编排：6 个 `PipelineAgent`（+1 持久化步）+ fail-closed 网关 + `agents_trace.json`（见 §2.5） | **非 LLM**、不引入任何非确定性；不重实现任何 core 函数 |
 | `structure_optimizer/core/demo.py` | 单次运行的 `demo.html` 静态评审页 | 不做服务端渲染 |
 | `structure_optimizer/core/study.py` | 参数 grid search + 候选排名 + `study.html` | 不做通用优化驱动 |
 | `structure_optimizer/visualization/` | matplotlib 出 PNG / GIF | 不依赖 GUI backend（headless 安全） |
 | `structure_optimizer/adapters/` | 后续替换的边界（求解器 / 优化器 / 文件导出） | 当前是 Protocol stub，不强制使用 |
 | `structure_optimizer/cli.py` | argparse 命令行入口 | 不做业务逻辑 |
 | `tests/` | pytest；冒烟 + 集成 + 输入校验 | 不做性能基准（v1.0 计划） |
+
+---
+
+## 2.5 确定性流水线编排（"六小匠" · `core/pipeline.py`）
+
+> **诚实声明（先读这条，别被"agent"误导）**：这里的 `PipelineAgent` 是**纯 Python、对既有 core 函数的薄封装**——不调用任何语言模型、不发网络请求、不取随机数、不引入任何非确定性。"agent" 在本仓指**带契约的流水线阶段**（precondition / run / postcondition / declared_tools），**不是**自主或 LLM 驱动的智能体。这条边界是项目红线（见 `docs/ASSESSMENT-2026-05-29.md` 的自评教训）。
+
+`run_config` 旧实现是一段隐式的过程式管线。v0.4 起它**重构为显式编排**：旧函数体的顺序语句变成 6 个命名的确定性 `PipelineAgent` + 1 个内部持久化步，由 `PipelineOrchestrator` 用一个**纯 for 循环**执行（线性依赖，无 DAG 引擎、无队列、无并行——并行会重排浮点、破坏 byte 复现）。`run_config` 只剩一段委托：构造 `PipelineContext` → `PipelineOrchestrator().run(ctx)`，**单一代码路径**（编排器即实现，没有第二条平行管线）。
+
+**6 个域 agent + 1 持久化步（执行顺序 = 旧 run_config 的语句顺序，逐字保持）：**
+
+| # | 阶段 | 封装的真实函数 | 网关 | 产物 |
+|---|---|---|---|---|
+| 1 | `problem_definition` | `run_store.input_hash` | GATE-CONFIG：`sha256:` 指纹 + 非空 name | `ctx.input_hash` |
+| 2 | `mesh` | `mesh.create_structured_mesh` | GATE-MESH：mesh 构建成功 | `ctx.mesh` |
+| 3 | `optimizer` | `adapters.algorithm_base.get_algorithm` + `.run` | GATE-RESULT-SHAPE：`OptimizationResult` 字段齐全 | `ctx.result` |
+| 4 | `convergence_gate` | （纯网关，读 `result.stop_reason`） | GATE-CONVERGENCE：`stop_reason ∈ {change_tolerance, max_iterations}` | trace 记 `converged` |
+| – | `persistence`（内部步，非 6 之一） | `run_store.{create_run_dir,save_*,write_json}` + `lineage.write_lineage` | GATE-RUNDIR：`mkdir(exist_ok=False)` + `summary.json` 落盘 | input/metrics/density/lineage/summary |
+| 5 | `verification` | `verification.verify_run` | GATE-VERIFICATION：**file+schema** fail-closed，**不**按工程状态中止 | `verification.json` / `manufacturability.json` |
+| 6 | `export_report` | `visualization.*` + `reporting.generate_report` | GATE-EXPORT：全部 PNG/GIF/report 落盘 | 5×PNG + frames + gif + report.md |
+
+> 关键顺序不变量：`mesh` 与 `optimizer` 在 `persistence` 建目录**之前**运行——所以优化器崩溃时**不留孤儿 run 目录**，与旧行为字节级一致。
+
+**三档 fail-closed 网关语义：**
+
+1. **硬中止**（结构性 = 损坏）：config 不可序列化 / mesh 维度非法 / 算法未知 / 结果 shape 错 / `mkdir` 撞已存在目录 / 导出 I/O 失败 → 记 `status=error`、写**部分** `agents_trace.json`（失败阶段可查）、**原样重抛**原异常（保持 all-or-nothing）。
+2. **记录不中止**（工程裁决 = 合法负结果）：`verification`。`verify_run` 契约上**永不抛**，写一个 status。工程性 `FAILURE_STATUS`（如 `connectivity_failed`）是**合法终态**：run 仍完成、`summary.status` 仍为 `completed`、CLI 仍退出 0；裁决以 `ok=False` 写入 trace 供 UI 显红。仅当 `verification.json` 缺失或 status 不在已知集合时才 fail-closed（守的是重构回归，不是工程结果）。
+3. **显式浮现**（收敛 = 信息性）：`convergence_gate`。把算法内部隐式的 `stop_reason` 提升为可测网关；`max_iterations` 视为合法 PASS（按预算收敛）；不改任何产物或控制流。
+
+**`agents_trace.json`（新增产物，默认开，最后写）**：每个阶段记 `name / role / tool（真实封装函数）/ declared_tools / status / gate{name,ok,verdict_status,detail} / artifacts（编排器**实测**的文件系统 diff，阶段无法谎报写了什么）/ detail / wall_ms`。唯一非确定字段是 `wall_ms`（perf_counter 测量），**绝不**进入 `summary.json` / `density.npy` / `metrics.csv` / `verification.json`；设 `SO_TRACE_DETERMINISTIC=1` 可将其归零以做整目录哈希。Web 端"讲解模式（六小匠）"读取这份 trace，使其演示**生成自真实运行**而非脚本叙事（直接闭合 v6–v16 的"死叙事覆盖层"陷阱）。
+
+**复现保证**：每个 agent 以相同实参、相同顺序调用相同 seam 函数，故每个产物 byte-identical（已用新旧 `run_config` 受控 A/B 逐文件 `cmp` 实证：除 run-id 路径与新增 trace 外全字节相同）。
 
 ---
 

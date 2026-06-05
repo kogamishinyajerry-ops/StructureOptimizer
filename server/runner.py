@@ -127,8 +127,15 @@ class RunManager:
                 }
             )
 
+        def on_stage(event: dict[str, Any]) -> None:
+            # Per-stage agent-rail frame on the SAME destructive queue as
+            # iteration/done/error (one SENTINEL, one consumer). ``event`` is the
+            # orchestrator's metadata-only payload {phase, agent, record}; the
+            # ``record`` for an end/error event IS the agents_trace.json entry.
+            state.frames.put({"type": "stage", **event})
+
         try:
-            run_dir = run_config(config, on_iteration=on_iteration)
+            run_dir = run_config(config, on_iteration=on_iteration, on_stage=on_stage)
             state.run_dir = run_dir
             summary = read_json(run_dir / "summary.json")
             verification = _safe_read_json(run_dir / "verification.json")

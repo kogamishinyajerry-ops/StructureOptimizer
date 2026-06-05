@@ -119,6 +119,26 @@
   color: var(--ok);
 }
 
+/* Engineering soft-fail (e.g. Verification ok=false) — amber, run still completes. */
+.guided-step.is-warn {
+  color: var(--warn);
+}
+.guided-step.is-warn .guided-step-dot {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+/* Structural abort (a gate raised) — red. */
+.guided-step.is-error {
+  color: var(--danger);
+}
+.guided-step.is-error .guided-step-dot {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
 .guided-exit {
   flex-shrink: 0;
   background: transparent;

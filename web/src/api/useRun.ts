@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchRun, startRun, streamUrl } from "./client";
-import type { DoneFrame, MetricPoint, RunOverrides, StreamFrame } from "./types";
+import type { DoneFrame, MetricPoint, RunOverrides, StageFrame, StreamFrame } from "./types";
 
 export type RunStatus = "idle" | "starting" | "running" | "done" | "error";
 
@@ -12,6 +12,8 @@ export interface RunSnapshot {
   /** Latest density frame (base64 uint8), updated per iteration. */
   density: string | null;
   iterations: MetricPoint[];
+  /** Ordered per-stage agent-rail events (start/end/error) for the live pipeline. */
+  stages: StageFrame[];
   done: DoneFrame | null;
   error: string | null;
 }
@@ -23,6 +25,7 @@ const EMPTY: RunSnapshot = {
   shape: null,
   density: null,
   iterations: [],
+  stages: [],
   done: null,
   error: null,
 };
@@ -95,6 +98,9 @@ export function useRun() {
             done: frame,
           };
         }
+        if (frame.type === "stage") {
+          return { ...prev, stages: [...prev.stages, frame] };
+        }
         return { ...prev, status: "error", error: frame.message };
       });
     };
@@ -152,6 +158,7 @@ export function useRun() {
       shape: detail.shape,
       density: detail.density_b64,
       iterations: detail.metrics,
+      stages: [], // reopened runs have no live rail yet (history replay via /trace is deferred)
       done,
       error: null,
     });

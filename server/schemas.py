@@ -116,6 +116,46 @@ class ErrorFrame(BaseModel):
     message: str
 
 
+class StageGate(BaseModel):
+    """A pipeline stage's gate verdict (mirrors pipeline.GateVerdict in the trace)."""
+
+    name: str
+    ok: bool
+    verdict_status: str
+    detail: str
+
+
+class StageRecord(BaseModel):
+    """One ``agents_trace.json`` entry — the orchestrator-measured stage result.
+
+    Identical shape to the on-disk trace record (pipeline._record), so a live
+    ``stage`` end-frame and the persisted trace are one source of truth.
+    """
+
+    name: str
+    role: str
+    tool: str
+    declared_tools: list[str]
+    domain_agent: bool
+    status: str
+    gate: StageGate
+    artifacts: list[str]
+    detail: dict[str, Any]
+    wall_ms: float
+
+
+class StageFrame(BaseModel):
+    """Per-stage agent-rail event. ``record`` is present for ``end``/``error``
+    (carrying the trace record) and ``None`` for ``start`` (active marker only).
+    Metadata only — never carries the density array (that flows via IterationFrame).
+    """
+
+    type: Literal["stage"] = "stage"
+    phase: Literal["start", "end", "error"]
+    agent: str
+    record: StageRecord | None = None
+
+
 class MetricPoint(BaseModel):
     """One ``metrics.csv`` row — the convergence series for a finished run."""
 
