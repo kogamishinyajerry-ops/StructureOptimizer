@@ -182,6 +182,16 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
     if (c.phase !== "idle") frontier = i;
   });
 
+  // Run-level failure (honest unhappy path). useRun sets snap.status="error" +
+  // snap.error for a top-level {type:"error"} frame, a startRun throw, or a WS
+  // onerror/onclose (Connection lost/closed). The rail also marks the specific
+  // aborting cell via phase==="error" (cellTone), but the run-level message must
+  // surface too — otherwise an error that leaves the rail empty/stalled hangs on
+  // the spinner forever with no explanation.
+  const runErrored = snap.status === "error";
+  const failedCellIdx = cellStates.findIndex((c) => c.phase === "error");
+  const failedStageName = failedCellIdx >= 0 ? STAGES[failedCellIdx].name : null;
+
   // Launch the REAL run once on entry.
   useEffect(() => {
     if (!launchedRef.current) {
@@ -347,7 +357,7 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
         <span>优化候选 · 需工程复核 · 非认证结论</span>
       </footer>
 
-      {finished && (
+      {finished && !runErrored && (
         <div className="guided-end">
           <div className="guided-end-card">
             <div className="guided-end-title">
@@ -357,6 +367,28 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
             <div className="guided-end-actions">
               <button type="button" className="guided-end-replay" onClick={replay}>
                 ↻ 重新演示
+              </button>
+              <button type="button" className="guided-end-exit" onClick={onExit}>
+                退出
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {runErrored && (
+        <div className="guided-error" role="alert">
+          <div className="guided-error-card">
+            <div className="guided-error-title">流程中断 · 未完成</div>
+            <div className="guided-error-sub">
+              {failedStageName
+                ? `在「${failedStageName}」阶段被门控挡下，运行已停止。`
+                : "运行未能完成（连接中断或引擎报错）。"}
+            </div>
+            <div className="guided-error-detail mono">{snap.error ?? "未知错误"}</div>
+            <div className="guided-error-actions">
+              <button type="button" className="guided-end-replay" onClick={replay}>
+                ↻ 重试
               </button>
               <button type="button" className="guided-end-exit" onClick={onExit}>
                 退出

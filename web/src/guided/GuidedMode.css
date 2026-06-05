@@ -524,7 +524,52 @@
   cursor: pointer;
 }
 
+/* ---- run-level error overlay (honest unhappy path) ---- */
+.guided-error {
+  position: absolute;
+  inset: 0;
+  z-index: 11; /* above .guided-end so an error never co-shows a success card */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 11, 16, 0.8);
+  backdrop-filter: blur(4px);
+  animation: guided-in var(--dur) var(--ease-out);
+}
+.guided-error-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 32rem;
+  padding: var(--space-5);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+}
+.guided-error-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  color: var(--danger);
+}
+.guided-error-sub {
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+}
+.guided-error-detail {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  word-break: break-word;
+  opacity: 0.85;
+}
+.guided-error-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .guided, .guided-card, .guided-end { animation: none; }
+  .guided, .guided-card, .guided-end, .guided-error { animation: none; }
   .guided-chip-dot { animation: none; }
 }
