@@ -100,6 +100,26 @@
   color: var(--text-tertiary);
 }
 
+/* Convergence quality (distinct from verification). change_tolerance reads as a
+   subtle neutral "converged"; max_iterations is the engine's converged-by-budget
+   case and gets a prominent amber chip so it is never mistaken for true
+   convergence (mirrors GuidedMode cellTone + pipeline.py:279). */
+.run-status-converge {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.run-status-converge--warn {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
 .run-status-error {
   padding: var(--space-3);
   border-radius: var(--radius-sm);

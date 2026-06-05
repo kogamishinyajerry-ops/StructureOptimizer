@@ -69,6 +69,13 @@ function renderState(snap: RunSnapshot) {
           : String(rawStatus);
       const passed = verifyStatus === "passed";
       const stopReason = done ? String(done.stop_reason) : "";
+      // Convergence honesty: change_tolerance is true convergence; max_iterations
+      // is converged-by-budget (hit the iteration cap) — surface it as a distinct
+      // amber chip, NOT muted text identical to a real convergence. Mirrors the
+      // engine's own definition (core/pipeline.py:279
+      // converged = stop_reason === "change_tolerance") and GuidedMode's cellTone.
+      const budgetTruncated = stopReason === "max_iterations";
+      const converged = stopReason === "change_tolerance";
       return (
         <div className="run-status-done">
           <span
@@ -80,7 +87,13 @@ function renderState(snap: RunSnapshot) {
           >
             {passed ? "Verified" : verifyStatus}
           </span>
-          {stopReason ? (
+          {budgetTruncated ? (
+            <span className="run-status-converge run-status-converge--warn">
+              converged by budget · hit iteration cap
+            </span>
+          ) : converged ? (
+            <span className="run-status-converge">converged</span>
+          ) : stopReason ? (
             <span className="run-status-reason">stopped: {stopReason}</span>
           ) : null}
         </div>
