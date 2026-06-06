@@ -84,7 +84,7 @@ const STAGES: Stage[] = [
     agent: "导出 Agent",
     tool: "几何导出（SVG / DXF / STL）",
     criteria: "阈值二值化 · 挤出深度",
-    artifact: "几何文件，内嵌指纹 + 验证状态 + 免责声明",
+    artifact: "几何文件：SVG / DXF 内嵌指纹 + 验证状态 + 免责声明；STL 经文件名携带溯源",
     gate: "终态：一个可被独立复核的「优化候选」",
     caption: "把密度场解析成带溯源的几何文件，直接进制造流程——但它是候选，需工程复核。",
   },
