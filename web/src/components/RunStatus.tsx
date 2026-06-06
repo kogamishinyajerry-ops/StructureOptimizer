@@ -37,7 +37,13 @@ export function RunStatus({ snap }: RunStatusProps) {
           </div>
         ))}
       </div>
-      <div className="run-status-state">{renderState(snap)}</div>
+      {/* Live region: the outcome/error badge is the most important state change
+          (Optimizing → Verified / converged-by-budget / error). Without a
+          live-region it is silent to assistive tech, unlike the ticking metrics
+          above (line 32). role=status keeps it polite so it does not interrupt. */}
+      <div className="run-status-state" role="status" aria-live="polite">
+        {renderState(snap)}
+      </div>
     </div>
   );
 }
