@@ -264,10 +264,14 @@ def get_run(run_id: str) -> RunResult:
     state = manager.get(run_id)
     if state is None:
         raise HTTPException(status_code=404, detail=f"Unknown run '{run_id}'")
-    if state.status == "running" or state.run_dir is None:
-        raise HTTPException(status_code=409, detail="Run not finished")
+    # Check error BEFORE not-finished: a real engine failure leaves run_dir=None
+    # (runner sets state.run_dir only after run_config returns), so an
+    # error-first ordering is required or every genuine failure would be masked
+    # as a misleading 409 "Run not finished" and the diagnostic discarded.
     if state.status == "error":
         raise HTTPException(status_code=500, detail=state.error or "Run failed")
+    if state.status == "running" or state.run_dir is None:
+        raise HTTPException(status_code=409, detail="Run not finished")
 
     # summary.json + density.npy are the essential artifacts; a partially-written
     # or pruned run dir that lacks them is "incomplete" -> a deliberate 409 rather

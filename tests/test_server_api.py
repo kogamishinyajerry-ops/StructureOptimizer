@@ -16,8 +16,9 @@ Happy paths drive a single real ``simple_bracket`` ``smoke`` run end-to-end
 branches inject a synthetic ``RunState`` into the app-global ``manager`` instead
 of racing to catch a live run mid-flight: a fresh ``RunState`` is
 ``status="running"`` with ``run_dir=None`` (the exact "not finished"
-precondition), and ``status="error"`` with a non-None ``run_dir`` reproduces the
-500 path (the handler checks not-finished BEFORE error). Each injected id is
+precondition), and ``status="error"`` drives the 500 path in both of its real
+shapes — ``run_dir=None`` (run_config raised) and ``run_dir`` set (post-read
+failed) — since the handler checks error BEFORE not-finished. Each injected id is
 removed in a ``finally`` block so the singleton is not polluted across tests.
 
 In-process ``TestClient`` (no real port), matching the sibling server tests.
@@ -182,9 +183,23 @@ def test_get_run_not_finished_409() -> None:
     assert resp.status_code == 409
 
 
-def test_get_run_errored_500(tmp_path: Path) -> None:
-    # status="error" with a NON-None run_dir: the handler checks not-finished
-    # (running / run_dir is None) BEFORE the error branch, so run_dir must be set.
+def test_get_run_errored_no_rundir_500(tmp_path: Path) -> None:
+    # The REAL worker-error shape: run_config() raised, so the runner's except
+    # clause set status="error" while run_dir was NEVER assigned (stays None).
+    # The handler must check error BEFORE not-finished, else this is masked as a
+    # misleading 409 and the engine message is dropped (regression guard).
+    state = RunState(run_id="synthetic-real-error", benchmark_id="simple_bracket", nelx=4, nely=4)
+    state.status = "error"
+    state.error = "engine boom"  # run_dir intentionally left None
+    with _injected(state):
+        resp = TestClient(app).get(f"/api/runs/{state.run_id}")
+    assert resp.status_code == 500
+    assert "engine boom" in resp.json()["detail"]  # diagnostic surfaced, not discarded
+
+
+def test_get_run_errored_with_rundir_500(tmp_path: Path) -> None:
+    # The rarer error shape: run_config() succeeded but post-read failed, so
+    # status="error" WITH run_dir set. Must also be 500 (not silently served).
     state = RunState(run_id="synthetic-error", benchmark_id="simple_bracket", nelx=4, nely=4)
     state.status = "error"
     state.run_dir = tmp_path
