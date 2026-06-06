@@ -22,7 +22,6 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
-
 from server.app import app, manager
 from server.schemas import StageFrame
 from structure_optimizer.core.run_store import read_json
