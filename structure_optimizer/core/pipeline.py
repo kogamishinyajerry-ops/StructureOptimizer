@@ -365,6 +365,7 @@ class VerificationAgent(PipelineAgent):
             raise PipelineGateError("verification requires persisted input.json + density.npy")
 
     def run(self, ctx: PipelineContext) -> None:
+        assert ctx.run_dir is not None  # precondition() raises if run_dir is None
         verify_run(ctx.run_dir)
         verification = read_json(ctx.run_dir / "verification.json")
         ctx.verification_status = verification.get("status")
@@ -422,6 +423,8 @@ class ExportReportAgent(PipelineAgent):
         )
 
         run_dir, mesh, result, config = ctx.run_dir, ctx.mesh, ctx.result, ctx.config
+        # precondition() raises unless run_dir + mesh + result are all set
+        assert run_dir is not None and mesh is not None and result is not None
         write_baseline_png(run_dir / "baseline.png", mesh)
         display_loads = [load for load_case in effective_load_cases(config) for load in load_case.loads]
         write_loadcase_png(run_dir / "loadcase.png", mesh, config.boundary_conditions, display_loads)
@@ -432,6 +435,7 @@ class ExportReportAgent(PipelineAgent):
         generate_report(run_dir)
 
     def postcondition(self, ctx: PipelineContext) -> GateVerdict:
+        assert ctx.run_dir is not None  # run()/precondition() guarantee this
         missing = [f for f in self._EXPECTED if not (ctx.run_dir / f).exists()]
         if missing:
             raise PipelineGateError(f"export did not produce expected artifacts: {missing}")
