@@ -67,7 +67,7 @@ BenchmarkConfig (JSON)
 | `structure_optimizer/core/pipeline.py` | 确定性契约编排：6 个 `PipelineAgent`（+1 持久化步）+ fail-closed 网关 + `agents_trace.json`（见 §2.5） | **非 LLM**、不引入任何非确定性；不重实现任何 core 函数 |
 | `structure_optimizer/core/demo.py` | 单次运行的 `demo.html` 静态评审页 | 不做服务端渲染 |
 | `structure_optimizer/core/study.py` | 参数 grid search + 候选排名 + `study.html` | 不做通用优化驱动 |
-| `structure_optimizer/visualization/` | matplotlib 出 PNG / GIF | 不依赖 GUI backend（headless 安全） |
+| `structure_optimizer/visualization/` | 纯 numpy + zlib 写 PNG / GIF（不引 matplotlib/Pillow） | 不依赖 GUI backend（headless 安全） |
 | `structure_optimizer/adapters/` | 后续替换的边界（求解器 / 优化器 / 文件导出） | 当前是 Protocol stub，不强制使用 |
 | `structure_optimizer/cli.py` | argparse 命令行入口 | 不做业务逻辑 |
 | `tests/` | pytest；冒烟 + 集成 + 输入校验 | 不做性能基准（v1.0 计划） |
