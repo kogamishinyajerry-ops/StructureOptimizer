@@ -96,6 +96,10 @@ export function RunHistory({ runs, activeRunId, disabled, onReopen, onCompare }:
                       className="run-history-action"
                       disabled={disabled}
                       onClick={() => setCompareMode(true)}
+                      // Stable focus-restore target for CompareView on close: the
+                      // compare flow unmounts the per-row trigger, so the modal
+                      // returns focus here (WCAG 2.4.3).
+                      data-compare-entry
                     >
                       Compare runs
                     </button>

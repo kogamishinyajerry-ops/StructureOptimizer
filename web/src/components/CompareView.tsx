@@ -38,14 +38,33 @@ export function CompareView({ pair, onClose }: CompareViewProps) {
     };
   }, [pair]);
 
-  // Dialog conventions: focus the close button on mount, close on Escape.
+  // Dialog conventions: focus the close button on mount, close on Escape, and
+  // restore focus to the triggering element on close. aria-modal makes a
+  // focus-management contract; without the restore half (WCAG 2.4.3) keyboard /
+  // screen-reader users land on <body> after closing instead of the trigger.
   useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      // The compare flow unmounts its own trigger (runCompare → exitCompare
+      // toggles compareMode in the same React batch), so the captured element is
+      // usually gone and focus has fallen to <body>. Restore to it only if it is
+      // still a real focusable node; otherwise fall back to the stable
+      // "Compare runs" entry control so focus never strands on <body>.
+      const prevUsable =
+        previouslyFocused &&
+        previouslyFocused !== document.body &&
+        document.contains(previouslyFocused);
+      const target = prevUsable
+        ? previouslyFocused
+        : document.querySelector<HTMLElement>("[data-compare-entry]");
+      target?.focus?.();
+    };
   }, [onClose]);
 
   return (
