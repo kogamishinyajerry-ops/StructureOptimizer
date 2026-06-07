@@ -348,6 +348,11 @@ def export_run(
         data, filename, mime = export_geometry(state.run_dir, fmt, threshold, extrusion_depth)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        # Corrupt/truncated artifacts (unparseable input.json, invalid persisted
+        # config, unreadable density.npy) degrade to 409 like get_run /
+        # get_run_trace — not a raw 500 with a stack trace.
+        raise HTTPException(status_code=409, detail="Run artifacts are incomplete") from exc
 
     return Response(
         content=data,

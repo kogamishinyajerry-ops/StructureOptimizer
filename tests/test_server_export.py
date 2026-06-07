@@ -20,7 +20,7 @@ pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
-from server.app import app
+from server.app import app, manager
 from server.export import EXPORT_FORMATS
 
 # format -> (filename extension, content-type prefix)
@@ -94,3 +94,25 @@ def test_export_out_of_range_query_params_422(params: dict[str, str]) -> None:
     client = TestClient(app)
     resp = client.get("/api/runs/does-not-exist/export", params=params)
     assert resp.status_code == 422
+
+
+def test_export_corrupt_artifacts_409() -> None:
+    """A finished run whose on-disk artifacts are corrupt/truncated (here a
+    half-written input.json) degrades to 409 'Run artifacts are incomplete' —
+    matching get_run / get_run_trace — instead of a raw 500 with a stack trace.
+
+    Uses a dedicated run (not the shared ``finished_run_id`` fixture) so the
+    corruption does not leak into the other tests.
+    """
+    client = TestClient(app)
+    run_id = client.post("/api/runs", json={"benchmark_id": "simple_bracket", "preset": "smoke"}).json()["run_id"]
+    with client.websocket_connect(f"/api/runs/{run_id}/stream") as ws:
+        while ws.receive_json()["type"] not in ("done", "error"):
+            pass
+    state = manager.get(run_id)
+    assert state is not None and state.run_dir is not None
+    (state.run_dir / "input.json").write_text("{ truncated")  # JSONDecodeError(ValueError)
+
+    resp = client.get(f"/api/runs/{run_id}/export", params={"format": "svg"})
+    assert resp.status_code == 409, resp.text
+    assert "incomplete" in resp.json()["detail"].lower()
