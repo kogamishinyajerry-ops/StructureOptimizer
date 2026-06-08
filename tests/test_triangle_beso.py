@@ -143,8 +143,13 @@ def test_beso_triangle_area_weighted_ranking_respects_unequal_areas():
         ]
     )
     mesh = TriangleMesh(nodes=nodes, elements=tris)
-    # Fix bottom-left
-    fixed_dofs = np.array([0, 1])
+    # Fix the whole left edge — nodes 0 (0,0) and 4 (0,1), both x & y. Pinning
+    # only node 0 leaves rigid-body rotation about it unconstrained, so the
+    # global stiffness matrix is singular: Linux LAPACK raises LinAlgError
+    # ("Singular matrix") while macOS Accelerate happened to tolerate it.
+    # Constraining both left-edge nodes removes all rigid-body modes and matches
+    # the cantilever intent (cf. _cantilever_setup, which fixes every x≈0 node).
+    fixed_dofs = np.array([0, 1, 8, 9])
     force = np.zeros(mesh.ndof)
     force[2 * 3 + 1] = -1.0  # load at node 3
 
