@@ -207,6 +207,41 @@ def test_pre_persistence_failure_leaves_no_run_dir(tmp_path, monkeypatch):
     assert not target.exists()
 
 
+def test_post_persistence_gate_failure_writes_partial_error_trace(tmp_path, monkeypatch):
+    """A gate failure AFTER the persistence stage (run_dir already on disk) must
+    still leave an inspectable agents_trace.json with terminal_status='error' and
+    the failing stage recorded — the debuggability contract (pipeline.py:517-518).
+    The existing failure tests all crash at the MESH stage (run_dir still None),
+    so this on-disk partial-trace branch was never asserted."""
+    import structure_optimizer.core.pipeline as pipeline
+
+    real_read_json = pipeline.read_json
+
+    def fake_read_json(path):
+        # read_json is used ONLY by VerificationAgent.run; inject an unknown
+        # verification status so postcondition raises PipelineGateError — but
+        # only AFTER the persistence stage already created run_dir on disk.
+        if getattr(path, "name", "") == "verification.json":
+            return {"status": "not_a_real_status"}
+        return real_read_json(path)
+
+    monkeypatch.setattr(pipeline, "read_json", fake_read_json)
+    run_dir = tmp_path / "post_persist_fail"
+    config = load_benchmark("mbb_beam", preset="smoke")
+
+    with pytest.raises(PipelineGateError):
+        pipeline.PipelineOrchestrator().run(PipelineContext(config=config, run_dir=run_dir))
+
+    trace_path = run_dir / "agents_trace.json"
+    assert trace_path.exists(), "post-persistence failure must persist a partial trace"
+    trace = json.loads(trace_path.read_text())
+    assert trace["terminal_status"] == "error"
+    statuses = {a["name"]: a["status"] for a in trace["agents"]}
+    assert statuses.get("verification") == "error"  # the failing stage, recorded
+    assert statuses.get("persistence") == "ok"  # ran successfully before the failure
+    assert "export_report" not in statuses  # never reached
+
+
 # --------------------------------------------------------------------------- #
 # determinism flag                                                              #
 # --------------------------------------------------------------------------- #
