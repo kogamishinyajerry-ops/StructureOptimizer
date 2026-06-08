@@ -68,8 +68,22 @@ export type RunProbe =
 export async function probeRun(run_id: string): Promise<RunProbe> {
   const res = await fetch(`${BASE}/api/runs/${run_id}`);
   if (res.ok) return { state: "done", detail: (await res.json()) as RunDetail };
-  if (res.status === 409) return { state: "running" };
   if (res.status === 404) return { state: "missing" };
+  if (res.status === 409) {
+    // get_run returns 409 for TWO distinct states: "Run not finished" (still
+    // running -> keep polling) and "Run artifacts are incomplete" (a finished-
+    // but-corrupt run — a TERMINAL error that must surface immediately, not poll
+    // for 9s then time out into a generic connection-loss message).
+    const body = await res.text().catch(() => "");
+    let detail = body;
+    try {
+      detail = (JSON.parse(body) as { detail?: string }).detail ?? body;
+    } catch {
+      /* non-JSON body — keep raw */
+    }
+    if (/not finished/i.test(detail)) return { state: "running" };
+    return { state: "errored", message: detail || "Run artifacts are incomplete" };
+  }
   const message = await res.text().catch(() => res.statusText);
   return { state: "errored", message };
 }

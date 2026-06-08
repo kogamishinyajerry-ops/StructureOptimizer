@@ -243,11 +243,15 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
     return () => clearTimeout(t);
   }, [idx, frontier, finished]);
 
-  // A REAL export fetch when the export stage actually completes (proves the
-  // endpoint), shown without a save dialog.
+  // A REAL export fetch once the RUN is fully done (proves the endpoint), shown
+  // without a save dialog. Gate on snap.status === "done", NOT the export-stage
+  // "end" frame: runner.py enqueues that stage frame from inside run_config but
+  // flips state.status to "done" only AFTER run_config returns, and /export 409s
+  // ("Run not finished") until then — so probing at stage-end can hit a transient
+  // 409 and latch a false "导出未完成" on a run that actually succeeded.
   useEffect(() => {
     if (exportRef.current || !snap.runId) return;
-    if (cellStates[5].phase !== "end") return;
+    if (snap.status !== "done") return;
     exportRef.current = true;
     fetch(`/api/runs/${snap.runId}/export?format=svg`)
       .then((res) => {
@@ -261,7 +265,7 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
         setExportInfo(`geometry.svg · ${(blob.size / 1024).toFixed(1)} KB · 内嵌 input_hash + 验证状态`),
       )
       .catch(() => setExportInfo("geometry.svg · 导出未完成"));
-  }, [cellStates, snap.runId]);
+  }, [snap.status, snap.runId]);
 
   // Finish once the focus has reached the export cell and it has really ended.
   useEffect(() => {
