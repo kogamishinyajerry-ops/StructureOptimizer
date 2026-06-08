@@ -318,6 +318,11 @@ def get_run_trace(run_id: str) -> list[dict[str, Any]]:
     state = manager.get(run_id)
     if state is None:
         raise HTTPException(status_code=404, detail=f"Unknown run '{run_id}'")
+    # Error-first ordering (matches get_run): a failed run leaves run_dir=None, so
+    # checking error before the None-guard surfaces the engine failure as a 500
+    # with its message instead of masking it as a 409 "Run not finished".
+    if state.status == "error":
+        raise HTTPException(status_code=500, detail=state.error or "Run failed")
     if state.run_dir is None:
         raise HTTPException(status_code=409, detail="Run not finished")
     try:

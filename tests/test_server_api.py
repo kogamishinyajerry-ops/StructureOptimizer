@@ -217,3 +217,17 @@ def test_get_trace_not_finished_409() -> None:
     with _injected(state):  # run_dir is None -> "not finished"
         resp = TestClient(app).get(f"/api/runs/{state.run_id}/trace")
     assert resp.status_code == 409
+
+
+def test_get_trace_errored_no_rundir_500() -> None:
+    # Mirror of test_get_run_errored_no_rundir_500 for the /trace sibling: a
+    # failed run (status="error", run_dir never assigned) must surface the engine
+    # message as 500, not be masked as a 409 "Run not finished" — regression guard
+    # for the error-first ordering in get_run_trace.
+    state = RunState(run_id="synthetic-trace-error", benchmark_id="simple_bracket", nelx=4, nely=4)
+    state.status = "error"
+    state.error = "trace boom"  # run_dir intentionally left None
+    with _injected(state):
+        resp = TestClient(app).get(f"/api/runs/{state.run_id}/trace")
+    assert resp.status_code == 500
+    assert "trace boom" in resp.json()["detail"]
