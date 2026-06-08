@@ -295,7 +295,7 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
   };
 
   return (
-    <div className="guided" role="dialog" aria-modal="true" aria-label="讲解模式">
+    <div className="guided" lang="zh-CN" role="dialog" aria-modal="true" aria-label="讲解模式">
       <header className="guided-top">
         <div className="guided-brand">
           <span className="guided-mark" aria-hidden="true" />

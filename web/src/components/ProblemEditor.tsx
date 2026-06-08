@@ -105,21 +105,23 @@ export function ProblemEditor(props: ProblemEditorProps) {
 
   return (
     <div className="problem-editor">
-      <button
-        type="button"
-        className="problem-editor-header problem-editor-toggle"
-        aria-expanded={open}
-        aria-controls="problem-editor-body"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="problem-editor-title">Problem definition</span>
-        {!open && (
-          <span className="problem-editor-summary mono" aria-hidden="true">
-            vf {opt.volume_fraction} · {mesh.nelx}×{mesh.nely} · {opt.max_iterations} it
-          </span>
-        )}
-        <ChevronIcon open={open} />
-      </button>
+      <h2 className="problem-editor-heading">
+        <button
+          type="button"
+          className="problem-editor-header problem-editor-toggle"
+          aria-expanded={open}
+          aria-controls="problem-editor-body"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="problem-editor-title">Problem definition</span>
+          {!open && (
+            <span className="problem-editor-summary mono" aria-hidden="true">
+              vf {opt.volume_fraction} · {mesh.nelx}×{mesh.nely} · {opt.max_iterations} it
+            </span>
+          )}
+          <ChevronIcon open={open} />
+        </button>
+      </h2>
 
       {open && (
         <div className="problem-editor-body" id="problem-editor-body">

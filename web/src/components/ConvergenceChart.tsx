@@ -100,7 +100,7 @@ export function ConvergenceChart({ iterations }: ConvergenceChartProps) {
 
   return (
     <div className="convergence">
-      <div className="convergence__label">Convergence</div>
+      <h2 className="convergence__label">Convergence</h2>
       {geo === null ? (
         <div className="convergence__empty">Awaiting first iteration…</div>
       ) : (

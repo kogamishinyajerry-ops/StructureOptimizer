@@ -49,6 +49,7 @@
 }
 
 .app-brand-name {
+  margin: 0; /* neutralize the UA <h1> default margin (semantic page heading) */
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-tight);

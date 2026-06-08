@@ -134,7 +134,7 @@ export function App() {
         <div className="app-brand">
           <span className="app-brand-mark" aria-hidden="true" />
           <div className="app-brand-text">
-            <span className="app-brand-name">StructureOptimizer</span>
+            <h1 className="app-brand-name">StructureOptimizer</h1>
             <span className="app-brand-sub">Topology Workbench</span>
           </div>
         </div>
@@ -161,6 +161,8 @@ export function App() {
             disabled={running}
             // Stable focus-restore target for GuidedMode on close (WCAG 2.4.3).
             data-guided-entry
+            // Chinese label under a lang="en" document (WCAG 3.1.2 Language of Parts).
+            lang="zh-CN"
           >
             ▶ 讲解模式
           </button>

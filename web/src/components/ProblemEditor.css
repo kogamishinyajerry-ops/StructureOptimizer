@@ -7,6 +7,13 @@
   overflow: hidden;
 }
 
+/* Semantic <h2> wrapping the disclosure toggle (WAI-ARIA accordion pattern).
+   font:inherit + margin:0 make it a transparent wrapper — no visual change. */
+.problem-editor-heading {
+  margin: 0;
+  font: inherit;
+}
+
 /* ---- Header (always visible; the toggle) ---- */
 .problem-editor-header {
   display: flex;

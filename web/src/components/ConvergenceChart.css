@@ -9,6 +9,7 @@
 }
 
 .convergence__label {
+  margin: 0; /* neutralize the UA <h2> default margin (semantic panel heading) */
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
   letter-spacing: var(--tracking-wide);

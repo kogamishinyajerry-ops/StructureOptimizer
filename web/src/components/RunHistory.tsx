@@ -47,19 +47,21 @@ export function RunHistory({ runs, activeRunId, disabled, onReopen, onCompare }:
 
   return (
     <div className="run-history">
-      <button
-        type="button"
-        className="run-history-header run-history-toggle"
-        aria-expanded={open}
-        aria-controls="run-history-body"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="run-history-title">History</span>
-        <span className="run-history-count mono" aria-label={`${runs.length} runs`}>
-          {runs.length}
-        </span>
-        <ChevronIcon open={open} />
-      </button>
+      <h2 className="run-history-heading">
+        <button
+          type="button"
+          className="run-history-header run-history-toggle"
+          aria-expanded={open}
+          aria-controls="run-history-body"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="run-history-title">History</span>
+          <span className="run-history-count mono" aria-label={`${runs.length} runs`}>
+            {runs.length}
+          </span>
+          <ChevronIcon open={open} />
+        </button>
+      </h2>
 
       {open && (
         <div className="run-history-body" id="run-history-body">
