@@ -53,6 +53,27 @@ export function fetchTrace(run_id: string): Promise<StageRecord[]> {
   return fetch(`${BASE}/api/runs/${run_id}/trace`).then(json<StageRecord[]>);
 }
 
+export type RunProbe =
+  | { state: "done"; detail: RunDetail }
+  | { state: "running" }
+  | { state: "errored"; message: string }
+  | { state: "missing" };
+
+/**
+ * Probe a run's terminal state WITHOUT throwing on the expected non-2xx codes,
+ * so the disconnect-recovery poller can branch cleanly: 200 -> done, 409 -> still
+ * running, 500 -> errored, 404 -> missing. (``fetchRun`` throws a generic Error
+ * with the status baked into the message string, which is awkward to branch on.)
+ */
+export async function probeRun(run_id: string): Promise<RunProbe> {
+  const res = await fetch(`${BASE}/api/runs/${run_id}`);
+  if (res.ok) return { state: "done", detail: (await res.json()) as RunDetail };
+  if (res.status === 409) return { state: "running" };
+  if (res.status === 404) return { state: "missing" };
+  const message = await res.text().catch(() => res.statusText);
+  return { state: "errored", message };
+}
+
 /** WebSocket URL for a run's live stream (handles ws/wss + dev proxy). */
 export function streamUrl(run_id: string): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
