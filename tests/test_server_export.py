@@ -21,7 +21,7 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient
 from server.app import app, manager
-from server.export import EXPORT_FORMATS
+from server.export import _DISCLAIMER, EXPORT_FORMATS
 
 # format -> (filename extension, content-type prefix)
 _EXT_MIME = {
@@ -94,6 +94,34 @@ def test_export_out_of_range_query_params_422(params: dict[str, str]) -> None:
     client = TestClient(app)
     resp = client.get("/api/runs/does-not-exist/export", params=params)
     assert resp.status_code == 422
+
+
+def test_svg_dxf_carry_inband_disclaimer(finished_run_id: str) -> None:
+    """SVG/DXF exports splice the provenance + disclaimer in-band — the whole
+    reason server/export.py exists over core.geometry_export — so a downstream
+    CAD consumer cannot mistake an unverified candidate for a certified part.
+    Guards the injection splice against a silent regression (every other export
+    test would still pass if the disclaimer were stripped)."""
+    client = TestClient(app)
+    for fmt in ("svg", "dxf"):
+        resp = client.get(f"/api/runs/{finished_run_id}/export", params={"format": fmt})
+        assert resp.status_code == 200, resp.text
+        body = resp.content.decode("utf-8")
+        assert _DISCLAIMER in body, f"{fmt}: in-band disclaimer missing"
+        assert "input_hash:" in body, f"{fmt}: provenance input_hash missing"
+
+
+def test_stl_has_no_inband_disclaimer(finished_run_id: str) -> None:
+    """STL deliberately carries NO in-band disclaimer (strict ASCII-STL parsers
+    reject non-facet tokens); provenance rides the attachment filename instead.
+    Pins the SVG-yes / STL-no asymmetry the GuidedMode export card depends on."""
+    client = TestClient(app)
+    resp = client.get(f"/api/runs/{finished_run_id}/export", params={"format": "stl"})
+    assert resp.status_code == 200, resp.text
+    assert b"NOT a certified" not in resp.content
+    disposition = resp.headers["content-disposition"]
+    assert "attachment" in disposition
+    assert disposition.rstrip().endswith('.stl"')
 
 
 def test_export_corrupt_artifacts_409() -> None:
