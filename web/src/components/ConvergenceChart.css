@@ -94,6 +94,37 @@
   margin-inline: auto;
 }
 
+.convergence__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 12px);
+}
+
+.convergence__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 4px);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.convergence__legend-swatch {
+  width: 12px;
+  border-radius: 1px;
+  flex: none;
+}
+
+.convergence__legend-swatch--compliance {
+  height: 3px;
+  background: var(--accent);
+}
+
+.convergence__legend-swatch--volume {
+  height: 2px;
+  background: var(--text-tertiary);
+  opacity: 0.55;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .convergence__dot {
     transition: none;

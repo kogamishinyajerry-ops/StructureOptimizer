@@ -110,7 +110,7 @@ export function ConvergenceChart({ iterations }: ConvergenceChartProps) {
             viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
             preserveAspectRatio="none"
             role="img"
-            aria-label="Compliance convergence over iterations"
+            aria-label="Compliance (log scale) and volume fraction (0 to 1) over iterations"
           >
             {gridY.map((y) => (
               <line
@@ -145,6 +145,22 @@ export function ConvergenceChart({ iterations }: ConvergenceChartProps) {
               {fmt(geo.complianceMin, 3)} – {fmt(geo.complianceMax, 3)}
             </span>
             <span className="mono convergence__tick">{geo.endIter}</span>
+          </div>
+          <div className="convergence__legend">
+            <span className="convergence__legend-item">
+              <span
+                className="convergence__legend-swatch convergence__legend-swatch--compliance"
+                aria-hidden
+              />
+              Compliance (log)
+            </span>
+            <span className="convergence__legend-item">
+              <span
+                className="convergence__legend-swatch convergence__legend-swatch--volume"
+                aria-hidden
+              />
+              Volume fraction (0–1)
+            </span>
           </div>
         </div>
       )}
