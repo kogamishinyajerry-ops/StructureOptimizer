@@ -974,13 +974,37 @@ def _rerun(rec: dict) -> tuple[np.ndarray, tuple[str, str], list[tuple[str, obje
     raise AssertionError(f"no rerun recipe for kind={kind!r} ({rec['benchmark']})")
 
 
+# A few fingerprints exercise *degenerate* discrete optimisers: the optimal
+# objective is reproducible, but the argmax among equal-objective optima is
+# decided by sub-1e-9 BLAS rounding, so the winning choice is NOT bit-portable
+# across platforms (macOS Accelerate vs Linux OpenBLAS). For these we assert the
+# platform-invariant objective on every OS, and pin the arbitrary tie-broken
+# fields only on the canonical bit-exact cell (REQUIRE_BIT_EXACT_FINGERPRINT=1).
+#   stacking_sequence / balanced_stacking (orthotropic_simp, off the live product
+#   path): ``optimize_stacking_sequence`` maximises bending stiffness d11; several
+#   ply orderings reach the same d11 to <1e-9, so the ordering itself
+#   (``sequence``) and its coupling (``b_absmax``) flip between platforms while
+#   d11 is stable. Verified on CI: Linux's d11 matches the macOS-pinned value;
+#   only sequence/b_absmax diverged (run 27088600929).
+_NON_PORTABLE_CHECKS: dict[str, set[str]] = {
+    "stacking_sequence": {"sequence", "b_absmax"},
+    "balanced_stacking": {"b_absmax"},
+}
+
+
 @pytest.mark.parametrize("fp_path", _multiphysics_fingerprints(), ids=lambda p: p.stem)
 def test_multiphysics_fingerprint_matches(fp_path):
     record = json.loads(fp_path.read_text())
     full_array, (sha_field, stored_sha), checks = _rerun(record)
+    strict = os.environ.get("REQUIRE_BIT_EXACT_FINGERPRINT") == "1"
+    non_portable = _NON_PORTABLE_CHECKS.get(record.get("kind", ""), set())
 
     # Tolerant tier — always on. Catches algorithm regressions cross-platform.
     for name, stored, actual in checks:
+        # BLAS-tie-broken fields are not portable; pin them only on the canonical
+        # bit-exact cell, but always assert the platform-invariant objective.
+        if name in non_portable and not strict:
+            continue
         if isinstance(stored, bool):
             assert stored == actual, f"{fp_path.name}: {name} differs (stored={stored}, actual={actual})"
         else:
@@ -993,7 +1017,7 @@ def test_multiphysics_fingerprint_matches(fp_path):
             )
 
     # Strict bit-exact tier — only on the canonical CI cell.
-    if os.environ.get("REQUIRE_BIT_EXACT_FINGERPRINT") == "1":
+    if strict:
         assert _sha256(full_array) == stored_sha, (
             f"{fp_path.name}: {sha_field} drifted (REQUIRE_BIT_EXACT_FINGERPRINT=1)"
         )
