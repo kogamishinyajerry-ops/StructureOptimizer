@@ -36,7 +36,7 @@ pip install -e .
 
 # 验证
 structure-optimizer --version
-# 输出: structure-optimizer 1.x.y
+# 输出: structure-optimizer 0.5.0
 ```
 
 ---

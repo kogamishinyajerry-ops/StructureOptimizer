@@ -72,8 +72,9 @@ $$
 with $B_e = -\frac{\partial c / \partial \rho_e}{\lambda \cdot \partial V / \partial \rho_e}$
 and $\lambda$ found via bisection to satisfy the volume constraint.
 
-**Density filter**: standard Bourdin (2001) linear-hat filter with radius
-$r_{\min}$ applied to sensitivities.
+**Density filter**: Sigmund (2001) density-weighted sensitivity filter with a
+linear-hat (cone) weight kernel of radius $r_{\min}$, applied to the
+sensitivities (see `core/filtering.py::density_filter`).
 
 Module: `core/simp.py::run_simp`.
 
