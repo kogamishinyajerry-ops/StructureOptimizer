@@ -9,7 +9,9 @@ Status codes (from ``core/verification.py``):
 - volume_constraint_failed — final density exceeds target + 0.02
 - connectivity_failed — density field has no load-to-support path
 - design_space_constraint_failed — frozen/void mask violated in stored density
-- report_failed — covered in ``test_cli.py`` for missing-dir path
+- stress_constraint_failed — stored density violates an enabled stress constraint
+- report_failed — RESERVED (documented in architecture.md); no current code path
+  emits it, so it is pinned for membership only, NOT behaviorally tested here
 
 This module focuses on the ones that are hardest to reach: fabricate a run
 directory with a doctored ``density.npy`` and run ``verify_run`` directly.
@@ -243,9 +245,18 @@ def test_stress_constraint_failed_via_cli(tmp_path, capsys):
 # --- coverage summary -------------------------------------------------
 
 
-def test_all_documented_failure_statuses_have_test_coverage_here():
-    """Meta-test: this file together with test_cli.py should reference every
-    string in ``FAILURE_STATUSES``. Documents the contract."""
+def test_failure_statuses_membership_is_pinned():
+    """Meta-test: pin the EXACT ``FAILURE_STATUSES`` membership so the set cannot
+    drift in either direction unnoticed — a status added without updating this set,
+    or one removed, both fail loudly.
+
+    This pins the membership CONTRACT, not per-status behavioral coverage: the
+    behavioral + CLI tests above exercise the reachable statuses, while
+    ``report_failed`` is a reserved status with no current emitter (see the module
+    docstring), so it is pinned for membership only. (Was an ``issubset`` check,
+    which was a tautology — ``expected`` is a hand-copy of the set literal, so a
+    subset assertion could only fail on REMOVAL, never on a silently-added status.)
+    """
     expected = {
         "invalid_config",
         "solver_failed",
@@ -256,6 +267,6 @@ def test_all_documented_failure_statuses_have_test_coverage_here():
         "stress_constraint_failed",
         "report_failed",
     }
-    assert expected.issubset(FAILURE_STATUSES), (
-        f"FAILURE_STATUSES set drifted: expected superset of {expected}, got {FAILURE_STATUSES}"
+    assert expected == FAILURE_STATUSES, (
+        f"FAILURE_STATUSES membership drifted: expected {expected}, got {FAILURE_STATUSES}"
     )
