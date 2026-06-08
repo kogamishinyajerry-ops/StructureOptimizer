@@ -43,3 +43,22 @@ def test_finite_overrides_still_applied() -> None:
     assert cfg.optimization.penalty == 3.5
     assert cfg.optimization.filter_radius == 1.2
     assert math.isfinite(cfg.optimization.penalty)
+
+
+def test_max_iterations_below_benchmark_minimum_rejected() -> None:
+    """The editor exposes max_iterations but NOT min_iterations. Lowering max below
+    the benchmark's min must raise a message phrased in the editor's own terms,
+    not the raw validate_config ConfigError ('min_iterations must be in
+    [1, max_iterations]') that names a parameter the user never saw."""
+    cfg = _cfg()
+    too_low = cfg.optimization.min_iterations - 1
+    assert too_low >= 1  # stay above the positivity guard so we hit the min check
+    with pytest.raises(ValueError, match=r"is below this benchmark's minimum"):
+        apply_overrides(cfg, {"optimization": {"max_iterations": too_low}})
+
+
+def test_max_iterations_at_minimum_allowed() -> None:
+    """Boundary: max_iterations == min_iterations is valid (min > max is the error)."""
+    cfg = _cfg()
+    out = apply_overrides(cfg, {"optimization": {"max_iterations": cfg.optimization.min_iterations}})
+    assert out.optimization.max_iterations == cfg.optimization.min_iterations

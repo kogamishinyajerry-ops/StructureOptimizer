@@ -114,6 +114,15 @@ def _apply_optimization(config: BenchmarkConfig, override: dict[str, Any]) -> An
         max_iterations = int(override["max_iterations"])
         if max_iterations > MAX_ITERATIONS_MAX:
             raise ValueError(f"max_iterations {max_iterations} exceeds cap of {MAX_ITERATIONS_MAX}")
+        # The editor exposes max_iterations but NOT min_iterations. validate_config
+        # rejects max < min with "min_iterations must be in [1, max_iterations]",
+        # which names a parameter the user never saw. Catch it here with a message
+        # phrased in the editor's own terms (every recommended benchmark ships
+        # min_iterations=5, so lowering Max iterations to 1-4 is reachable).
+        if max_iterations < opt.min_iterations:
+            raise ValueError(
+                f"max_iterations {max_iterations} is below this benchmark's minimum of {opt.min_iterations}"
+            )
         new_values["max_iterations"] = max_iterations
     return replace(opt, **new_values)
 
