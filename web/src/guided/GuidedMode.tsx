@@ -162,6 +162,34 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
   const launchedRef = useRef(false);
   const exportRef = useRef(false);
   const focusStartRef = useRef(0);
+  const exitRef = useRef<HTMLButtonElement>(null);
+  // Keep onExit current without re-running the dialog effect on every streamed
+  // snap frame (the parent recreates onExit/onLaunch each render).
+  const onExitRef = useRef(onExit);
+  onExitRef.current = onExit;
+
+  // Full-screen role="dialog" conventions (WCAG 2.4.3 / 2.1.2): focus the exit
+  // control on open, close on Escape, and restore focus to the launcher on
+  // close — mirrors CompareView. Empty deps: runs once for the overlay lifetime.
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    exitRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onExitRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      const prevUsable =
+        previouslyFocused &&
+        previouslyFocused !== document.body &&
+        document.contains(previouslyFocused);
+      const target = prevUsable
+        ? previouslyFocused
+        : document.querySelector<HTMLElement>("[data-guided-entry]");
+      target?.focus?.();
+    };
+  }, []);
 
   // REAL per-cell state from the live engine trace (not scripted): the latest
   // stage event for each agent. This is the truth the rail renders.
@@ -257,7 +285,7 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
   };
 
   return (
-    <div className="guided" role="dialog" aria-label="讲解模式">
+    <div className="guided" role="dialog" aria-modal="true" aria-label="讲解模式">
       <header className="guided-top">
         <div className="guided-brand">
           <span className="guided-mark" aria-hidden="true" />
@@ -277,7 +305,7 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
             );
           })}
         </ol>
-        <button type="button" className="guided-exit" onClick={onExit}>
+        <button ref={exitRef} type="button" className="guided-exit" onClick={onExit}>
           退出讲解
         </button>
       </header>

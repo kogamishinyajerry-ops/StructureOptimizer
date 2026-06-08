@@ -159,6 +159,8 @@ export function App() {
             className="app-guided-btn"
             onClick={() => setGuided(true)}
             disabled={running}
+            // Stable focus-restore target for GuidedMode on close (WCAG 2.4.3).
+            data-guided-entry
           >
             ▶ 讲解模式
           </button>
