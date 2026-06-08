@@ -149,7 +149,7 @@ export function ProblemEditor(props: ProblemEditorProps) {
             <RangeField
               id="pe-filter"
               label="Filter radius"
-              min={0}
+              min={0.5}
               max={4}
               step={0.5}
               value={opt.filter_radius}
