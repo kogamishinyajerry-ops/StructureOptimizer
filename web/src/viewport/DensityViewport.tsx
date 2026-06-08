@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { decodeDensity } from "../api/types";
 import "./DensityViewport.css";
 
@@ -22,7 +22,7 @@ export function DensityViewport({ density, shape, running }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !density || !shape) return;
     const [nely, nelx] = shape;
@@ -67,6 +67,24 @@ export function DensityViewport({ density, shape, running }: Props) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(off, ox, oy, drawW, drawH);
   }, [density, shape]);
+
+  // Repaint on every new frame (density/shape change).
+  useEffect(() => {
+    draw();
+  }, [draw]);
+
+  // Re-fit the backing store + repaint on resize. The draw routine sizes the
+  // bitmap from the CSS box, but that box only changes on window/layout resize —
+  // not on a React render. Without this, the terminal 'done' state and every
+  // reopened/compared static run (no further frames) keep a stale, CSS-stretched
+  // image after a resize, breaking the component's crispness contract.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver(() => draw());
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [draw]);
 
   return (
     <div className={`viewport ${running ? "is-running" : ""}`}>
