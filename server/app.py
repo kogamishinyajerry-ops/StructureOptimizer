@@ -48,7 +48,7 @@ from server.schemas import (
     StartRunResponse,
 )
 
-app = FastAPI(title="StructureOptimizer Workbench API", version="0.1.0")
+app = FastAPI(title="StructureOptimizer Workbench API", version="0.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -73,13 +73,13 @@ _BLURBS = {
     "loaded_hook": "Loaded hook — non-rectangular design domain.",
     "simple_bracket": "2.5D bracket — frozen/void selectors and multiple load cases.",
     "multi_load_cantilever": "Cantilever under multiple load cases (weighted / worst-case).",
-    "stress_limited_bracket": "Bracket with a stress constraint (p-norm / KS + adjoint).",
+    "stress_limited_bracket": "Bracket — compliance with a p-norm/KS stress constraint enforced in verification.",
     "stress_multi_load_bracket": "Stress constraint plus multiple load cases.",
-    "heat_sink": "2D heat-conduction SIMP (Poisson).",
-    "vibrating_beam": "Modal / frequency-response benchmark.",
-    "nonlinear_cantilever": "Geometric-nonlinear cantilever (simplified TL).",
-    "bimaterial_beam": "Multi-material SIMP beam.",
-    "uncertain_load_bracket": "Reliability / Monte-Carlo robust SIMP.",
+    "heat_sink": "Heat-sink domain — compliance run (thermal SIMP is not on the live path).",
+    "vibrating_beam": "Beam — compliance run (modal / frequency-response is not on the live path).",
+    "nonlinear_cantilever": "Cantilever — linear compliance run (geometric-nonlinear TL is not on the live path).",
+    "bimaterial_beam": "Beam — single-material compliance run (multi-material is not on the live path).",
+    "uncertain_load_bracket": "Bracket — deterministic compliance run (robust / Monte-Carlo is not on the live path).",
 }
 
 
@@ -224,18 +224,24 @@ async def stream_run(websocket: WebSocket, run_id: str) -> None:
         return
 
     # A run's frame queue is a single destructive stream with one SENTINEL, so it
-    # supports exactly one consumer. Reject a second concurrent consumer (two tabs,
-    # a StrictMode double-mount, a reconnect race) or a late one connecting after
-    # the stream finished — either would otherwise steal frames or block forever on
-    # the missing SENTINEL, leaking a thread + socket. The check/set pair has no
-    # await between it, so it is atomic on the event loop.
-    if state.streaming or state.stream_done:
+    # supports exactly one consumer EVER. Reject a second concurrent consumer (two
+    # tabs, a StrictMode double-mount, a reconnect race), a late one connecting
+    # after the stream finished, OR a reconnect after a mid-stream disconnect —
+    # each would otherwise steal/lose frames or block forever on the missing
+    # SENTINEL. ``consumed`` latches on the first accepted consumer and never
+    # resets, so a reconnect is told to fetch the final result + trace via REST.
+    # The check/set pair has no await between it, so it is atomic on the event loop.
+    if state.consumed or state.stream_done:
         await websocket.send_json(
-            {"type": "error", "message": "Run stream is unavailable; fetch the result via GET /api/runs/{id}"}
+            {
+                "type": "error",
+                "message": "Run stream already consumed; fetch the result via GET /api/runs/{id} and /api/runs/{id}/trace",
+            }
         )
         await websocket.close()
         return
     state.streaming = True
+    state.consumed = True
 
     try:
         while True:
@@ -258,10 +264,14 @@ def get_run(run_id: str) -> RunResult:
     state = manager.get(run_id)
     if state is None:
         raise HTTPException(status_code=404, detail=f"Unknown run '{run_id}'")
-    if state.status == "running" or state.run_dir is None:
-        raise HTTPException(status_code=409, detail="Run not finished")
+    # Check error BEFORE not-finished: a real engine failure leaves run_dir=None
+    # (runner sets state.run_dir only after run_config returns), so an
+    # error-first ordering is required or every genuine failure would be masked
+    # as a misleading 409 "Run not finished" and the diagnostic discarded.
     if state.status == "error":
         raise HTTPException(status_code=500, detail=state.error or "Run failed")
+    if state.status == "running" or state.run_dir is None:
+        raise HTTPException(status_code=409, detail="Run not finished")
 
     # summary.json + density.npy are the essential artifacts; a partially-written
     # or pruned run dir that lacks them is "incomplete" -> a deliberate 409 rather
@@ -294,6 +304,35 @@ def get_run(run_id: str) -> RunResult:
     )
 
 
+@app.get("/api/runs/{run_id}/trace")
+def get_run_trace(run_id: str) -> list[dict[str, Any]]:
+    """Return the run's ``agents_trace.json`` ``agents`` list — the per-stage
+    agent rail, for history replay (rebuild the rail without re-running).
+
+    Serves the on-disk artifact verbatim (each entry's ``artifacts`` were
+    filesystem-measured by the orchestrator, so a stage cannot lie about what it
+    produced). Only runs still tracked by the manager (the most recent
+    ``max_runs``) are served; the run_id↔run_dir map is in-memory, so older runs
+    return 404.
+    """
+    state = manager.get(run_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail=f"Unknown run '{run_id}'")
+    # Error-first ordering (matches get_run): a failed run leaves run_dir=None, so
+    # checking error before the None-guard surfaces the engine failure as a 500
+    # with its message instead of masking it as a 409 "Run not finished".
+    if state.status == "error":
+        raise HTTPException(status_code=500, detail=state.error or "Run failed")
+    if state.run_dir is None:
+        raise HTTPException(status_code=409, detail="Run not finished")
+    try:
+        trace = read_json(state.run_dir / "agents_trace.json")
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail="Run trace is unavailable") from exc
+    agents: list[dict[str, Any]] = trace.get("agents", [])
+    return agents
+
+
 @app.get("/api/runs/{run_id}/export")
 def export_run(
     run_id: str,
@@ -314,6 +353,11 @@ def export_run(
         data, filename, mime = export_geometry(state.run_dir, fmt, threshold, extrusion_depth)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        # Corrupt/truncated artifacts (unparseable input.json, invalid persisted
+        # config, unreadable density.npy) degrade to 409 like get_run /
+        # get_run_trace — not a raw 500 with a stack trace.
+        raise HTTPException(status_code=409, detail="Run artifacts are incomplete") from exc
 
     return Response(
         content=data,

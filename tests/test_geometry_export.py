@@ -270,3 +270,29 @@ def test_cli_export_threshold_flag(tmp_path, monkeypatch):
 def test_cli_export_rejects_unknown_format(tmp_path):
     with pytest.raises(SystemExit):
         main(["export", "--run", str(tmp_path), "--format", "step"])
+
+
+def test_cli_export_missing_dir_returns_one(tmp_path, capsys):
+    """export on a nonexistent run dir exits 1 with a single-line ``error:``
+    stderr and no traceback — the caught-error contract that verify/report/study
+    already test, but export did not."""
+    exit_code = main(["export", "--run", str(tmp_path / "missing"), "--format", "svg"])
+    err = capsys.readouterr().err
+    assert exit_code == 1
+    assert err.startswith("error: ")
+    assert "Traceback" not in err
+    assert "\n" not in err.rstrip("\n")  # single line
+
+
+def test_cli_export_incomplete_dir_returns_one(tmp_path, capsys, monkeypatch):
+    """export on a real run dir whose density.npy was removed exits 1 with the
+    same clean single-line error (not a raw traceback)."""
+    monkeypatch.chdir(tmp_path)
+    run_dir = _generate_run(tmp_path)
+    (run_dir / "density.npy").unlink()
+    capsys.readouterr()  # discard _generate_run stdout
+    exit_code = main(["export", "--run", str(run_dir), "--format", "svg"])
+    err = capsys.readouterr().err
+    assert exit_code == 1
+    assert err.startswith("error: ")
+    assert "Traceback" not in err

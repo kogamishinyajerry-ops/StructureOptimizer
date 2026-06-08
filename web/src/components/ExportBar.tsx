@@ -36,7 +36,7 @@ export function ExportBar({ runId }: ExportBarProps) {
   return (
     <div className="export-bar">
       <div className="export-bar-header">
-        <span className="export-bar-label">Export geometry</span>
+        <h2 className="export-bar-label">Export geometry</h2>
       </div>
       <div className="export-bar-buttons">
         {FORMATS.map(({ format, label, hint }) => (

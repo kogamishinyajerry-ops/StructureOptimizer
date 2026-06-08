@@ -16,6 +16,7 @@ import { ProblemEditor } from "./components/ProblemEditor";
 import { RunHistory } from "./components/RunHistory";
 import { CompareView } from "./components/CompareView";
 import { DensityViewport } from "./viewport/DensityViewport";
+import { GuidedMode } from "./guided/GuidedMode";
 import "./App.css";
 
 export function App() {
@@ -29,6 +30,7 @@ export function App() {
   const [configReload, setConfigReload] = useState(0);
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [comparePair, setComparePair] = useState<[string, string] | null>(null);
+  const [guided, setGuided] = useState(false);
   const { snap, launch, loadRun } = useRun();
 
   useEffect(() => {
@@ -132,7 +134,7 @@ export function App() {
         <div className="app-brand">
           <span className="app-brand-mark" aria-hidden="true" />
           <div className="app-brand-text">
-            <span className="app-brand-name">StructureOptimizer</span>
+            <h1 className="app-brand-name">StructureOptimizer</h1>
             <span className="app-brand-sub">Topology Workbench</span>
           </div>
         </div>
@@ -152,6 +154,18 @@ export function App() {
             onPresetChange={setPreset}
             onRun={onRun}
           />
+          <button
+            type="button"
+            className="app-guided-btn"
+            onClick={() => setGuided(true)}
+            disabled={running}
+            // Stable focus-restore target for GuidedMode on close (WCAG 2.4.3).
+            data-guided-entry
+            // Chinese label under a lang="en" document (WCAG 3.1.2 Language of Parts).
+            lang="zh-CN"
+          >
+            ▶ 讲解模式
+          </button>
         </div>
       </header>
 
@@ -206,6 +220,10 @@ export function App() {
 
       {comparePair && (
         <CompareView pair={comparePair} onClose={() => setComparePair(null)} />
+      )}
+
+      {guided && (
+        <GuidedMode snap={snap} onLaunch={(id) => launch(id)} onExit={() => setGuided(false)} />
       )}
     </div>
   );

@@ -1043,6 +1043,17 @@ def _circumcircle(a: np.ndarray, b: np.ndarray, c: np.ndarray):
     return np.array([ux, uy]), (ax - ux) ** 2 + (ay - uy) ** 2
 
 
+def _sorted_edge(a: int, b: int) -> tuple[int, int]:
+    """Canonical ``(low, high)`` edge key as a fixed 2-tuple.
+
+    ``tuple(sorted((a, b)))`` is value-identical but types as ``tuple[int, ...]``
+    (variable length), which does not satisfy the ``tuple[int, int]`` dict-key /
+    set-member contracts used throughout the triangulation. This returns the same
+    ordering with the precise fixed-length type.
+    """
+    return (a, b) if a <= b else (b, a)
+
+
 def _bowyer_watson_delaunay(points: np.ndarray) -> list[tuple[int, int, int]]:
     """Bowyer-Watson Delaunay triangulation of 2-D ``points`` (numpy-only, O(n²);
     fine for the few-hundred-vertex ring boundaries here)."""
@@ -1068,8 +1079,8 @@ def _bowyer_watson_delaunay(points: np.ndarray) -> list[tuple[int, int, int]]:
         edge_count: dict[tuple[int, int], int] = {}
         for t in bad:
             for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
-                k = tuple(sorted(e))
-                edge_count[k] = edge_count.get(k, 0) + 1
+                ek = _sorted_edge(e[0], e[1])
+                edge_count[ek] = edge_count.get(ek, 0) + 1
         boundary = [e for e, ct in edge_count.items() if ct == 1]
         bad_set = set(bad)
         tris = [t for t in tris if t not in bad_set]
@@ -1113,8 +1124,8 @@ def constrained_delaunay_triangulate(outer_loop, holes=None) -> tuple[np.ndarray
     edge_count: dict[tuple[int, int], int] = {}
     for t in kept:
         for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
-            k = tuple(sorted(e))
-            edge_count[k] = edge_count.get(k, 0) + 1
+            ek = _sorted_edge(e[0], e[1])
+            edge_count[ek] = edge_count.get(ek, 0) + 1
     boundary = {e for e, ct in edge_count.items() if ct == 1}
     if boundary != constraints:
         raise SolverError("cdt_constraint_recovery_failed")
@@ -1122,7 +1133,7 @@ def constrained_delaunay_triangulate(outer_loop, holes=None) -> tuple[np.ndarray
 
 
 def _tri_sorted_edges(t: tuple[int, int, int]) -> list[tuple[int, int]]:
-    return [tuple(sorted((t[0], t[1]))), tuple(sorted((t[1], t[2]))), tuple(sorted((t[2], t[0])))]
+    return [_sorted_edge(t[0], t[1]), _sorted_edge(t[1], t[2]), _sorted_edge(t[2], t[0])]
 
 
 def _apex(t: tuple[int, int, int], c: int, d: int) -> int:
@@ -1158,13 +1169,13 @@ def recover_constraints_by_flips(
     strictly reduces the crossing count, so the constraint is recovered in finitely
     many flips. Returns the updated triangle list (constraint edges now present).
     """
-    tris = [tuple(t) for t in tris]
+    tris = [(t[0], t[1], t[2]) for t in tris]
     flips = 0
     for a, b in constraints:
         present = set()
         for t in tris:
             present.update(_tri_sorted_edges(t))
-        if tuple(sorted((a, b))) in present:
+        if _sorted_edge(a, b) in present:
             continue
         pa, pb = pts[a], pts[b]
         # crossing-edge work list
@@ -1179,7 +1190,7 @@ def recover_constraints_by_flips(
             if guard > max_flips:
                 break
             c, d = crossing.pop(0)
-            owners = [i for i, t in enumerate(tris) if tuple(sorted((c, d))) in _tri_sorted_edges(t)]
+            owners = [i for i, t in enumerate(tris) if _sorted_edge(c, d) in _tri_sorted_edges(t)]
             if len(owners) != 2:
                 continue  # boundary/constraint edge — cannot flip
             t1, t2 = tris[owners[0]], tris[owners[1]]
@@ -1194,8 +1205,8 @@ def recover_constraints_by_flips(
             new.append((x, y, d))
             tris = new
             flips += 1
-            new_edge = tuple(sorted((x, y)))
-            if new_edge != tuple(sorted((a, b))) and _segment_intersects(pa, pb, pts[x], pts[y]):
+            new_edge = _sorted_edge(x, y)
+            if new_edge != _sorted_edge(a, b) and _segment_intersects(pa, pb, pts[x], pts[y]):
                 crossing.append(new_edge)
     return tris
 
@@ -1231,7 +1242,7 @@ def refine_min_angle_flips(
     flipped, so the result is a **constrained** Delaunay triangulation (Delaunay
     subject to the boundary) and the boundary — hence watertightness — is preserved.
     """
-    tris = [tuple(t) for t in tris]
+    tris = [(t[0], t[1], t[2]) for t in tris]
     for _ in range(max_passes):
         flipped = False
         edge_map = _edge_to_tri_indices(tris)
@@ -1429,9 +1440,9 @@ def ruppert_refine(
             ptl.append(ptl[apex] + (r / length) * d)
         else:
             ptl.append(0.5 * (ptl[a] + ptl[b]))
-        cons.discard(tuple(sorted((a, b))))
-        cons.add(tuple(sorted((a, idx))))
-        cons.add(tuple(sorted((idx, b))))
+        cons.discard(_sorted_edge(a, b))
+        cons.add(_sorted_edge(a, idx))
+        cons.add(_sorted_edge(idx, b))
         n_steiner += 1
 
     for _ in range(max_steiner):

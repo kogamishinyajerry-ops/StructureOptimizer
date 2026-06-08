@@ -1,0 +1,575 @@
+/* Guided / 讲解 mode — full-screen presenter overlay over the real run. */
+
+.guided {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #0e1620 0%, var(--bg-base) 60%);
+  color: var(--text-primary);
+  animation: guided-in var(--dur) var(--ease-out);
+}
+
+@keyframes guided-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---- top bar: brand + stepper + exit ---- */
+.guided-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.guided-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.guided-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent), #0e7c6e);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.guided-brand-name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  display: block;
+}
+
+.guided-brand-sub {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  letter-spacing: 0.12em;
+}
+
+.guided-stepper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.guided-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  color: var(--text-tertiary);
+  transition: color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+
+.guided-step:not(:last-child)::after {
+  content: "";
+  width: 22px;
+  height: 1px;
+  background: var(--border);
+  margin-left: var(--space-2);
+}
+
+.guided-step-dot {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  flex-shrink: 0;
+}
+
+.guided-step-label {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.guided-step.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.guided-step.is-active .guided-step-dot {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.guided-step.is-done {
+  color: var(--text-secondary);
+}
+.guided-step.is-done .guided-step-dot {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+/* Engineering soft-fail (e.g. Verification ok=false) — amber, run still completes. */
+.guided-step.is-warn {
+  color: var(--warn);
+}
+.guided-step.is-warn .guided-step-dot {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+/* Structural abort (a gate raised) — red. */
+.guided-step.is-error {
+  color: var(--danger);
+}
+.guided-step.is-error .guided-step-dot {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.guided-exit {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.guided-exit:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+/* ---- stage: canvas + annotation card ---- */
+.guided-stage {
+  display: grid;
+  grid-template-columns: 1fr minmax(380px, 460px);
+  gap: var(--space-6);
+  padding: var(--space-6);
+  min-height: 0;
+}
+
+.guided-canvas {
+  position: relative;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guided-canvas canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.guided-chip {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  backdrop-filter: blur(4px);
+}
+.guided-chip--run {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.guided-chip--ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.guided-chip--warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.guided-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: guided-blink 1.3s var(--ease-in-out) infinite;
+}
+@keyframes guided-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.guided-metrics {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  gap: var(--space-5);
+  padding: var(--space-3) var(--space-5);
+  background: var(--glass, rgba(15, 21, 33, 0.62));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  backdrop-filter: blur(6px);
+}
+.guided-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.guided-metric-l {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  letter-spacing: 0.06em;
+}
+.guided-metric-v {
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+}
+
+/* ---- annotation card ---- */
+.guided-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  align-self: center;
+  animation: guided-card-in 0.45s var(--ease-out);
+}
+@keyframes guided-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.guided-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.guided-card-no {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  color: var(--accent);
+  line-height: 1;
+}
+.guided-card-name {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+}
+.guided-card-agent {
+  font-size: var(--text-sm);
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+.guided-card-caption {
+  font-size: var(--text-lg);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.guided-card-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+.guided-row {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+.guided-row dt {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+.guided-row dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ---- per-constraint verification chips (Phase 2: the independent critic) ---- */
+.guided-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+.guided-check {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.guided-check.is-ok {
+  color: var(--ok);
+  border-color: var(--ok);
+  background: var(--ok-soft);
+}
+.guided-check.is-warn {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+/* ---- footer disclaimer ---- */
+.guided-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+}
+.guided-foot-honest {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  opacity: 0.85;
+}
+
+/* ---- problem schematic (pre-solve) ---- */
+.guided-schematic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+}
+.gs-domain {
+  position: relative;
+  width: 60%;
+  max-width: 720px;
+  aspect-ratio: 2 / 1;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  background: rgba(45, 212, 191, 0.05);
+  box-shadow: 0 0 60px rgba(45, 212, 191, 0.12);
+}
+.gs-domain--mesh {
+  background-image:
+    linear-gradient(rgba(45, 212, 191, 0.28) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.28) 1px, transparent 1px);
+  background-size: 5% 10%;
+}
+.gs-fixed {
+  position: absolute;
+  left: -14px;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--text-secondary) 0,
+    var(--text-secondary) 2px,
+    transparent 2px,
+    transparent 6px
+  );
+}
+.gs-load {
+  position: absolute;
+  right: -2px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.gs-arrow {
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 16px solid var(--danger);
+  margin-top: 40px;
+  filter: drop-shadow(0 0 6px rgba(248, 81, 73, 0.5));
+}
+.gs-load::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 44px;
+  background: var(--danger);
+  border-radius: 2px;
+}
+.gs-budget {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+  background: var(--bg-base);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+}
+.gs-legend {
+  display: flex;
+  gap: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+.gs-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.gs-key {
+  width: 16px;
+  height: 10px;
+  display: inline-block;
+}
+.gs-key--fix {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--text-secondary) 0,
+    var(--text-secondary) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+}
+.gs-key--load {
+  background: var(--danger);
+}
+
+/* ---- end overlay ---- */
+.guided-end {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 11, 16, 0.74);
+  backdrop-filter: blur(4px);
+  animation: guided-in var(--dur) var(--ease-out);
+}
+.guided-end-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.guided-end-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+}
+.guided-end-title b {
+  color: var(--accent);
+}
+.guided-end-sub {
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+}
+.guided-end-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+.guided-end-replay {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-inverse);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-5);
+  cursor: pointer;
+}
+.guided-end-exit {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-5);
+  cursor: pointer;
+}
+
+/* ---- run-level error overlay (honest unhappy path) ---- */
+.guided-error {
+  position: absolute;
+  inset: 0;
+  z-index: 11; /* above .guided-end so an error never co-shows a success card */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 11, 16, 0.8);
+  backdrop-filter: blur(4px);
+  animation: guided-in var(--dur) var(--ease-out);
+}
+.guided-error-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 32rem;
+  padding: var(--space-5);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+}
+.guided-error-title {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  color: var(--danger);
+}
+.guided-error-sub {
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+}
+.guided-error-detail {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  word-break: break-word;
+  opacity: 0.85;
+}
+.guided-error-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guided, .guided-card, .guided-end, .guided-error { animation: none; }
+  .guided-chip-dot { animation: none; }
+}

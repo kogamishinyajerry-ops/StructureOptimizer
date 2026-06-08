@@ -12,8 +12,23 @@ NumPy/scipy/LAPACK build. On a single machine + same env the SHA-256
 matches; across Python versions or OS the underlying BLAS may produce
 last-bit differences. We accept ≤1e-9 relative error as
 "engineering-equivalent" and require the strict SHA-256 match only when
-``REQUIRE_BIT_EXACT_FINGERPRINT=1`` is set in the environment (used by
-the per-OS, per-Python CI variant where bit-exact is achievable).
+``REQUIRE_BIT_EXACT_FINGERPRINT=1`` is set in the environment. Byte-exact
+reproducibility is a WITHIN-PLATFORM property (same OS/BLAS as the host that
+generated the fingerprints), so the strict tier is run locally on the
+generating host — not in cross-platform CI, where the fingerprints' source
+OS (macOS Accelerate) and the runner's BLAS (Linux OpenBLAS) differ and only
+the tolerant ≤1e-9 tier is meaningful.
+
+Cross-platform CI regression coverage therefore rests on the tolerant tier:
+``input_hash`` (exact), ``densities_first_8`` and the global ``scalars`` — all
+at ≤1e-9. ``compliance`` is the strong signal here; ``mass`` is weak because
+SIMP's volume constraint pins it near-constant across solver versions. Known
+residual gap (deliberately accepted, not gated — Codex review of 696e372,
+[P1]): a solver change that converged to a *different* density distribution at
+the same volume fraction AND the same compliance/displacement/stress to 1e-9
+could pass CI. The full-array byte gate that would catch it is not BLAS-portable
+(see above), so it is enforced only locally on the generating host via
+``REQUIRE_BIT_EXACT_FINGERPRINT=1``; run it there after any solver change.
 
 To regenerate: ``python scripts/generate_fingerprints.py``.
 """

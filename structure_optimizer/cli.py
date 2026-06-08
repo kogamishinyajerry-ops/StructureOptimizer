@@ -136,7 +136,8 @@ def build_parser() -> argparse.ArgumentParser:
             "Re-run independent verification on a previously-generated run "
             "directory. Returns one of: passed, invalid_config, "
             "solver_failed, singular_matrix, volume_constraint_failed, "
-            "connectivity_failed, design_space_constraint_failed."
+            "connectivity_failed, design_space_constraint_failed, "
+            "stress_constraint_failed."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Example:\n  structure-optimizer verify --run runs/mbb_beam/20260516-180000-123456",

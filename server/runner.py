@@ -46,12 +46,17 @@ class RunState:
     error: str | None = None
     thread: threading.Thread | None = None
     # The frame queue is a single destructive stream with exactly one SENTINEL,
-    # so only one WebSocket may drain it. These flags let the stream endpoint
-    # reject a second concurrent consumer (which would steal frames and then
-    # block forever on the already-consumed SENTINEL) and a late consumer
-    # connecting after the stream is finished.
+    # so only one WebSocket may EVER drain it. These flags let the stream
+    # endpoint reject a second concurrent consumer (which would steal frames and
+    # then block forever on the already-consumed SENTINEL), a late consumer
+    # connecting after the stream finished, AND a reconnect after a mid-stream
+    # disconnect (which would otherwise drain the residual queue and show a
+    # partial view). ``consumed`` latches True on the first accepted consumer and
+    # never resets — a reconnect is told to fetch the final result + trace via
+    # the REST endpoints instead.
     streaming: bool = False
     stream_done: bool = False
+    consumed: bool = False
 
 
 class RunManager:
@@ -127,8 +132,15 @@ class RunManager:
                 }
             )
 
+        def on_stage(event: dict[str, Any]) -> None:
+            # Per-stage agent-rail frame on the SAME destructive queue as
+            # iteration/done/error (one SENTINEL, one consumer). ``event`` is the
+            # orchestrator's metadata-only payload {phase, agent, record}; the
+            # ``record`` for an end/error event IS the agents_trace.json entry.
+            state.frames.put({"type": "stage", **event})
+
         try:
-            run_dir = run_config(config, on_iteration=on_iteration)
+            run_dir = run_config(config, on_iteration=on_iteration, on_stage=on_stage)
             state.run_dir = run_dir
             summary = read_json(run_dir / "summary.json")
             verification = _safe_read_json(run_dir / "verification.json")

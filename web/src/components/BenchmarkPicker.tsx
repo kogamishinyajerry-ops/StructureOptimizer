@@ -49,7 +49,7 @@ export function BenchmarkPicker({ benchmarks, selectedId, disabled, onSelect }: 
         type="button"
         className="picker-trigger"
         disabled={disabled}
-        aria-haspopup="listbox"
+        aria-haspopup="true"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
@@ -69,7 +69,10 @@ export function BenchmarkPicker({ benchmarks, selectedId, disabled, onSelect }: 
       </button>
 
       {open && (
-        <div className="picker-menu" role="listbox">
+        <div className="picker-menu">
+          {/* No role="listbox": the WAI-ARIA listbox keyboard model (arrow-key
+              nav / activedescendant) isn't implemented. These are plain
+              Tab+Enter buttons; the selected one is marked with aria-current. */}
           {recommended.length > 0 && (
             <Group label="Recommended">
               {recommended.map((b) => (
@@ -111,8 +114,7 @@ function Option({
   return (
     <button
       type="button"
-      role="option"
-      aria-selected={active}
+      aria-current={active ? "true" : undefined}
       className={`picker-option ${active ? "is-active" : ""}`}
       onClick={() => onPick(b.id)}
     >

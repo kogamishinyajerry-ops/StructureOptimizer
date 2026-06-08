@@ -1,0 +1,43 @@
+{
+  "name": "wing_spar",
+  "dimension": "2d",
+  "units": "mm_N_MPa",
+  "thickness": 1.0,
+  "mesh": {
+    "type": "structured_quad",
+    "nelx": 100,
+    "nely": 30,
+    "width": 100.0,
+    "height": 30.0
+  },
+  "material": {
+    "young_modulus": 72000.0,
+    "poisson_ratio": 0.33,
+    "density": 2.7e-9
+  },
+  "boundary_conditions": [
+    {"selector": "left_edge",  "components": ["ux","uy"]},
+    {"selector": "right_edge", "components": ["ux","uy"]}
+  ],
+  "loads": [
+    {"selector": "top_mid",   "fx": 0.0, "fy": -3000.0},
+    {"selector": "top_edge",  "fx": 0.0, "fy": -1000.0}
+  ],
+  "optimization": {
+    "objective": "min_compliance",
+    "volume_fraction": 0.30,
+    "penalty": 3.0,
+    "filter_radius": 2.0,
+    "max_iterations": 80,
+    "min_iterations": 5,
+    "change_tolerance": 0.008,
+    "min_density": 0.001
+  },
+  "solver": { "backend": "cg" },
+  "presets": {
+    "smoke": {
+      "mesh": {"nelx": 50, "nely": 15, "width": 50.0, "height": 15.0},
+      "optimization": {"max_iterations": 8, "min_iterations": 8}
+    }
+  }
+}

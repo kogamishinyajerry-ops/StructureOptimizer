@@ -37,7 +37,13 @@ export function RunStatus({ snap }: RunStatusProps) {
           </div>
         ))}
       </div>
-      <div className="run-status-state">{renderState(snap)}</div>
+      {/* Live region: the outcome/error badge is the most important state change
+          (Optimizing → Verified / converged-by-budget / error). Without a
+          live-region it is silent to assistive tech, unlike the ticking metrics
+          above (line 32). role=status keeps it polite so it does not interrupt. */}
+      <div className="run-status-state" role="status" aria-live="polite">
+        {renderState(snap)}
+      </div>
     </div>
   );
 }
@@ -69,6 +75,13 @@ function renderState(snap: RunSnapshot) {
           : String(rawStatus);
       const passed = verifyStatus === "passed";
       const stopReason = done ? String(done.stop_reason) : "";
+      // Convergence honesty: change_tolerance is true convergence; max_iterations
+      // is converged-by-budget (hit the iteration cap) — surface it as a distinct
+      // amber chip, NOT muted text identical to a real convergence. Mirrors the
+      // engine's own definition (core/pipeline.py:279
+      // converged = stop_reason === "change_tolerance") and GuidedMode's cellTone.
+      const budgetTruncated = stopReason === "max_iterations";
+      const converged = stopReason === "change_tolerance";
       return (
         <div className="run-status-done">
           <span
@@ -80,7 +93,13 @@ function renderState(snap: RunSnapshot) {
           >
             {passed ? "Verified" : verifyStatus}
           </span>
-          {stopReason ? (
+          {budgetTruncated ? (
+            <span className="run-status-converge run-status-converge--warn">
+              converged by budget · hit iteration cap
+            </span>
+          ) : converged ? (
+            <span className="run-status-converge">converged</span>
+          ) : stopReason ? (
             <span className="run-status-reason">stopped: {stopReason}</span>
           ) : null}
         </div>

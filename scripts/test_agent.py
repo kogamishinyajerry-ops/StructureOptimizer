@@ -39,8 +39,12 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
-VENV_PYTEST = REPO_ROOT / ".venv" / "bin" / "pytest"
+# Prefer the repo's .venv (local dev) but fall back to the interpreter running
+# this script when it's absent — CI installs the package directly into the runner
+# environment (setup-python + pip install -e), with no .venv. Used as the leading
+# element(s) of a subprocess command, hence a list.
+_VENV_PYTEST = REPO_ROOT / ".venv" / "bin" / "pytest"
+PYTEST_CMD = [str(_VENV_PYTEST)] if _VENV_PYTEST.exists() else [sys.executable, "-m", "pytest"]
 
 
 @dataclass
@@ -119,7 +123,7 @@ def _pytest_collect_count(*targets: str) -> int:
     ``targets`` is an optional list of pytest paths/nodeids; with no args,
     counts the entire suite.
     """
-    _rc, out, err = _run([str(VENV_PYTEST), "--collect-only", "-q", *targets])
+    _rc, out, err = _run([*PYTEST_CMD, "--collect-only", "-q", *targets])
     match = re.search(r"(\d+)\s+tests?\s+collected", out + err)
     return int(match.group(1)) if match else 0
 
@@ -128,7 +132,7 @@ def _pytest_coverage(module: str) -> float:
     """Run pytest --cov=<module> and return TOTAL percentage."""
     _rc, out, _err = _run(
         [
-            str(VENV_PYTEST),
+            *PYTEST_CMD,
             f"--cov={module}",
             "--cov-report=term",
             "-q",
@@ -1274,7 +1278,7 @@ def check_pytest_green() -> dict:
     Skips are allowed (the slow perf tests are ``--run-slow``-gated). The
     authoritative signal is the return code; counts are parsed for reporting.
     """
-    rc, out, err = _run([str(VENV_PYTEST), "-q", "--no-header"])
+    rc, out, err = _run([*PYTEST_CMD, "-q", "--no-header"])
     text = out + err
 
     def _count(pattern: str) -> int:

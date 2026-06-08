@@ -76,7 +76,41 @@ export interface ErrorFrame {
   message: string;
 }
 
-export type StreamFrame = IterationFrame | DoneFrame | ErrorFrame;
+/** A pipeline stage's gate verdict (mirrors server StageGate / pipeline.GateVerdict). */
+export interface StageGate {
+  name: string;
+  ok: boolean;
+  verdict_status: string;
+  detail: string;
+}
+
+/** One agents_trace.json entry — the orchestrator-measured stage result. */
+export interface StageRecord {
+  name: string;
+  role: string;
+  tool: string;
+  declared_tools: string[];
+  domain_agent: boolean;
+  status: string;
+  gate: StageGate;
+  artifacts: string[];
+  detail: Record<string, unknown>;
+  wall_ms: number;
+}
+
+/**
+ * Per-stage agent-rail event. `record` is present for `end`/`error` (the trace
+ * record) and null for `start` (active marker only). Metadata only — the live
+ * density never rides this frame (it flows via IterationFrame).
+ */
+export interface StageFrame {
+  type: "stage";
+  phase: "start" | "end" | "error";
+  agent: string;
+  record: StageRecord | null;
+}
+
+export type StreamFrame = IterationFrame | DoneFrame | ErrorFrame | StageFrame;
 
 // ---- M3: problem-definition editor (mirrors server/overrides.py contract) ----
 

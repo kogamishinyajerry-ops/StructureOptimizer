@@ -47,19 +47,21 @@ export function RunHistory({ runs, activeRunId, disabled, onReopen, onCompare }:
 
   return (
     <div className="run-history">
-      <button
-        type="button"
-        className="run-history-header run-history-toggle"
-        aria-expanded={open}
-        aria-controls="run-history-body"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="run-history-title">History</span>
-        <span className="run-history-count mono" aria-label={`${runs.length} runs`}>
-          {runs.length}
-        </span>
-        <ChevronIcon open={open} />
-      </button>
+      <h2 className="run-history-heading">
+        <button
+          type="button"
+          className="run-history-header run-history-toggle"
+          aria-expanded={open}
+          aria-controls="run-history-body"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="run-history-title">History</span>
+          <span className="run-history-count mono" aria-label={`${runs.length} runs`}>
+            {runs.length}
+          </span>
+          <ChevronIcon open={open} />
+        </button>
+      </h2>
 
       {open && (
         <div className="run-history-body" id="run-history-body">
@@ -96,6 +98,10 @@ export function RunHistory({ runs, activeRunId, disabled, onReopen, onCompare }:
                       className="run-history-action"
                       disabled={disabled}
                       onClick={() => setCompareMode(true)}
+                      // Stable focus-restore target for CompareView on close: the
+                      // compare flow unmounts the per-row trigger, so the modal
+                      // returns focus here (WCAG 2.4.3).
+                      data-compare-entry
                     >
                       Compare runs
                     </button>

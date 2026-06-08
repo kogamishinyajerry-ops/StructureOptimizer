@@ -28,6 +28,7 @@ M3, so ``overrides["loads"]`` is ignored when ``config.load_cases`` is non-empty
 
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 from typing import Any
 
@@ -87,19 +88,41 @@ def apply_overrides(config: BenchmarkConfig, overrides: dict[str, Any] | None) -
     return config
 
 
+def _finite(name: str, value: Any) -> float:
+    """Coerce a user-supplied float and reject NaN/Infinity at the single
+    enforcement point. validate_config's range guards (e.g. ``penalty <= 0``,
+    ``filter_radius <= 0``, ``fx == 0 and fy == 0``) silently PASS non-finite
+    values — ``nan <= 0`` and ``inf <= 0`` are both False and ``nan != 0`` is
+    True — so without this a NaN/Inf override would reach the engine and poison
+    the run (silent garbage or a confusing unrelated 400)."""
+    x = float(value)
+    if not math.isfinite(x):
+        raise ValueError(f"{name} must be a finite number")
+    return x
+
+
 def _apply_optimization(config: BenchmarkConfig, override: dict[str, Any]) -> Any:
     opt = config.optimization
     new_values: dict[str, Any] = {}
     if "volume_fraction" in override:
-        new_values["volume_fraction"] = float(override["volume_fraction"])
+        new_values["volume_fraction"] = _finite("volume_fraction", override["volume_fraction"])
     if "penalty" in override:
-        new_values["penalty"] = float(override["penalty"])
+        new_values["penalty"] = _finite("penalty", override["penalty"])
     if "filter_radius" in override:
-        new_values["filter_radius"] = float(override["filter_radius"])
+        new_values["filter_radius"] = _finite("filter_radius", override["filter_radius"])
     if "max_iterations" in override:
         max_iterations = int(override["max_iterations"])
         if max_iterations > MAX_ITERATIONS_MAX:
             raise ValueError(f"max_iterations {max_iterations} exceeds cap of {MAX_ITERATIONS_MAX}")
+        # The editor exposes max_iterations but NOT min_iterations. validate_config
+        # rejects max < min with "min_iterations must be in [1, max_iterations]",
+        # which names a parameter the user never saw. Catch it here with a message
+        # phrased in the editor's own terms (every recommended benchmark ships
+        # min_iterations=5, so lowering Max iterations to 1-4 is reachable).
+        if max_iterations < opt.min_iterations:
+            raise ValueError(
+                f"max_iterations {max_iterations} is below this benchmark's minimum of {opt.min_iterations}"
+            )
         new_values["max_iterations"] = max_iterations
     return replace(opt, **new_values)
 
@@ -126,8 +149,8 @@ def _apply_loads(override: list[Any]) -> list[dict[str, Any]]:
         loads.append(
             {
                 "selector": selector,
-                "fx": float(entry.get("fx", 0.0)),
-                "fy": float(entry.get("fy", 0.0)),
+                "fx": _finite("fx", entry.get("fx", 0.0)),
+                "fy": _finite("fy", entry.get("fy", 0.0)),
             }
         )
     return loads
