@@ -73,10 +73,10 @@ const STAGES: Stage[] = [
     name: "独立验证",
     agent: "独立验证 Agent",
     tool: "独立模块从输入重算有限元",
-    criteria: "体积 · 连通性 · 冻结区 · 挖空区 · 应力 · 可制造性",
-    artifact: "逐项 pass / fail + Verified 徽章",
-    gate: "全部通过 → Verified；任一不过 → 标出失败项",
-    caption: "不信优化器自报：另一套代码重算一遍、逐项打分，过了才打 Verified。",
+    criteria: "体积 · 连通性 · 冻结区 · 挖空区 · 应力（若启用约束）",
+    artifact: "逐项 pass / fail + Verified 徽章（可制造性同时计算，仅作建议不否决）",
+    gate: "门控项全部通过 → Verified；任一不过 → 标出失败项",
+    caption: "不信优化器自报：独立模块从存档输入重新装配、求解、逐项核对约束，过了才打 Verified。",
   },
   {
     no: "06",
@@ -250,11 +250,17 @@ export function GuidedMode({ snap, onLaunch, onExit }: GuidedModeProps) {
     if (cellStates[5].phase !== "end") return;
     exportRef.current = true;
     fetch(`/api/runs/${snap.runId}/export?format=svg`)
-      .then((res) => res.blob())
+      .then((res) => {
+        // Guard res.ok: an error Response (409 incomplete / 500 / network) still
+        // carries a body, which must NOT be sized + narrated as a successful,
+        // provenance-stamped artifact. Honesty over a tidy-looking caption.
+        if (!res.ok) throw new Error(`export failed: ${res.status}`);
+        return res.blob();
+      })
       .then((blob) =>
         setExportInfo(`geometry.svg · ${(blob.size / 1024).toFixed(1)} KB · 内嵌 input_hash + 验证状态`),
       )
-      .catch(() => setExportInfo("geometry.svg · 内嵌 input_hash + 验证状态"));
+      .catch(() => setExportInfo("geometry.svg · 导出未完成"));
   }, [cellStates, snap.runId]);
 
   // Finish once the focus has reached the export cell and it has really ended.
