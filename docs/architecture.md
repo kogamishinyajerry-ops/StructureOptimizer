@@ -44,7 +44,7 @@ BenchmarkConfig (JSON)
         │   批量执行不同参数候选，并生成 candidates.csv + study.html
 ```
 
-`workflow.run_config` 是这条流水线的入口；`cli.py` 把它包装成 `run` / `verify` / `report` / `demo` / `study` 五个子命令。
+`workflow.run_config` 是这条流水线的入口；`cli.py` 把它包装成 `run` / `verify` / `report` / `demo` / `export` / `study` 六个子命令。
 
 ---
 
