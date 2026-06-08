@@ -69,14 +69,16 @@ jobs:
           name: coverage-report
           path: coverage.xml
 
-      - name: Cross-platform bit-exact fingerprint check (Linux + Python 3.12 with-extras only)
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' && matrix.install-variant == 'with-extras'
-        env:
-          REQUIRE_BIT_EXACT_FINGERPRINT: "1"
-        run: pytest tests/test_fingerprints.py -q
-
-      - name: Cross-platform tolerant fingerprint check (other matrix cells)
-        if: matrix.os != 'ubuntu-latest' || matrix.python-version != '3.12' || matrix.install-variant != 'with-extras'
+      # Fingerprint reproducibility is gated cross-platform at the TOLERANT tier:
+      # input_hash (platform-independent) must be exact and densities must match
+      # to 1e-9 — this runs on every matrix cell and is the CI regression gate.
+      # Byte-exact reproducibility (REQUIRE_BIT_EXACT_FINGERPRINT=1) is a
+      # WITHIN-PLATFORM property only: iterative CG output is not bit-identical
+      # across BLAS backends (macOS Accelerate vs Linux OpenBLAS) and the stored
+      # fingerprints are generated on the dev host, so the strict SHA tier is
+      # verified locally on the generating host, NOT in cross-platform CI.
+      # (The newer benchmarks pin input_hash, not solve-SHA, for the same reason.)
+      - name: Fingerprint reproducibility (tolerant, cross-platform)
         run: pytest tests/test_fingerprints.py -q
 
       - name: v4 test agent — rubric scorecard (no-regression gate)
